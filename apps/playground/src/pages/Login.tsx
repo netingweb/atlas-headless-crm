@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
+import { Info } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -102,6 +103,36 @@ export default function Login() {
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
+
+          {/* Test Users Info */}
+          <div className="mt-6 pt-6 border-t">
+            <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-blue-900 mb-2">Test Users</h4>
+                <div className="space-y-1.5 text-xs text-blue-800">
+                  <div>
+                    <strong>Admin:</strong> admin@demo.local / changeme
+                    <span className="ml-2 px-1.5 py-0.5 bg-blue-200 rounded text-blue-900">
+                      Full Access
+                    </span>
+                  </div>
+                  <div>
+                    <strong>Manager:</strong> manager@demo.local / password123
+                    <span className="ml-2 px-1.5 py-0.5 bg-green-200 rounded text-green-900">
+                      Read + Write
+                    </span>
+                  </div>
+                  <div>
+                    <strong>Sales Rep:</strong> rep@demo.local / password123
+                    <span className="ml-2 px-1.5 py-0.5 bg-gray-200 rounded text-gray-900">
+                      Read Only
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

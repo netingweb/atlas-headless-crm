@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { PermissionsConfig } from '@crm-atlas/types';
 
 export interface UnitConfig {
   unit_id: string;
@@ -73,6 +74,16 @@ export const configApi = {
     } catch (error) {
       console.error(`Failed to get entity definition for ${entityName}:`, error);
       throw error;
+    }
+  },
+
+  getPermissions: async (tenant: string): Promise<PermissionsConfig | null> => {
+    try {
+      const response = await apiClient.get<PermissionsConfig>(`/${tenant}/config/permissions`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to get permissions for tenant ${tenant}:`, error);
+      return null;
     }
   },
 };

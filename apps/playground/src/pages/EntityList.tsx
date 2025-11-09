@@ -2,13 +2,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
 import { entitiesApi } from '@/lib/api/entities';
+import { configApi } from '@/lib/api/config';
+import { isApiAvailable } from '@/lib/api/permissions';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
 export default function EntityList() {
   const { entityType } = useParams<{ entityType: string }>();
   const navigate = useNavigate();
-  const { tenantId, unitId } = useAuthStore();
+  const { tenantId, unitId, user } = useAuthStore();
 
   const { data: entities, isLoading } = useQuery({
     queryKey: ['entities', tenantId, unitId, entityType],
@@ -21,6 +23,14 @@ export default function EntityList() {
     enabled: !!tenantId && !!unitId && !!entityType,
   });
 
+  const { data: permissions } = useQuery({
+    queryKey: ['permissions', tenantId],
+    queryFn: () => configApi.getPermissions(tenantId || ''),
+    enabled: !!tenantId,
+  });
+
+  const canCreate = isApiAvailable('entities.create', user || null, permissions || null);
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -32,10 +42,12 @@ export default function EntityList() {
           <h1 className="text-3xl font-bold capitalize">{entityType}</h1>
           <p className="text-gray-500">Manage your {entityType} entities</p>
         </div>
-        <Button onClick={() => navigate(`/entities/${entityType}/new`)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create {entityType}
-        </Button>
+        {canCreate && (
+          <Button onClick={() => navigate(`/entities/${entityType}/new`)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create {entityType}
+          </Button>
+        )}
       </div>
 
       <div className="border rounded-lg">

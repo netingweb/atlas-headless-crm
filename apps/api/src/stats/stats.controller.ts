@@ -6,10 +6,11 @@ import {
   ApiBearerAuth,
   ApiQuery,
   ApiOkResponse,
+  ApiResponse,
 } from '@nestjs/swagger';
 import { StatsService } from './stats.service';
 import type { TenantContext } from '@crm-atlas/core';
-import { JwtAuthGuard } from '@crm-atlas/auth';
+import { JwtAuthGuard, ScopesGuard, AuthScopes } from '@crm-atlas/auth';
 
 @ApiTags('stats')
 @Controller(':tenant/:unit/stats')
@@ -17,7 +18,8 @@ export class StatsController {
   constructor(private readonly statsService: StatsService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get dashboard statistics',
@@ -29,6 +31,7 @@ export class StatsController {
   @ApiOkResponse({
     description: 'Dashboard statistics',
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async getStats(
     @Param('tenant') tenant: string,
     @Param('unit') unit: string
@@ -38,7 +41,8 @@ export class StatsController {
   }
 
   @Get('notes/recent')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get recent notes',
@@ -55,6 +59,7 @@ export class StatsController {
   @ApiOkResponse({
     description: 'List of recent notes',
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async getRecentNotes(
     @Param('tenant') tenant: string,
     @Param('unit') unit: string,

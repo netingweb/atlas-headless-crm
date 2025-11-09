@@ -6,9 +6,10 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiOkResponse,
+  ApiResponse,
 } from '@nestjs/swagger';
 import { MCPService } from './mcp.service';
-import { JwtAuthGuard } from '@crm-atlas/auth';
+import { JwtAuthGuard, ScopesGuard, AuthScopes } from '@crm-atlas/auth';
 
 // CallToolDto without validation decorators - validation handled by SmartValidationPipe
 export class CallToolDto {
@@ -22,7 +23,8 @@ export class MCPController {
   constructor(private readonly mcpService: MCPService) {}
 
   @Get('tools')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'List available MCP tools',
@@ -33,6 +35,7 @@ export class MCPController {
   @ApiOkResponse({
     description: 'List of available MCP tools',
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async listTools(
     @Param('tenant') tenant: string,
     @Param('unit') unit: string
@@ -41,11 +44,13 @@ export class MCPController {
   }
 
   @Post('call-tool')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:write', 'crm:read', 'crm:delete')
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Call an MCP tool',
-    description: 'Execute an MCP tool with the provided arguments.',
+    description:
+      'Execute an MCP tool with the provided arguments. Requires appropriate permissions based on tool operation.',
   })
   @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
   @ApiParam({ name: 'unit', description: 'Unit ID', example: 'sales' })
@@ -53,6 +58,7 @@ export class MCPController {
   @ApiOkResponse({
     description: 'Tool execution result',
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async callTool(
     @Param('tenant') tenant: string,
     @Param('unit') unit: string,

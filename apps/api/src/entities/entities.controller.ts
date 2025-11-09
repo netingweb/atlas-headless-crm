@@ -9,6 +9,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -27,6 +28,7 @@ import type { TenantContext } from '@crm-atlas/core';
 import { CreateEntityDto, UpdateEntityDto, EntityResponseDto } from '../common/dto/entity.dto';
 import { RelationsService } from './relations.service';
 import { DynamicEntityValidationPipe } from '../common/pipes/dynamic-entity.pipe';
+import { JwtAuthGuard, ScopesGuard, AuthScopes } from '@crm-atlas/auth';
 
 @ApiTags('entities')
 @Controller(':tenant/:unit/:entity')
@@ -37,6 +39,8 @@ export class EntitiesController {
   ) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:write')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Create a new entity document',
@@ -57,6 +61,7 @@ export class EntitiesController {
     type: EntityResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Validation failed' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Entity type not found' })
   @ApiBearerAuth()
   async create(
@@ -70,6 +75,8 @@ export class EntitiesController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiOperation({
     summary: 'Get entity document by ID',
     description:
@@ -89,6 +96,7 @@ export class EntitiesController {
     description: 'Entity document found',
     type: EntityResponseDto,
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Entity not found' })
   @ApiBearerAuth()
   async findById(
@@ -109,6 +117,8 @@ export class EntitiesController {
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:write')
   @ApiOperation({
     summary: 'Update entity document',
     description: 'Update an existing entity document. Only provided fields will be updated.',
@@ -123,6 +133,7 @@ export class EntitiesController {
     type: EntityResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Validation failed' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Entity not found' })
   @ApiBearerAuth()
   async update(
@@ -137,12 +148,15 @@ export class EntitiesController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete entity document' })
   @ApiParam({ name: 'tenant', description: 'Tenant ID' })
   @ApiParam({ name: 'unit', description: 'Unit ID' })
   @ApiParam({ name: 'entity', description: 'Entity name' })
   @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiBearerAuth()
   async delete(
     @Param('tenant') tenant: string,
@@ -155,6 +169,8 @@ export class EntitiesController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiOperation({
     summary: 'List all entity documents',
     description: 'Retrieve all documents for the specified entity type.',
@@ -166,6 +182,7 @@ export class EntitiesController {
     description: 'List of entity documents',
     type: [EntityResponseDto],
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiBearerAuth()
   async findAll(
     @Param('tenant') tenant: string,
@@ -177,6 +194,8 @@ export class EntitiesController {
   }
 
   @Get(':id/:relatedEntity')
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiOperation({
     summary: 'Get related entities',
     description:
@@ -196,6 +215,7 @@ export class EntitiesController {
     description: 'List of related entities',
     type: [EntityResponseDto],
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Entity or related entity not found' })
   @ApiBearerAuth()
   async getRelated(

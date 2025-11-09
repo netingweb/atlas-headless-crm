@@ -1,6 +1,13 @@
 import { Controller, Get, Post, UseGuards, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiOkResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@crm-atlas/auth';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiOkResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiResponse,
+} from '@nestjs/swagger';
+import { JwtAuthGuard, ScopesGuard, AuthScopes } from '@crm-atlas/auth';
 import { TenantContext } from '@crm-atlas/core';
 import { IndexingService } from './indexing.service';
 
@@ -10,7 +17,8 @@ export class IndexingController {
   constructor(private readonly indexingService: IndexingService) {}
 
   @Get('health')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Check Typesense health',
@@ -21,12 +29,14 @@ export class IndexingController {
   @ApiOkResponse({
     description: 'Typesense health status',
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async checkHealth(): Promise<{ ok: boolean; version?: string; error?: string }> {
     return this.indexingService.checkHealth();
   }
 
   @Get('metrics')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get Typesense metrics',
@@ -37,6 +47,7 @@ export class IndexingController {
   @ApiOkResponse({
     description: 'Typesense metrics',
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async getMetrics(
     @Param('tenant') tenant: string,
     @Param('unit') unit: string
@@ -55,7 +66,8 @@ export class IndexingController {
   }
 
   @Post('backfill')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:write')
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Trigger backfill indexing',
@@ -66,6 +78,7 @@ export class IndexingController {
   @ApiOkResponse({
     description: 'Backfill operation result',
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async triggerBackfill(): Promise<{ success: boolean; message: string }> {
     return this.indexingService.triggerBackfill();
   }

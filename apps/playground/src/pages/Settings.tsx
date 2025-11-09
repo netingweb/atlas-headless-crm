@@ -1,8 +1,8 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import IndexingTab from '@/components/settings/IndexingTab';
 import AIEngineTab from '@/components/settings/AIEngineTab';
 import MCPToolsTab from '@/components/settings/MCPToolsTab';
+import APIMethodsTab from '@/components/settings/APIMethodsTab';
 
 export default function Settings() {
   return (
@@ -25,17 +25,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="api">
-          <Card>
-            <CardHeader>
-              <CardTitle>API Methods Configuration</CardTitle>
-              <CardDescription>Enable or disable API methods</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-500">
-                API methods configuration will be implemented here
-              </p>
-            </CardContent>
-          </Card>
+          <APIMethodsTab />
         </TabsContent>
 
         <TabsContent value="ai">

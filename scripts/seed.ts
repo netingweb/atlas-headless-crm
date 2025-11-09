@@ -117,9 +117,49 @@ async function seed(): Promise<void> {
       upsert: true,
     });
 
+  // Create sales manager user
+  const managerPasswordHash = await hashPassword('password123');
+  const managerUser = {
+    tenant_id: defaultTenant,
+    unit_id: 'sales',
+    email: 'manager@demo.local',
+    passwordHash: managerPasswordHash,
+    roles: ['sales_manager'],
+    scopes: ['crm:read', 'crm:write'],
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  await db
+    .collection('users')
+    .replaceOne({ tenant_id: defaultTenant, email: 'manager@demo.local' }, managerUser, {
+      upsert: true,
+    });
+
+  // Create sales rep user
+  const repPasswordHash = await hashPassword('password123');
+  const repUser = {
+    tenant_id: defaultTenant,
+    unit_id: 'sales',
+    email: 'rep@demo.local',
+    passwordHash: repPasswordHash,
+    roles: ['sales_rep'],
+    scopes: ['crm:read'],
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  await db
+    .collection('users')
+    .replaceOne({ tenant_id: defaultTenant, email: 'rep@demo.local' }, repUser, {
+      upsert: true,
+    });
+
   console.log(`✅ Seeded database with tenant: ${defaultTenant}`);
-  console.log(`   Admin user: ${defaultAdminEmail}`);
-  console.log(`   Password: ${defaultAdminPassword}`);
+  console.log(`\n📋 Users created:`);
+  console.log(`   👤 Admin: ${defaultAdminEmail} / ${defaultAdminPassword} (role: admin)`);
+  console.log(`   👤 Manager: manager@demo.local / password123 (role: sales_manager)`);
+  console.log(`   👤 Sales Rep: rep@demo.local / password123 (role: sales_rep)`);
 
   await client.close();
 }

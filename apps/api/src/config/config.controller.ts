@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiParam, ApiOkResponse, ApiBearerAuth } from '@
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { getDb } from '@crm-atlas/db';
 import { JwtAuthGuard } from '@crm-atlas/auth';
-import type { UnitConfig, EntityDefinition } from '@crm-atlas/types';
+import type { UnitConfig, EntityDefinition, PermissionsConfig } from '@crm-atlas/types';
 
 @ApiTags('config')
 @Controller()
@@ -118,6 +118,19 @@ export class ConfigController {
   ): Promise<EntityDefinition | null> {
     const entities = await this.getEntities(tenant);
     return entities.find((e) => e.name === entityName) || null;
+  }
+
+  @Get(':tenant/config/permissions')
+  @ApiOperation({
+    summary: 'Get permissions configuration',
+    description: 'Returns the permissions configuration (roles and scopes) for a tenant.',
+  })
+  @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
+  @ApiOkResponse({
+    description: 'Permissions configuration',
+  })
+  async getPermissions(@Param('tenant') tenant: string): Promise<PermissionsConfig | null> {
+    return this.configLoader.getPermissions(tenant);
   }
 
   @Get(':tenant/config/clear-cache')

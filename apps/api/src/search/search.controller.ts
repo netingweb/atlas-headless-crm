@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -7,6 +7,7 @@ import {
   ApiQuery,
   ApiBody,
   ApiOkResponse,
+  ApiResponse,
 } from '@nestjs/swagger';
 import { SearchService } from './search.service';
 import type { TenantContext } from '@crm-atlas/core';
@@ -16,6 +17,7 @@ import {
   SemanticSearchResponseDto,
 } from '../common/dto/search.dto';
 import { HybridSearchDto, HybridSearchResponseDto } from './hybrid-search.dto';
+import { JwtAuthGuard, ScopesGuard, AuthScopes } from '@crm-atlas/auth';
 
 import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
@@ -48,6 +50,8 @@ export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
   @Post('text')
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiOperation({
     summary: 'Full-text search',
     description: 'Perform a full-text search across entity documents using Typesense.',
@@ -59,6 +63,7 @@ export class SearchController {
     description: 'Search results',
     type: TextSearchResponseDto,
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiBearerAuth()
   async textSearch(
     @Param('tenant') tenant: string,
@@ -70,6 +75,8 @@ export class SearchController {
   }
 
   @Post('semantic')
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiOperation({
     summary: 'Semantic search using embeddings',
     description:
@@ -89,6 +96,7 @@ export class SearchController {
     description: 'Semantic search results with similarity scores',
     type: SemanticSearchResponseDto,
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiBearerAuth()
   async semanticSearch(
     @Param('tenant') tenant: string,
@@ -108,6 +116,8 @@ export class SearchController {
   }
 
   @Post('hybrid')
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiOperation({
     summary: 'Hybrid search (full-text + semantic)',
     description:
@@ -120,6 +130,7 @@ export class SearchController {
     description: 'Hybrid search results with combined scores',
     type: HybridSearchResponseDto,
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiBearerAuth()
   async hybridSearch(
     @Param('tenant') tenant: string,
@@ -139,6 +150,8 @@ export class SearchController {
   }
 
   @Post('global')
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
   @ApiOperation({
     summary: 'Global search across all entities',
     description: 'Search across all entity types simultaneously using full-text search.',
@@ -149,6 +162,7 @@ export class SearchController {
   @ApiOkResponse({
     description: 'Global search results grouped by entity type',
   })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiBearerAuth()
   async globalSearch(
     @Param('tenant') tenant: string,

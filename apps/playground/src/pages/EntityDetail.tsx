@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { entitiesApi, type Entity } from '@/lib/api/entities';
 import { configApi, type EntityDefinition } from '@/lib/api/config';
 import { apiClient } from '@/lib/api/client';
+import { isApiAvailable } from '@/lib/api/permissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,10 +39,21 @@ const READONLY_FIELDS = [
 export default function EntityDetail() {
   const { entityType, id } = useParams<{ entityType: string; id: string }>();
   const navigate = useNavigate();
-  const { tenantId, unitId } = useAuthStore();
+  const { tenantId, unitId, user } = useAuthStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isNew = id === 'new';
+
+  // Get permissions
+  const { data: permissions } = useQuery({
+    queryKey: ['permissions', tenantId],
+    queryFn: () => configApi.getPermissions(tenantId || ''),
+    enabled: !!tenantId,
+  });
+
+  // Check permissions
+  const canCreate = isApiAvailable('entities.create', user || null, permissions || null);
+  const canUpdate = isApiAvailable('entities.update', user || null, permissions || null);
 
   // Get entity definition
   const {
@@ -540,17 +552,25 @@ export default function EntityDetail() {
                 </div>
 
                 <div className="flex gap-4">
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {createMutation.isPending || updateMutation.isPending
-                      ? 'Saving...'
-                      : isNew
-                        ? 'Create'
-                        : 'Update'}
-                  </Button>
+                  {(isNew ? canCreate : canUpdate) ? (
+                    <Button
+                      type="submit"
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {createMutation.isPending || updateMutation.isPending
+                        ? 'Saving...'
+                        : isNew
+                          ? 'Create'
+                          : 'Update'}
+                    </Button>
+                  ) : (
+                    <div className="text-sm text-gray-500 flex items-center">
+                      {isNew
+                        ? 'You do not have permission to create entities'
+                        : 'You do not have permission to update entities'}
+                    </div>
+                  )}
                   <Button type="button" variant="outline" onClick={() => navigate(-1)}>
                     Cancel
                   </Button>
