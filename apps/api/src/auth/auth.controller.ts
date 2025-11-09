@@ -13,6 +13,7 @@ import { AuthService } from './auth.service';
 import { LoginDto, LoginResponseDto } from '../common/dto/login.dto';
 import { JwtAuthGuard } from '@crm-atlas/auth';
 import type { AuthenticatedRequest } from '@crm-atlas/auth';
+import type { User } from '@crm-atlas/types';
 
 @ApiTags('auth')
 @Controller('auth')
