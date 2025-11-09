@@ -154,7 +154,7 @@ export class SearchController {
     @Param('tenant') tenant: string,
     @Param('unit') unit: string,
     @Body() body: GlobalSearchDto
-  ) {
+  ): Promise<Array<{ entity: string; items: unknown[] }>> {
     const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.searchService.globalSearch(ctx, body.q, body.limit || 10);
   }

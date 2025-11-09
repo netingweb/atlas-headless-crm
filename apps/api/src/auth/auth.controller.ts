@@ -55,7 +55,7 @@ export class AuthController {
     status: 401,
     description: 'Unauthorized',
   })
-  async getMe(@Request() req: AuthenticatedRequest) {
+  async getMe(@Request() req: AuthenticatedRequest): Promise<Omit<User, 'passwordHash'>> {
     const userId = req.user?.sub;
     if (!userId) {
       throw new Error('User ID not found in token');

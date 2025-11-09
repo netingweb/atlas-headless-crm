@@ -11,11 +11,6 @@ import type { UnitConfig, EntityDefinition } from '@crm-atlas/types';
 @ApiBearerAuth()
 export class ConfigController {
   private readonly configLoader = new MongoConfigLoader(getDb());
-  // Access cache property safely
-  private get cache(): Map<string, unknown> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this.configLoader as any).cache as Map<string, unknown>;
-  }
 
   @Get(':tenant/units')
   @ApiOperation({
@@ -134,8 +129,12 @@ export class ConfigController {
   @ApiOkResponse({ description: 'Cache cleared successfully' })
   async clearCache(@Param('tenant') tenant: string): Promise<{ message: string }> {
     // Clear cache for the tenant
-    if (this.cache && typeof this.cache.clear === 'function') {
-      this.cache.clear(tenant);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cacheInstance = (this.configLoader as any).cache as {
+      clear?: (tenantId?: string) => void;
+    };
+    if (cacheInstance && typeof cacheInstance.clear === 'function') {
+      cacheInstance.clear(tenant);
       return { message: `Cache cleared for tenant: ${tenant}` };
     }
     return { message: 'Cache clear requested. Please restart API to fully clear cache.' };
