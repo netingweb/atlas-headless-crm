@@ -1,0 +1,37 @@
+{
+  "name": "crm-atlas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CRM Atlas - Headless CRM multi-tenant, API-first, MCP-ready",
+  "license": "MIT",
+  "scripts": {
+    "build": "pnpm -w -r build",
+    "lint": "pnpm -w -r lint",
+    "lint:fix": "pnpm -w -r lint:fix",
+    "typecheck": "pnpm -w -r typecheck",
+    "test": "pnpm -w -r test",
+    "test:coverage": "pnpm -w -r test -- --coverage",
+    "clean": "pnpm -w -r clean",
+    "prepare": "husky install",
+    "precommit": "lint-staged",
+    "prepush": "pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
+

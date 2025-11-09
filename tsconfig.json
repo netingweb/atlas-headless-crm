@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./",
+    "removeComments": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
+    "paths": {
+      "@crm-atlas/core": ["packages/core/src"],
+      "@crm-atlas/config": ["packages/config/src"],
+      "@crm-atlas/auth": ["packages/auth/src"],
+      "@crm-atlas/db": ["packages/db/src"],
+      "@crm-atlas/search": ["packages/search/src"],
+      "@crm-atlas/embeddings": ["packages/embeddings/src"],
+      "@crm-atlas/workflows": ["packages/workflows/src"],
+      "@crm-atlas/types": ["packages/types/src"],
+      "@crm-atlas/utils": ["packages/utils/src"]
+    }
+  },
+  "include": ["apps/**/*", "packages/**/*"],
+  "exclude": ["node_modules", "dist", "build", "coverage"]
+}
+
