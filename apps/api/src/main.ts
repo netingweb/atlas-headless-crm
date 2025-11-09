@@ -5,6 +5,14 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { connectMongo } from '@crm-atlas/db';
 
+/**
+ * CRM Atlas API Server
+ * Headless CRM multi-tenant, API-first, MCP-ready
+ *
+ * @author Luca Mainieri - www.neting.it
+ * @license MIT
+ */
+
 async function bootstrap(): Promise<void> {
   const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/crm_atlas';
   const dbName = process.env.MONGODB_DB_NAME || 'crm_atlas';
@@ -33,6 +41,8 @@ async function bootstrap(): Promise<void> {
         'Headless CRM multi-tenant, API-first, MCP-ready. Complete API documentation for managing contacts, companies, tasks, notes, and opportunities.'
       )
       .setVersion('0.1.0')
+      .setContact('Luca Mainieri', 'https://www.neting.it', 'info@neting.it')
+      .setLicense('MIT', 'https://opensource.org/licenses/MIT')
       .addBearerAuth(
         {
           type: 'http',

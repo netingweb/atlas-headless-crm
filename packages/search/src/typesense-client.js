@@ -65,7 +65,8 @@ async function search(ctx, entity, options) {
     };
     const result = await client.collections(collName).documents().search(searchParams);
     return {
-        hits: (result.hits?.map((h) => h.document) || []),
+        hits: (result.hits?.map((h) => h.document) ||
+            []),
         found: result.found || 0,
         page: result.page || 1,
     };

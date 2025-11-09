@@ -4,6 +4,18 @@
   "private": true,
   "description": "CRM Atlas - Headless CRM multi-tenant, API-first, MCP-ready",
   "license": "MIT",
+  "author": {
+    "name": "Luca Mainieri",
+    "url": "https://www.neting.it"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/netingweb/atlas-headless-crm.git"
+  },
+  "homepage": "https://github.com/netingweb/atlas-headless-crm#readme",
+  "bugs": {
+    "url": "https://github.com/netingweb/atlas-headless-crm/issues"
+  },
   "scripts": {
     "dev": "pnpm --filter @crm-atlas/api dev",
     "start": "pnpm --filter @crm-atlas/api start",
@@ -20,6 +32,10 @@
     "seed": "tsx scripts/seed.ts",
     "seed:docker": "docker-compose exec api pnpm seed",
     "config:sync": "tsx scripts/sync-config.ts",
+    "indexer": "tsx apps/indexer/src/main.ts",
+    "indexer:backfill": "tsx apps/indexer/src/backfill.ts",
+    "workflow": "tsx apps/workflow/src/main.ts",
+    "mcp": "tsx apps/mcp-server/src/main.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",

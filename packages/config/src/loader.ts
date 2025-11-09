@@ -10,8 +10,11 @@ import { ConfigCache } from './cache';
 
 export interface ConfigLoader {
   getTenant(tenantId: string): Promise<TenantConfig | null>;
+  getTenants(): Promise<TenantConfig[]>;
   getUnit(tenantId: string, unitId: string): Promise<UnitConfig | null>;
+  getUnits(tenantId: string): Promise<UnitConfig[]>;
   getEntity(ctx: TenantContext, entityName: string): Promise<EntityDefinition | null>;
+  getEntities(ctx: TenantContext): Promise<EntityDefinition[]>;
   getPermissions(tenantId: string): Promise<PermissionsConfig | null>;
 }
 
@@ -20,6 +23,9 @@ export class MongoConfigLoader implements ConfigLoader {
     private readonly db: {
       collection(name: string): {
         findOne(filter: Record<string, unknown>): Promise<unknown | null>;
+        find(filter?: Record<string, unknown>): {
+          toArray(): Promise<unknown[]>;
+        };
       };
     },
     private readonly cache: ConfigCache = new ConfigCache()
@@ -35,6 +41,12 @@ export class MongoConfigLoader implements ConfigLoader {
     const config = doc as TenantConfig;
     this.cache.setTenant(tenantId, config);
     return config;
+  }
+
+  async getTenants(): Promise<TenantConfig[]> {
+    const cursor = (this.db.collection('tenant_config') as any).find({});
+    const docs = await cursor.toArray();
+    return docs.map((doc: unknown) => doc as TenantConfig);
   }
 
   async getUnit(tenantId: string, unitId: string): Promise<UnitConfig | null> {
@@ -53,6 +65,17 @@ export class MongoConfigLoader implements ConfigLoader {
     return config;
   }
 
+  async getUnits(tenantId: string): Promise<UnitConfig[]> {
+    const cached = this.cache.getUnits(tenantId);
+    if (cached) return cached;
+
+    const cursor = (this.db.collection('units_config') as any).find({ tenant_id: tenantId });
+    const docs = await cursor.toArray();
+    const units = docs.map((doc: unknown) => doc as UnitConfig);
+    this.cache.setUnits(tenantId, units);
+    return units;
+  }
+
   async getEntity(ctx: TenantContext, entityName: string): Promise<EntityDefinition | null> {
     const cached = this.cache.getEntity(ctx, entityName);
     if (cached) return cached;
@@ -65,6 +88,22 @@ export class MongoConfigLoader implements ConfigLoader {
     const config = configDoc as EntitiesConfig;
     this.cache.setEntities(ctx.tenant_id, config);
     return config.entities.find((e) => e.name === entityName) || null;
+  }
+
+  async getEntities(ctx: TenantContext): Promise<EntityDefinition[]> {
+    const cachedConfig = (this.cache as any).entitiesCache.get(ctx.tenant_id);
+    if (cachedConfig) {
+      return (cachedConfig as EntitiesConfig).entities;
+    }
+
+    const configDoc = await this.db.collection('entities_config').findOne({
+      tenant_id: ctx.tenant_id,
+    });
+    if (!configDoc) return [];
+
+    const config = configDoc as EntitiesConfig;
+    this.cache.setEntities(ctx.tenant_id, config);
+    return config.entities;
   }
 
   async getPermissions(tenantId: string): Promise<PermissionsConfig | null> {

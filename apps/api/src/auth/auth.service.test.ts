@@ -82,13 +82,22 @@ describe('AuthService', () => {
         tenant_id: 'test',
         email: 'newuser@example.com',
         password: 'password123',
+        roles: ['user'],
+        scopes: ['crm:read'],
       };
 
       mockDb.collection().insertOne.mockResolvedValue({
         insertedId: 'new-user-id',
       });
 
-      const result = await service.createUser(ctx, userData.email, userData.password);
+      const result = await service.createUser(
+        ctx.tenant_id,
+        ctx.unit_id,
+        userData.email,
+        userData.password,
+        userData.roles,
+        userData.scopes
+      );
 
       expect(result).toHaveProperty('_id');
       expect(result.email).toBe(userData.email);

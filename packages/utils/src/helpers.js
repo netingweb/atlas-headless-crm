@@ -29,6 +29,9 @@ function getEmbeddableFields(entityDef) {
         .map((f) => f.name);
 }
 function concatFields(doc, fields) {
-    return fields.map((f) => String(doc[f] || '')).filter(Boolean).join(' ');
+    return fields
+        .map((f) => String(doc[f] || ''))
+        .filter(Boolean)
+        .join(' ');
 }
 //# sourceMappingURL=helpers.js.map

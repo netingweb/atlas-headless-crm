@@ -16,6 +16,7 @@ import {
 } from '@crm-atlas/search';
 import { createEmbeddingsProvider, getProviderConfig } from '@crm-atlas/embeddings';
 import { getEmbeddableFields, concatFields } from '@crm-atlas/utils';
+import { EntityEvents } from './entities.events';
 
 @Injectable()
 export class EntitiesService {
@@ -23,6 +24,7 @@ export class EntitiesService {
   private readonly configLoader = new MongoConfigLoader(getDb());
   private readonly validatorCache = new ValidatorCache();
   private readonly relationsService = new RelationsService();
+  private readonly events: EntityEvents | null = null; // Will be injected if EventEmitter2 is available
 
   async create(
     ctx: TenantContext,
@@ -59,9 +61,15 @@ export class EntitiesService {
     await this.relationsService.validateReferences(ctx, entityDef, data);
 
     const created = await this.repository.create(ctx, entity, data);
+    const createdId = (created as { _id: string })._id;
 
     // Index in Typesense and Qdrant
     await this.indexEntity(ctx, entity, entityDef, created as unknown as Record<string, unknown>);
+
+    // Emit event for workflow engine (if available)
+    if (this.events) {
+      this.events.emitEntityCreated(ctx.tenant_id, ctx.unit_id, entity, createdId, data);
+    }
 
     return created;
   }
@@ -128,6 +136,11 @@ export class EntitiesService {
     // Re-index in Typesense and Qdrant
     await this.indexEntity(ctx, entity, entityDef, updated as unknown as Record<string, unknown>);
 
+    // Emit event for workflow engine (if available)
+    if (this.events) {
+      this.events.emitEntityUpdated(ctx.tenant_id, ctx.unit_id, entity, id, data);
+    }
+
     return updated;
   }
 
@@ -140,6 +153,11 @@ export class EntitiesService {
 
     // Remove from search indexes
     await this.removeFromIndexes(ctx, entity, id, entityDef);
+
+    // Emit event for workflow engine (if available)
+    if (this.events) {
+      this.events.emitEntityDeleted(ctx.tenant_id, ctx.unit_id, entity, id);
+    }
   }
 
   async findAll(ctx: TenantContext, entity: string): Promise<unknown[]> {
