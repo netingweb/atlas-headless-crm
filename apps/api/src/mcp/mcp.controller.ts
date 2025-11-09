@@ -10,6 +10,7 @@ import {
 import { MCPService } from './mcp.service';
 import { JwtAuthGuard } from '@crm-atlas/auth';
 
+// CallToolDto without validation decorators - validation handled by SmartValidationPipe
 export class CallToolDto {
   name!: string;
   arguments!: Record<string, unknown>;
@@ -57,6 +58,7 @@ export class MCPController {
     @Param('unit') unit: string,
     @Body() body: CallToolDto
   ): Promise<unknown> {
+    // SmartValidationPipe handles validation with forbidNonWhitelisted: false
     return this.mcpService.callTool(tenant, unit, body.name, body.arguments || {});
   }
 }

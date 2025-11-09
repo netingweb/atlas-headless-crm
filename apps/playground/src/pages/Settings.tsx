@@ -1,6 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import IndexingTab from '@/components/settings/IndexingTab';
+import AIEngineTab from '@/components/settings/AIEngineTab';
+import MCPToolsTab from '@/components/settings/MCPToolsTab';
 
 export default function Settings() {
   return (
@@ -19,17 +21,7 @@ export default function Settings() {
         </TabsList>
 
         <TabsContent value="mcp">
-          <Card>
-            <CardHeader>
-              <CardTitle>MCP Tools Configuration</CardTitle>
-              <CardDescription>Enable or disable MCP tools for the AI assistant</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-500">
-                MCP tools configuration will be implemented here
-              </p>
-            </CardContent>
-          </Card>
+          <MCPToolsTab />
         </TabsContent>
 
         <TabsContent value="api">
@@ -47,17 +39,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="ai">
-          <Card>
-            <CardHeader>
-              <CardTitle>AI Engine Configuration</CardTitle>
-              <CardDescription>Configure LLM provider and settings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-500">
-                AI engine configuration will be implemented here
-              </p>
-            </CardContent>
-          </Card>
+          <AIEngineTab />
         </TabsContent>
 
         <TabsContent value="indexing">

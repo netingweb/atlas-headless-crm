@@ -72,4 +72,17 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    force: true, // Force re-optimization of dependencies
+    include: [
+      'react',
+      'react-dom',
+      'react-dom/client',
+      '@tanstack/react-query',
+      'react-router-dom',
+      '@langchain/core',
+      '@langchain/openai',
+      'langchain',
+    ],
+  },
 });

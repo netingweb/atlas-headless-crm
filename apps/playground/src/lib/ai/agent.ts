@@ -1,0 +1,499 @@
+import { ChatOpenAI } from '@langchain/openai';
+import { DynamicStructuredTool } from '@langchain/core/tools';
+import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
+import { z } from 'zod';
+import type { AIConfig } from '@/stores/ai-store';
+import { mcpApi } from '@/lib/api/mcp';
+import type { TenantContext } from '@crm-atlas/core';
+
+/**
+ * Create LLM instance based on AI configuration
+ */
+function createLLM(config: AIConfig): ChatOpenAI {
+  const apiKey = config.apiKey?.trim();
+
+  if (!apiKey || apiKey === '') {
+    throw new Error('API key is required. Please configure it in Settings > AI Engine.');
+  }
+
+  console.log('Creating LLM with config:', {
+    provider: config.provider,
+    model: config.model,
+    hasApiKey: !!apiKey,
+    apiKeyPrefix: apiKey.substring(0, 7),
+  });
+
+  if (config.provider === 'azure') {
+    return new ChatOpenAI({
+      model: config.model,
+      temperature: config.temperature ?? 0.7,
+      maxTokens: config.maxTokens ?? 2000,
+      azureOpenAIApiKey: apiKey,
+      azureOpenAIApiInstanceName: process.env.AZURE_OPENAI_INSTANCE_NAME || '',
+      azureOpenAIApiDeploymentName: config.model,
+      azureOpenAIApiVersion: '2024-02-15-preview',
+    });
+  }
+
+  // Default to OpenAI
+  // LangChain v1.0: Pass both apiKey and openAIApiKey for maximum compatibility
+  console.log('Creating ChatOpenAI with both apiKey and openAIApiKey parameters');
+
+  const llmConfig = {
+    model: config.model,
+    temperature: config.temperature ?? 0.7,
+    maxTokens: config.maxTokens ?? 2000,
+    apiKey: apiKey,
+    openAIApiKey: apiKey, // Explicit parameter name
+  };
+
+  console.log('LLM Config:', {
+    model: llmConfig.model,
+    hasApiKey: !!llmConfig.apiKey,
+    hasOpenAIApiKey: !!llmConfig.openAIApiKey,
+  });
+
+  return new ChatOpenAI(llmConfig);
+}
+
+/**
+ * Convert MCP tool schema to LangChain tool
+ */
+function createToolFromMCP(
+  mcpTool: { name: string; description: string; inputSchema: Record<string, unknown> },
+  ctx: TenantContext
+): DynamicStructuredTool {
+  // Convert JSON Schema to Zod schema
+  const properties = (mcpTool.inputSchema.properties || {}) as Record<string, unknown>;
+  const required = (mcpTool.inputSchema.required || []) as string[];
+
+  const zodSchema: Record<string, z.ZodTypeAny> = {};
+  for (const [key, prop] of Object.entries(properties)) {
+    const propSchema = prop as {
+      type?: string;
+      description?: string;
+      enum?: unknown[];
+    };
+    const isRequired = required.includes(key);
+
+    let zodType: z.ZodTypeAny;
+    switch (propSchema.type) {
+      case 'string':
+        zodType = z.string();
+        // Handle enum if present
+        if (propSchema.enum && Array.isArray(propSchema.enum)) {
+          zodType = z.enum(propSchema.enum as [string, ...string[]]);
+        }
+        break;
+      case 'number':
+        zodType = z.number();
+        break;
+      case 'integer':
+        zodType = z.number().int();
+        break;
+      case 'boolean':
+        zodType = z.boolean();
+        break;
+      case 'array':
+        zodType = z.array(z.unknown());
+        break;
+      case 'object':
+        zodType = z.record(z.unknown());
+        break;
+      default:
+        zodType = z.unknown();
+    }
+
+    zodSchema[key] = isRequired ? zodType : zodType.optional();
+  }
+
+  console.log(`[Tool Schema] Generated Zod schema for ${mcpTool.name}:`, {
+    properties: Object.keys(zodSchema),
+    required,
+    zodSchemaKeys: Object.keys(zodSchema),
+  });
+
+  const finalSchema = z.object(zodSchema);
+
+  console.log(`[Tool Schema] Final schema for ${mcpTool.name}:`, {
+    schemaKeys: Object.keys(zodSchema),
+    requiredFields: required,
+    inputSchema: mcpTool.inputSchema,
+  });
+
+  return new DynamicStructuredTool({
+    name: mcpTool.name,
+    description: mcpTool.description,
+    schema: finalSchema,
+    func: async (args: Record<string, unknown>) => {
+      try {
+        console.log(`[Tool] Calling MCP tool: ${mcpTool.name}`, {
+          args,
+          argsKeys: Object.keys(args),
+          tenant: ctx.tenant_id,
+          unit: ctx.unit_id,
+        });
+
+        // Validate args against schema before calling
+        try {
+          finalSchema.parse(args);
+          console.log(`[Tool] Args validated successfully for ${mcpTool.name}`);
+        } catch (validationError) {
+          console.error(`[Tool] Schema validation failed for ${mcpTool.name}:`, {
+            error: validationError,
+            args,
+            expectedSchema: zodSchema,
+          });
+          throw validationError;
+        }
+
+        const result = await mcpApi.callTool(ctx.tenant_id, ctx.unit_id, mcpTool.name, args);
+
+        console.log(`[Tool] MCP tool ${mcpTool.name} result:`, result);
+
+        // Handle MCP response format: { content: Array<{ type: string; text: string }>, isError: boolean }
+        if (result && typeof result === 'object' && 'content' in result) {
+          const mcpResult = result as {
+            content: Array<{ type: string; text: string }>;
+            isError?: boolean;
+          };
+          if (mcpResult.isError) {
+            const errorText = mcpResult.content.map((c) => c.text).join('\n');
+            throw new Error(errorText);
+          }
+          // Return the text content
+          return mcpResult.content.map((c) => c.text).join('\n');
+        }
+
+        return JSON.stringify(result);
+      } catch (error) {
+        console.error(`[Tool] Error calling MCP tool ${mcpTool.name}:`, error);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        throw new Error(`Error calling tool ${mcpTool.name}: ${errorMsg}`);
+      }
+    },
+  });
+}
+
+export interface Agent {
+  llm: ChatOpenAI;
+  tools: DynamicStructuredTool[];
+  systemPrompt: string;
+}
+
+/**
+ * Create LangChain agent with MCP tools
+ */
+export async function createAgent(
+  config: AIConfig,
+  ctx: TenantContext,
+  disabledToolNames?: Set<string>
+): Promise<Agent> {
+  console.log('createAgent called with config:', {
+    provider: config.provider,
+    model: config.model,
+    hasApiKey: !!config.apiKey,
+    apiKeyLength: config.apiKey?.length,
+    apiKeyPrefix: config.apiKey?.substring(0, 7),
+  });
+
+  // Load MCP tools
+  const mcpTools = await mcpApi.listTools(ctx.tenant_id, ctx.unit_id);
+
+  // Filter tools: exclude disabled tools
+  const filteredTools = disabledToolNames
+    ? mcpTools.filter((tool) => !disabledToolNames.has(tool.name))
+    : mcpTools; // If no filter provided, use all tools
+
+  // Convert MCP tools to LangChain tools
+  const tools = filteredTools.map((tool) => createToolFromMCP(tool, ctx));
+
+  // Create LLM with tools bound
+  const llm = createLLM(config).bindTools(tools);
+
+  // Create system prompt with detailed tool information
+  const toolsDescription = tools
+    .map((tool) => {
+      // Get the tool's schema to show required fields
+      const toolSchema = mcpTools.find((t) => t.name === tool.name);
+      const requiredFields = toolSchema?.inputSchema?.required || [];
+      const properties = (toolSchema?.inputSchema?.properties || {}) as Record<string, unknown>;
+
+      let toolInfo = `- ${tool.name}: ${tool.description}`;
+      if (requiredFields.length > 0) {
+        const requiredDetails = requiredFields
+          .map((field: string) => {
+            const prop = properties[field] as { type?: string; description?: string } | undefined;
+            const type = prop?.type || 'unknown';
+            const desc = prop?.description || '';
+            return `  * ${field} (${type})${desc ? `: ${desc}` : ''} [REQUIRED]`;
+          })
+          .join('\n');
+        toolInfo += `\n  Required fields:\n${requiredDetails}`;
+      }
+      return toolInfo;
+    })
+    .join('\n\n');
+
+  const systemPrompt = `You are a helpful AI assistant for a CRM system. You can help users manage contacts, companies, tasks, notes, and opportunities.
+
+You have access to the following tools:
+${toolsDescription}
+
+IMPORTANT RULES:
+- Always provide ALL required fields when creating entities
+- If a required field is missing from user input, ask for it before proceeding
+- Be thorough and ensure all mandatory information is collected
+- When creating a company, you MUST include the 'email' field (it's required)
+- When creating a contact, you MUST include both 'name' and 'email' fields (they're required)
+
+Always be helpful, accurate, and concise. When using tools, provide clear explanations of what you're doing.`;
+
+  return {
+    llm,
+    tools,
+    systemPrompt,
+  };
+}
+
+/**
+ * Run agent with user message
+ */
+export async function runAgent(
+  agent: Agent,
+  userMessage: string,
+  chatHistory: Array<{ role: string; content: string }> = []
+): Promise<string> {
+  // Build messages array
+  const messages = [
+    new SystemMessage(agent.systemPrompt),
+    ...chatHistory.map((msg) => {
+      if (msg.role === 'user') {
+        return new HumanMessage(msg.content);
+      }
+      return new AIMessage(msg.content);
+    }),
+    new HumanMessage(userMessage),
+  ];
+
+  // Invoke LLM
+  const response = await agent.llm.invoke(messages);
+
+  // Check if LLM wants to call tools
+  if (response.tool_calls && response.tool_calls.length > 0) {
+    // Add the AI message with tool_calls to the conversation
+    messages.push(response);
+
+    // Execute tool calls and create ToolMessages
+    const toolMessages = await Promise.all(
+      response.tool_calls.map(async (toolCall) => {
+        const tool = agent.tools.find((t) => t.name === toolCall.name);
+        if (!tool) {
+          return new ToolMessage({
+            content: `Tool ${toolCall.name} not found`,
+            tool_call_id: toolCall.id || '',
+          });
+        }
+
+        try {
+          const result = await tool.invoke(toolCall.args as Record<string, unknown>);
+          const resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+          return new ToolMessage({
+            content: resultStr,
+            tool_call_id: toolCall.id || '',
+          });
+        } catch (error) {
+          const errorMsg = `Error calling tool ${toolCall.name}: ${error instanceof Error ? error.message : String(error)}`;
+          return new ToolMessage({
+            content: errorMsg,
+            tool_call_id: toolCall.id || '',
+          });
+        }
+      })
+    );
+
+    // Call LLM again with tool results
+    const finalMessages = [...messages, ...toolMessages];
+
+    const finalResponse = await agent.llm.invoke(finalMessages);
+    return finalResponse.content as string;
+  }
+
+  return response.content as string;
+}
+
+export interface StreamEvent {
+  type: 'thinking' | 'tool_call' | 'tool_result' | 'content' | 'done' | 'error';
+  content?: string;
+  toolName?: string;
+  toolArgs?: Record<string, unknown>;
+  toolResult?: string;
+  error?: string;
+}
+
+/**
+ * Run agent with user message and stream events
+ */
+export async function* runAgentStream(
+  agent: Agent,
+  userMessage: string,
+  chatHistory: Array<{ role: string; content: string }> = []
+): AsyncGenerator<StreamEvent, void, unknown> {
+  // Build messages array
+  const messages = [
+    new SystemMessage(agent.systemPrompt),
+    ...chatHistory.map((msg) => {
+      if (msg.role === 'user') {
+        return new HumanMessage(msg.content);
+      }
+      return new AIMessage(msg.content);
+    }),
+    new HumanMessage(userMessage),
+  ];
+
+  try {
+    // Stream LLM response
+    const stream = await agent.llm.stream(messages);
+
+    const toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }> = [];
+
+    // Stream initial thinking/content
+    for await (const chunk of stream) {
+      if (chunk.content) {
+        fullContent += chunk.content;
+        yield { type: 'content', content: chunk.content };
+      }
+
+      // Collect tool calls if present
+      if (chunk.tool_calls && chunk.tool_calls.length > 0) {
+        for (const toolCall of chunk.tool_calls) {
+          if (!toolCalls.find((tc) => tc.id === toolCall.id)) {
+            toolCalls.push({
+              id: toolCall.id || '',
+              name: toolCall.name || '',
+              args: (toolCall.args || {}) as Record<string, unknown>,
+            });
+
+            yield {
+              type: 'tool_call',
+              toolName: toolCall.name,
+              toolArgs: toolCall.args as Record<string, unknown>,
+            };
+          }
+        }
+      }
+    }
+
+    // If we have tool calls, execute them
+    if (toolCalls.length > 0) {
+      // Get the full response to access all tool calls
+      const response = await agent.llm.invoke(messages);
+
+      if (response.tool_calls && response.tool_calls.length > 0) {
+        // Add the AI message with tool_calls to the conversation
+        messages.push(response);
+
+        // Execute each tool call and create ToolMessages
+        for (const toolCall of response.tool_calls) {
+          const tool = agent.tools.find((t) => t.name === toolCall.name);
+          if (!tool) {
+            const errorMsg = `Tool ${toolCall.name} not found`;
+            yield {
+              type: 'tool_result',
+              toolName: toolCall.name,
+              toolResult: errorMsg,
+              error: 'Tool not found',
+            };
+            // Add ToolMessage with error
+            messages.push(
+              new ToolMessage({
+                content: errorMsg,
+                tool_call_id: toolCall.id || '',
+              })
+            );
+            continue;
+          }
+
+          try {
+            yield {
+              type: 'thinking',
+              content: `Calling tool: ${toolCall.name} with args: ${JSON.stringify(toolCall.args)}...`,
+            };
+
+            console.log(`[Agent] Calling tool: ${toolCall.name}`, {
+              args: toolCall.args,
+              toolCallId: toolCall.id,
+            });
+
+            const result = await tool.invoke(toolCall.args as Record<string, unknown>);
+            const resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+
+            console.log(`[Agent] Tool ${toolCall.name} result:`, resultStr);
+
+            yield {
+              type: 'tool_result',
+              toolName: toolCall.name,
+              toolArgs: toolCall.args as Record<string, unknown>,
+              toolResult: resultStr,
+            };
+
+            // Add ToolMessage with the result (CRITICAL: must match tool_call_id)
+            messages.push(
+              new ToolMessage({
+                content: resultStr,
+                tool_call_id: toolCall.id || '',
+              })
+            );
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            const errorDetails = error instanceof Error ? error.stack : String(error);
+
+            console.error(`[Agent] Tool ${toolCall.name} error:`, {
+              error: errorMsg,
+              details: errorDetails,
+              args: toolCall.args,
+            });
+
+            yield {
+              type: 'tool_result',
+              toolName: toolCall.name,
+              toolArgs: toolCall.args as Record<string, unknown>,
+              toolResult: `Error: ${errorMsg}`,
+              error: errorMsg,
+            };
+            // Add ToolMessage with error
+            messages.push(
+              new ToolMessage({
+                content: `Error: ${errorMsg}. Details: ${errorDetails}`,
+                tool_call_id: toolCall.id || '',
+              })
+            );
+          }
+        }
+
+        // Stream final response with tool results
+        yield { type: 'thinking', content: 'Processing tool results...' };
+
+        const finalStream = await agent.llm.stream(messages);
+
+        for await (const chunk of finalStream) {
+          if (chunk.content) {
+            finalContent += chunk.content;
+            yield { type: 'content', content: chunk.content };
+          }
+        }
+
+        yield { type: 'done' };
+        return;
+      }
+    }
+
+    yield { type: 'done' };
+  } catch (error) {
+    yield {
+      type: 'error',
+      content: error instanceof Error ? error.message : String(error),
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}

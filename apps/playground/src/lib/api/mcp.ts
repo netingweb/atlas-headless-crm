@@ -25,12 +25,69 @@ export const mcpApi = {
   callTool: async (
     tenant: string,
     unit: string,
-    request: CallToolRequest
+    toolName: string,
+    args: Record<string, unknown>
   ): Promise<CallToolResponse> => {
-    const response = await apiClient.post<CallToolResponse>(
-      `/${tenant}/${unit}/mcp/call-tool`,
-      request
-    );
-    return response.data;
+    try {
+      console.log(`[MCP API] Calling tool: ${toolName}`, {
+        tenant,
+        unit,
+        args,
+      });
+
+      const response = await apiClient.post<CallToolResponse>(`/${tenant}/${unit}/mcp/call-tool`, {
+        name: toolName,
+        arguments: args,
+      });
+
+      console.log(`[MCP API] Tool ${toolName} response:`, response.data);
+      return response.data;
+    } catch (error: unknown) {
+      console.error(`[MCP API] Error calling tool ${toolName}:`, error);
+
+      // Extract detailed error information
+      let errorMessage = 'Unknown error';
+      let errorDetails: unknown = null;
+
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: unknown; status?: number } };
+        errorDetails = axiosError.response?.data;
+        errorMessage = `Request failed with status code ${axiosError.response?.status || 'unknown'}`;
+
+        if (axiosError.response?.data && typeof axiosError.response.data === 'object') {
+          const errorData = axiosError.response.data as { message?: string | string[] };
+          if (errorData.message) {
+            const message = Array.isArray(errorData.message)
+              ? errorData.message.join(', ')
+              : errorData.message;
+            errorMessage = `${errorMessage}: ${message}`;
+          }
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+        errorDetails = error.stack;
+      } else {
+        errorMessage = String(error);
+      }
+
+      console.error(`[MCP API] Error details for ${toolName}:`, {
+        message: errorMessage,
+        details: errorDetails,
+        args,
+      });
+
+      // Return error in MCP format
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              errorMessage +
+              (errorDetails ? `\n\nDetails: ${JSON.stringify(errorDetails, null, 2)}` : ''),
+          },
+        ],
+        isError: true,
+      };
+    }
   },
 };
