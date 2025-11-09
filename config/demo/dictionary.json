@@ -1,0 +1,78 @@
+{
+  "tenant_id": "demo",
+  "dictionaries": {
+    "contact_source": [
+      { "value": "website", "label": "Website" },
+      { "value": "referral", "label": "Referral" },
+      { "value": "social_media", "label": "Social Media" },
+      { "value": "email_campaign", "label": "Email Campaign" },
+      { "value": "trade_show", "label": "Trade Show" },
+      { "value": "cold_call", "label": "Cold Call" },
+      { "value": "partner", "label": "Partner" },
+      { "value": "other", "label": "Other" }
+    ],
+    "contact_role": [
+      { "value": "decision_maker", "label": "Decision Maker" },
+      { "value": "influencer", "label": "Influencer" },
+      { "value": "end_user", "label": "End User" },
+      { "value": "technical_contact", "label": "Technical Contact" },
+      { "value": "financial_contact", "label": "Financial Contact" },
+      { "value": "executive", "label": "Executive" },
+      { "value": "manager", "label": "Manager" },
+      { "value": "other", "label": "Other" }
+    ],
+    "contact_status": [
+      { "value": "new", "label": "New" },
+      { "value": "contacted", "label": "Contacted" },
+      { "value": "qualified", "label": "Qualified" },
+      { "value": "converted", "label": "Converted" },
+      { "value": "lost", "label": "Lost" },
+      { "value": "nurturing", "label": "Nurturing" }
+    ],
+    "company_size": [
+      { "value": "startup", "label": "Startup (1-10)" },
+      { "value": "small", "label": "Small (11-50)" },
+      { "value": "medium", "label": "Medium (51-200)" },
+      { "value": "large", "label": "Large (201-1000)" },
+      { "value": "enterprise", "label": "Enterprise (1000+)" }
+    ],
+    "company_industry": [
+      { "value": "technology", "label": "Technology" },
+      { "value": "finance", "label": "Finance" },
+      { "value": "healthcare", "label": "Healthcare" },
+      { "value": "retail", "label": "Retail" },
+      { "value": "manufacturing", "label": "Manufacturing" },
+      { "value": "consulting", "label": "Consulting" },
+      { "value": "education", "label": "Education" },
+      { "value": "real_estate", "label": "Real Estate" },
+      { "value": "hospitality", "label": "Hospitality" },
+      { "value": "other", "label": "Other" }
+    ],
+    "task_type": [
+      { "value": "call", "label": "Call" },
+      { "value": "email", "label": "Email" },
+      { "value": "meeting", "label": "Meeting" },
+      { "value": "follow_up", "label": "Follow Up" },
+      { "value": "proposal", "label": "Proposal" },
+      { "value": "demo", "label": "Demo" },
+      { "value": "quote", "label": "Quote" },
+      { "value": "contract", "label": "Contract" },
+      { "value": "other", "label": "Other" }
+    ],
+    "task_status": [
+      { "value": "not_started", "label": "Not Started" },
+      { "value": "in_progress", "label": "In Progress" },
+      { "value": "completed", "label": "Completed" },
+      { "value": "cancelled", "label": "Cancelled" },
+      { "value": "deferred", "label": "Deferred" }
+    ],
+    "opportunity_stage": [
+      { "value": "prospecting", "label": "Prospecting" },
+      { "value": "qualification", "label": "Qualification" },
+      { "value": "proposal", "label": "Proposal" },
+      { "value": "negotiation", "label": "Negotiation" },
+      { "value": "closed_won", "label": "Closed Won" },
+      { "value": "closed_lost", "label": "Closed Lost" }
+    ]
+  }
+}

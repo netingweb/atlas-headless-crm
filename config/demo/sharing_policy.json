@@ -1,0 +1,17 @@
+{
+  "tenant_id": "demo",
+  "policies": [
+    {
+      "entity": "lead",
+      "rules": [
+        {
+          "source_unit": "sales",
+          "visible_to": ["support"],
+          "conditions": {
+            "status": "converted"
+          }
+        }
+      ]
+    }
+  ]
+}

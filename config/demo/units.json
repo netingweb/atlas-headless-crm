@@ -1,0 +1,14 @@
+[
+  {
+    "unit_id": "sales",
+    "name": "Sales Unit",
+    "tenant_id": "demo",
+    "settings": {}
+  },
+  {
+    "unit_id": "support",
+    "name": "Support Unit",
+    "tenant_id": "demo",
+    "settings": {}
+  }
+]

@@ -7,7 +7,6 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./",
     "removeComments": true,
     "strict": true,
     "noImplicitAny": true,
@@ -42,7 +41,6 @@
       "@crm-atlas/utils": ["packages/utils/src"]
     }
   },
-  "include": ["apps/**/*", "packages/**/*"],
-  "exclude": ["node_modules", "dist", "build", "coverage"]
+  "include": ["apps/**/*", "packages/**/*", "scripts/**/*"],
+  "exclude": ["node_modules", "dist", "build", "coverage", "**/*.d.ts"]
 }
-

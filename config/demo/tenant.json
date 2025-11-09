@@ -1,0 +1,10 @@
+{
+  "tenant_id": "demo",
+  "name": "Demo Tenant",
+  "settings": {},
+  "embeddingsProvider": {
+    "name": "openai",
+    "apiKey": "",
+    "model": "text-embedding-3-small"
+  }
+}

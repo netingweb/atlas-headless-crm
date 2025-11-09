@@ -1,0 +1,32 @@
+{
+  "name": "crm-atlas-sales",
+  "version": "0.1.0",
+  "description": "CRM Atlas MCP tools for sales operations",
+  "tools": [
+    {
+      "name": "create_lead",
+      "description": "Create a new lead in the CRM",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "company": { "type": "string" }
+        },
+        "required": ["name", "email"]
+      }
+    },
+    {
+      "name": "search_leads",
+      "description": "Search for leads using text or semantic search",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "type": { "type": "string", "enum": ["text", "semantic"] }
+        },
+        "required": ["query"]
+      }
+    }
+  ]
+}

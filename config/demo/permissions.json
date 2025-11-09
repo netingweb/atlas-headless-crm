@@ -1,0 +1,17 @@
+{
+  "tenant_id": "demo",
+  "roles": [
+    {
+      "role": "admin",
+      "scopes": ["crm:read", "crm:write", "crm:delete"]
+    },
+    {
+      "role": "sales_manager",
+      "scopes": ["crm:read", "crm:write"]
+    },
+    {
+      "role": "sales_rep",
+      "scopes": ["crm:read"]
+    }
+  ]
+}

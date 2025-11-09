@@ -24,6 +24,7 @@ pnpm-debug.log*
 # Testing
 coverage
 .nyc_output
+*.test.js.snap
 
 # IDE
 .vscode
@@ -40,4 +41,3 @@ Thumbs.db
 tmp
 temp
 *.tmp
-

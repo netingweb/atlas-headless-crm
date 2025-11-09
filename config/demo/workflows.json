@@ -1,0 +1,29 @@
+{
+  "tenant_id": "demo",
+  "workflows": [
+    {
+      "workflow_id": "followup_hot_lead",
+      "trigger": {
+        "type": "event",
+        "event": "entity.updated",
+        "entity": "lead",
+        "conditions": [
+          {
+            "field": "status",
+            "operator": "==",
+            "value": "hot"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "update",
+          "entity": "lead",
+          "data": {
+            "assigned_to": "sales_manager_1"
+          }
+        }
+      ]
+    }
+  ]
+}

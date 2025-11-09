@@ -1,0 +1,1100 @@
+{
+  "info": {
+    "name": "CRM Atlas API",
+    "description": "Complete API collection for CRM Atlas - Headless CRM multi-tenant with relational data",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "crm-atlas"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Check API health status"
+          },
+          "response": []
+        },
+        {
+          "name": "Readiness Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health/ready",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health", "ready"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Liveness Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health/live",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health", "live"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('auth_token', jsonData.token);",
+                  "    console.log('Token saved:', jsonData.token.substring(0, 50) + '...');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"demo\",\n  \"email\": \"admin@demo.local\",\n  \"password\": \"changeme\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login and get JWT token"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Companies",
+      "item": [
+        {
+          "name": "Create Company",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData._id) {",
+                  "        pm.environment.set('company_id', jsonData._id);",
+                  "        console.log('Company ID saved:', jsonData._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corporation\",\n  \"email\": \"info@acme.com\",\n  \"phone\": \"+1-555-0123\",\n  \"website\": \"https://acme.com\",\n  \"size\": \"medium\",\n  \"industry\": \"technology\",\n  \"address\": \"123 Main St, San Francisco, CA 94105\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/company",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "company"]
+            },
+            "description": "Create a new company"
+          },
+          "response": []
+        },
+        {
+          "name": "List All Companies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/company",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "company"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Company by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/company/{{company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "company", "{{company_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Company by ID (with Populate)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/company/{{company_id}}?populate=true",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "company", "{{company_id}}"],
+              "query": [
+                {
+                  "key": "populate",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Get company with populated related entities (contacts, notes, tasks)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Company Contacts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/company/{{company_id}}/contact",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{tenant_id}}",
+                "{{unit_id}}",
+                "company",
+                "{{company_id}}",
+                "contact"
+              ]
+            },
+            "description": "Get all contacts related to a company"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Company",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size\": \"large\",\n  \"industry\": \"finance\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/company/{{company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "company", "{{company_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Company",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/company/{{company_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "company", "{{company_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Contacts",
+      "item": [
+        {
+          "name": "Create Contact",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData._id) {",
+                  "        pm.environment.set('contact_id', jsonData._id);",
+                  "        console.log('Contact ID saved:', jsonData._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john.doe@acme.com\",\n  \"phone\": \"+1-555-0124\",\n  \"source\": \"website\",\n  \"role\": \"decision_maker\",\n  \"status\": \"qualified\",\n  \"company_id\": \"{{company_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/contact",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "contact"]
+            },
+            "description": "Create a new contact (related to a company)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Contact - Standalone",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"phone\": \"+1-555-0125\",\n  \"source\": \"referral\",\n  \"role\": \"influencer\",\n  \"status\": \"new\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/contact",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "contact"]
+            },
+            "description": "Create a contact without company (lead)"
+          },
+          "response": []
+        },
+        {
+          "name": "List All Contacts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/contact",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "contact"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Contact by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/contact/{{contact_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "contact", "{{contact_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Contact",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"contacted\",\n  \"role\": \"decision_maker\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/contact/{{contact_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "contact", "{{contact_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Contact",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/contact/{{contact_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "contact", "{{contact_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notes",
+      "item": [
+        {
+          "name": "Create Note for Company",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData._id) {",
+                  "        pm.environment.set('note_id', jsonData._id);",
+                  "        console.log('Note ID saved:', jsonData._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Initial Meeting Notes\",\n  \"content\": \"Met with Acme Corp team. Discussed their needs for enterprise solution. Budget approved, decision expected by end of month.\",\n  \"company_id\": \"{{company_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/note",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "note"]
+            },
+            "description": "Create a note related to a company"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Note for Contact",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Follow-up Call\",\n  \"content\": \"Called John Doe. Very interested in our solution. Wants to schedule a demo next week.\",\n  \"contact_id\": \"{{contact_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/note",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "note"]
+            },
+            "description": "Create a note related to a contact"
+          },
+          "response": []
+        },
+        {
+          "name": "List All Notes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/note",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "note"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Note by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/note/{{note_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "note", "{{note_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Note",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Updated: Decision delayed to next quarter. Continue nurturing.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/note/{{note_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "note", "{{note_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Note",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/note/{{note_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "note", "{{note_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "Create Task for Company",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData._id) {",
+                  "        pm.environment.set('task_id', jsonData._id);",
+                  "        console.log('Task ID saved:', jsonData._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Send Proposal to Acme Corp\",\n  \"description\": \"Prepare and send enterprise license proposal\",\n  \"due_date\": \"2024-12-15\",\n  \"type\": \"proposal\",\n  \"status\": \"not_started\",\n  \"company_id\": \"{{company_id}}\",\n  \"contact_id\": \"{{contact_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/task",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "task"]
+            },
+            "description": "Create a task related to a company and contact"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Task for Contact",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Follow-up Call\",\n  \"description\": \"Call John to discuss pricing\",\n  \"due_date\": \"2024-11-20\",\n  \"type\": \"call\",\n  \"status\": \"not_started\",\n  \"contact_id\": \"{{contact_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/task",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "task"]
+            },
+            "description": "Create a task related to a contact"
+          },
+          "response": []
+        },
+        {
+          "name": "List All Tasks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/task",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "task"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Task by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/task/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "task", "{{task_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Task",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\",\n  \"description\": \"Proposal sent. Waiting for feedback.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/task/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "task", "{{task_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Task",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/task/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "task", "{{task_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Opportunities",
+      "item": [
+        {
+          "name": "Create Opportunity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData._id) {",
+                  "        pm.environment.set('opportunity_id', jsonData._id);",
+                  "        console.log('Opportunity ID saved:', jsonData._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Enterprise License Deal\",\n  \"value\": 50000,\n  \"stage\": \"proposal\",\n  \"description\": \"Large enterprise customer interested in annual license. Decision expected by end of month.\",\n  \"company_id\": \"{{company_id}}\",\n  \"contact_id\": \"{{contact_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/opportunity",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "opportunity"]
+            },
+            "description": "Create a new opportunity with relations"
+          },
+          "response": []
+        },
+        {
+          "name": "List All Opportunities",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/opportunity",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "opportunity"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Opportunity by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/opportunity/{{opportunity_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "opportunity", "{{opportunity_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Opportunity",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stage\": \"negotiation\",\n  \"value\": 55000,\n  \"description\": \"Updated proposal sent. Customer reviewing terms.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/opportunity/{{opportunity_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "opportunity", "{{opportunity_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Opportunity",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/opportunity/{{opportunity_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "opportunity", "{{opportunity_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Text Search - Companies",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": \"technology\",\n  \"entity\": \"company\",\n  \"per_page\": 10,\n  \"page\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/search/text",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "search", "text"]
+            },
+            "description": "Full-text search in companies"
+          },
+          "response": []
+        },
+        {
+          "name": "Text Search - Contacts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": \"John\",\n  \"entity\": \"contact\",\n  \"per_page\": 10,\n  \"page\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/search/text",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "search", "text"]
+            },
+            "description": "Full-text search in contacts"
+          },
+          "response": []
+        },
+        {
+          "name": "Text Search - Tasks",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": \"proposal\",\n  \"entity\": \"task\",\n  \"per_page\": 10,\n  \"page\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/search/text",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "search", "text"]
+            },
+            "description": "Full-text search in tasks"
+          },
+          "response": []
+        },
+        {
+          "name": "Semantic Search - Companies",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/search/semantic?entity=company&q=large+technology+company&limit=5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "search", "semantic"],
+              "query": [
+                {
+                  "key": "entity",
+                  "value": "company"
+                },
+                {
+                  "key": "q",
+                  "value": "large technology company"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Semantic search using embeddings (requires OpenAI/Jina API key)"
+          },
+          "response": []
+        },
+        {
+          "name": "Semantic Search - Contacts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/search/semantic?entity=contact&q=interested+decision+maker&limit=5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "search", "semantic"],
+              "query": [
+                {
+                  "key": "entity",
+                  "value": "contact"
+                },
+                {
+                  "key": "q",
+                  "value": "interested decision maker"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Hybrid Search - Contacts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": \"interested decision maker\",\n  \"entity\": \"contact\",\n  \"semantic_weight\": 0.7,\n  \"text_weight\": 0.3,\n  \"limit\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/search/hybrid",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "search", "hybrid"]
+            },
+            "description": "Hybrid search combining semantic and full-text search with weighted scoring"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "tenant_id",
+      "value": "demo",
+      "type": "string"
+    },
+    {
+      "key": "unit_id",
+      "value": "sales",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "company_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "contact_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "note_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "task_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "opportunity_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

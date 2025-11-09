@@ -1,0 +1,294 @@
+{
+  "tenant_id": "demo",
+  "entities": [
+    {
+      "name": "contact",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "phone",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "source",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "role",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "company_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        }
+      ]
+    },
+    {
+      "name": "company",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "phone",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "website",
+          "type": "url",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "size",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "industry",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": false
+        }
+      ]
+    },
+    {
+      "name": "note",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "required": true,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "company_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        },
+        {
+          "name": "contact_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        }
+      ]
+    },
+    {
+      "name": "task",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "due_date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "company_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        },
+        {
+          "name": "contact_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        },
+        {
+          "name": "lead_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        }
+      ]
+    },
+    {
+      "name": "opportunity",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "value",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "stage",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "company_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        },
+        {
+          "name": "contact_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        }
+      ]
+    }
+  ]
+}

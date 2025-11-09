@@ -1,0 +1,51 @@
+FROM node:20-alpine AS base
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@8.15.0
+
+# Copy workspace files
+COPY pnpm-workspace.yaml package.json ./
+COPY .npmrc* ./
+
+# Copy all package.json files
+COPY packages/*/package.json ./packages/*/
+COPY apps/*/package.json ./apps/*/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build all packages
+RUN pnpm build
+
+# Production stage
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@8.15.0
+
+# Copy workspace files
+COPY pnpm-workspace.yaml package.json ./
+COPY packages/*/package.json ./packages/*/
+COPY apps/api/package.json ./apps/api/
+
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy built files
+COPY --from=base /app/packages ./packages
+COPY --from=base /app/apps/api/dist ./apps/api/dist
+
+WORKDIR /app/apps/api
+
+EXPOSE 3000
+
+CMD ["node", "dist/main.js"]
+
+
