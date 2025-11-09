@@ -82,6 +82,7 @@ function buildTypesenseSchema(entityDef, name) {
             const tsField = {
                 name: field.name,
                 type: mapFieldTypeToTypesense(field.type),
+                optional: !field.required,
             };
             if (field.searchable) {
                 tsField.index = true;
@@ -92,11 +93,19 @@ function buildTypesenseSchema(entityDef, name) {
             fields.push(tsField);
         }
     }
-    return {
+    const numericFields = fields.filter((f) => (f.type === 'int32' || f.type === 'int64' || f.type === 'float') && !f.optional);
+    const dateFields = fields.filter((f) => f.type === 'int64' && !f.optional);
+    const defaultSortField = dateFields.find((f) => f.name === 'created_at' || f.name === 'updated_at')?.name ||
+        numericFields.find((f) => f.name !== 'id')?.name ||
+        undefined;
+    const schema = {
         name,
         fields,
-        default_sorting_field: 'id',
     };
+    if (defaultSortField) {
+        schema.default_sorting_field = defaultSortField;
+    }
+    return schema;
 }
 function mapFieldTypeToTypesense(fieldType) {
     switch (fieldType) {

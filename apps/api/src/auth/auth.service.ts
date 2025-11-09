@@ -3,6 +3,7 @@ import { UnauthorizedError } from '@crm-atlas/core';
 import { hashPassword, verifyPassword, signJwt } from '@crm-atlas/auth';
 import { getDb } from '@crm-atlas/db';
 import type { User } from '@crm-atlas/types';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class AuthService {
@@ -60,5 +61,17 @@ export class AuthService {
 
     const result = await db.collection('users').insertOne(user as any);
     return { ...user, _id: result.insertedId.toString() };
+  }
+
+  async getCurrentUser(userId: string): Promise<Omit<User, 'passwordHash'> | null> {
+    const db = getDb();
+    const userDoc = await db.collection('users').findOne({ _id: new ObjectId(userId) });
+    if (!userDoc) {
+      return null;
+    }
+    const user = userDoc as unknown as User;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 }

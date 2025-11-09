@@ -2,11 +2,15 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateEntityDto {
   // Index signature for dynamic entity fields
+  // Note: ValidationPipe with forbidNonWhitelisted will be disabled for this DTO
+  // using a custom pipe in the controller
   [key: string]: unknown;
 }
 
 export class UpdateEntityDto {
   // Index signature for dynamic entity fields
+  // Note: ValidationPipe with forbidNonWhitelisted will be disabled for this DTO
+  // using a custom pipe in the controller
   [key: string]: unknown;
 }
 

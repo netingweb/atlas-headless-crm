@@ -18,6 +18,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @crm-atlas/api dev",
+    "dev:playground": "pnpm --filter @crm-atlas/playground dev",
     "start": "pnpm --filter @crm-atlas/api start",
     "build": "pnpm -w -r build",
     "lint": "pnpm -w -r lint",

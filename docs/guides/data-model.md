@@ -72,11 +72,11 @@ Attività e compiti da svolgere.
 - `status` (string, optional) - Stato del task (dictionary: `task_status`)
 - `company_id` (reference → company, optional) - Relazione con l'azienda
 - `contact_id` (reference → contact, optional) - Relazione con il contatto
-- `lead_id` (reference → contact, optional) - Relazione con il lead/contatto
 
 **Relazioni:**
 
-- Può essere associato a una `company`, un `contact`, o un `lead` (o combinazioni)
+- Può essere associato a una `company` e/o un `contact` (o combinazioni)
+- Nota: I "leads" non sono un'entità separata - sono contatti con uno status specifico (es. "new", "pre_qualification")
 
 ### 5. Opportunity
 

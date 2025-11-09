@@ -1,0 +1,259 @@
+import { Injectable } from '@nestjs/common';
+import { getDb } from '@crm-atlas/db';
+import { MongoConfigLoader } from '@crm-atlas/config';
+import { EntityRepository } from '@crm-atlas/db';
+import { search, searchQdrant } from '@crm-atlas/search';
+import { createEmbeddingsProvider, getProviderConfig } from '@crm-atlas/embeddings';
+import { getEmbeddableFields } from '@crm-atlas/utils';
+import type { TenantContext } from '@crm-atlas/core';
+
+@Injectable()
+export class MCPService {
+  private configLoader: MongoConfigLoader;
+  private repository: EntityRepository;
+
+  constructor() {
+    this.configLoader = new MongoConfigLoader(getDb());
+    this.repository = new EntityRepository();
+  }
+
+  async listTools(
+    tenantId: string,
+    unitId: string
+  ): Promise<Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>> {
+    const units = await this.configLoader.getUnits(tenantId);
+    const entities = await this.configLoader.getEntities({
+      tenant_id: tenantId,
+      unit_id: unitId || units[0]?.unit_id || '',
+    });
+
+    const tools: Array<{
+      name: string;
+      description: string;
+      inputSchema: Record<string, unknown>;
+    }> = [];
+
+    for (const entity of entities) {
+      // Create entity tool
+      tools.push({
+        name: `create_${entity.name}`,
+        description: `Create a new ${entity.name} in CRM`,
+        inputSchema: {
+          type: 'object',
+          properties: this.buildEntityProperties(entity),
+          required: entity.fields
+            .filter((f: { required: boolean }) => f.required)
+            .map((f: { name: string }) => f.name),
+        },
+      });
+
+      // Search entity tool
+      tools.push({
+        name: `search_${entity.name}`,
+        description: `Search for ${entity.name} using text or semantic search`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Search query' },
+            type: {
+              type: 'string',
+              enum: ['text', 'semantic', 'hybrid'],
+              description: 'Search type',
+              default: 'hybrid',
+            },
+            limit: { type: 'number', description: 'Result limit', default: 10 },
+          },
+          required: ['query'],
+        },
+      });
+
+      // Get entity by ID tool
+      tools.push({
+        name: `get_${entity.name}`,
+        description: `Get a ${entity.name} by ID`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'Entity ID' },
+          },
+          required: ['id'],
+        },
+      });
+    }
+
+    return tools;
+  }
+
+  private buildEntityProperties(entity: {
+    fields: Array<{ name: string; type: string; required: boolean }>;
+  }): Record<string, unknown> {
+    const properties: Record<string, unknown> = {};
+
+    for (const field of entity.fields) {
+      const schema: Record<string, unknown> = {};
+
+      switch (field.type) {
+        case 'string':
+        case 'email':
+        case 'url':
+        case 'text':
+          schema.type = 'string';
+          break;
+        case 'number':
+          schema.type = 'number';
+          break;
+        case 'boolean':
+          schema.type = 'boolean';
+          break;
+        case 'date':
+          schema.type = 'string';
+          schema.format = 'date';
+          break;
+        default:
+          schema.type = 'string';
+      }
+
+      properties[field.name] = schema;
+    }
+
+    return properties;
+  }
+
+  async callTool(
+    tenantId: string,
+    unitId: string,
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<{ content: Array<{ type: string; text: string }>; isError: boolean }> {
+    try {
+      const [action, entity] = name.split('_', 2);
+      const ctx: TenantContext = { tenant_id: tenantId, unit_id: unitId };
+
+      if (action === 'create') {
+        const created = await this.repository.create(ctx, entity, args);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(created, null, 2),
+            },
+          ],
+          isError: false,
+        };
+      }
+
+      if (action === 'search') {
+        const searchType = (args.type as string) || 'hybrid';
+        const query = args.query as string;
+        const limit = (args.limit as number) || 10;
+
+        if (searchType === 'semantic' || searchType === 'hybrid') {
+          const entityDef = await this.configLoader.getEntity(ctx, entity);
+          if (entityDef) {
+            const embeddableFields = getEmbeddableFields(entityDef);
+            if (embeddableFields.length > 0) {
+              const tenantConfig = await this.configLoader.getTenant(tenantId);
+              const globalConfig = getProviderConfig();
+              const provider = createEmbeddingsProvider(
+                globalConfig,
+                tenantConfig?.embeddingsProvider
+              );
+              const [queryVector] = await provider.embedTexts([query]);
+
+              const results = await searchQdrant(tenantId, entity, {
+                vector: queryVector,
+                limit,
+                filter: {
+                  must: [
+                    { key: 'tenant_id', match: { value: tenantId } },
+                    { key: 'unit_id', match: { value: unitId } },
+                  ],
+                },
+              });
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(results, null, 2),
+                  },
+                ],
+                isError: false,
+              };
+            }
+          }
+        }
+
+        // Fallback to text search
+        const results = await search(ctx, entity, {
+          q: query,
+          per_page: limit,
+          page: 1,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2),
+            },
+          ],
+          isError: false,
+        };
+      }
+
+      if (action === 'get') {
+        const id = args.id as string;
+        const doc = await this.repository.findById(ctx, entity, id);
+
+        if (!doc) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({ error: 'Not found' }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(doc, null, 2),
+            },
+          ],
+          isError: false,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ error: `Unknown action: ${action}` }, null, 2),
+          },
+        ],
+        isError: true,
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                error: error instanceof Error ? error.message : 'Unknown error',
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+}

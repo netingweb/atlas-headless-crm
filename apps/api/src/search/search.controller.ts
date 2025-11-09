@@ -17,6 +17,31 @@ import {
 } from '../common/dto/search.dto';
 import { HybridSearchDto, HybridSearchResponseDto } from './hybrid-search.dto';
 
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class GlobalSearchDto {
+  @ApiProperty({
+    description: 'Search query',
+    example: 'test',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty()
+  q!: string;
+
+  @ApiProperty({
+    description: 'Maximum number of results per entity',
+    example: 5,
+    default: 10,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  limit?: number;
+}
+
 @ApiTags('search')
 @Controller(':tenant/:unit/search')
 export class SearchController {
@@ -111,5 +136,26 @@ export class SearchController {
       query.limit
     );
     return results as HybridSearchResponseDto;
+  }
+
+  @Post('global')
+  @ApiOperation({
+    summary: 'Global search across all entities',
+    description: 'Search across all entity types simultaneously using full-text search.',
+  })
+  @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
+  @ApiParam({ name: 'unit', description: 'Unit ID', example: 'sales' })
+  @ApiBody({ type: GlobalSearchDto })
+  @ApiOkResponse({
+    description: 'Global search results grouped by entity type',
+  })
+  @ApiBearerAuth()
+  async globalSearch(
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
+    @Body() body: GlobalSearchDto
+  ) {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
+    return this.searchService.globalSearch(ctx, body.q, body.limit || 10);
   }
 }

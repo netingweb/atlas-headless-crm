@@ -26,6 +26,7 @@ import { NotFoundError } from '@crm-atlas/core';
 import type { TenantContext } from '@crm-atlas/core';
 import { CreateEntityDto, UpdateEntityDto, EntityResponseDto } from '../common/dto/entity.dto';
 import { RelationsService } from './relations.service';
+import { DynamicEntityValidationPipe } from '../common/pipes/dynamic-entity.pipe';
 
 @ApiTags('entities')
 @Controller(':tenant/:unit/:entity')
@@ -62,7 +63,7 @@ export class EntitiesController {
     @Param('tenant') tenant: string,
     @Param('unit') unit: string,
     @Param('entity') entity: string,
-    @Body() data: CreateEntityDto
+    @Body(DynamicEntityValidationPipe) data: CreateEntityDto
   ): Promise<EntityResponseDto> {
     const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.entitiesService.create(ctx, entity, data) as Promise<EntityResponseDto>;
@@ -129,7 +130,7 @@ export class EntitiesController {
     @Param('unit') unit: string,
     @Param('entity') entity: string,
     @Param('id') id: string,
-    @Body() data: UpdateEntityDto
+    @Body(DynamicEntityValidationPipe) data: UpdateEntityDto
   ): Promise<EntityResponseDto> {
     const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.entitiesService.update(ctx, entity, id, data) as Promise<EntityResponseDto>;

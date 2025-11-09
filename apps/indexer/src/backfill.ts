@@ -67,11 +67,24 @@ async function backfillEntity(
 
   const embeddableFields = getEmbeddableFields(entityDef);
   if (embeddableFields.length > 0) {
-    const tenantConfig = await configLoader.getTenant(tenantId);
-    const globalConfig = getProviderConfig();
-    const provider = createEmbeddingsProvider(globalConfig, tenantConfig?.embeddingsProvider);
-    const [sampleVector] = await provider.embedTexts(['sample']);
-    await ensureQdrantCollection(tenantId, entity, sampleVector.length);
+    try {
+      const tenantConfig = await configLoader.getTenant(tenantId);
+      const globalConfig = getProviderConfig();
+
+      // Skip Qdrant if no embeddings provider is configured
+      if (!globalConfig.name && !tenantConfig?.embeddingsProvider?.name) {
+        console.log(`    ⚠️  Skipping Qdrant for ${entity}: no embeddings provider configured`);
+      } else {
+        const provider = createEmbeddingsProvider(globalConfig, tenantConfig?.embeddingsProvider);
+        const [sampleVector] = await provider.embedTexts(['sample']);
+        await ensureQdrantCollection(tenantId, entity, sampleVector.length);
+      }
+    } catch (error) {
+      console.warn(
+        `    ⚠️  Failed to setup Qdrant for ${entity}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
   }
 
   // Get all documents
@@ -88,24 +101,40 @@ async function backfillEntity(
         ...doc,
       });
 
-      // Index in Qdrant if has embeddable fields
+      // Index in Qdrant if has embeddable fields and embeddings provider is configured
       if (embeddableFields.length > 0) {
-        const tenantConfig = await configLoader.getTenant(tenantId);
-        const globalConfig = getProviderConfig();
-        const provider = createEmbeddingsProvider(globalConfig, tenantConfig?.embeddingsProvider);
+        try {
+          const tenantConfig = await configLoader.getTenant(tenantId);
+          const globalConfig = getProviderConfig();
 
-        const textToEmbed = concatFields(doc as Record<string, unknown>, embeddableFields);
-        if (textToEmbed.trim()) {
-          const [vector] = await provider.embedTexts([textToEmbed]);
-          await upsertQdrantPoint(tenantId, entity, {
-            id: docId,
-            vector,
-            payload: {
-              tenant_id: tenantId,
-              unit_id: unitId,
-              ...doc,
-            },
-          });
+          // Skip Qdrant indexing if no embeddings provider is configured
+          if (!globalConfig.name && !tenantConfig?.embeddingsProvider?.name) {
+            // Skip silently - already logged during setup
+          } else {
+            const provider = createEmbeddingsProvider(
+              globalConfig,
+              tenantConfig?.embeddingsProvider
+            );
+            const textToEmbed = concatFields(doc as Record<string, unknown>, embeddableFields);
+            if (textToEmbed.trim()) {
+              const [vector] = await provider.embedTexts([textToEmbed]);
+              await upsertQdrantPoint(tenantId, entity, {
+                id: docId,
+                vector,
+                payload: {
+                  tenant_id: tenantId,
+                  unit_id: unitId,
+                  ...doc,
+                },
+              });
+            }
+          }
+        } catch (error) {
+          // Log error but continue with Typesense indexing
+          console.warn(
+            `    ⚠️  Failed to index ${entity}/${docId} in Qdrant:`,
+            error instanceof Error ? error.message : error
+          );
         }
       }
 

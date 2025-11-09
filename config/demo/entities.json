@@ -1,4 +1,5 @@
 {
+  "_comment": "⚠️ IMPORTANT: After modifying this file, you MUST run 'pnpm config:sync demo' to sync changes to MongoDB. Changes are NOT applied automatically!",
   "tenant_id": "demo",
   "entities": [
     {
@@ -50,7 +51,10 @@
           "required": false,
           "indexed": true,
           "searchable": false,
-          "embeddable": false
+          "embeddable": false,
+          "validation": {
+            "enum": ["new", "pre_qualification", "qualified", "customer", "win", "lost"]
+          }
         },
         {
           "name": "company_id",
@@ -217,15 +221,6 @@
         },
         {
           "name": "contact_id",
-          "type": "reference",
-          "required": false,
-          "indexed": true,
-          "searchable": false,
-          "embeddable": false,
-          "reference_entity": "contact"
-        },
-        {
-          "name": "lead_id",
           "type": "reference",
           "required": false,
           "indexed": true,

@@ -133,8 +133,9 @@ export async function search(
 
   const result = await client.collections(collName).documents().search(searchParams);
   return {
-    hits: (result.hits?.map((h: any) => h.document as TypesenseDocument) ||
-      []) as TypesenseDocument[],
+    hits: (result.hits?.map(
+      (h: { document?: TypesenseDocument }) => (h.document || h) as TypesenseDocument
+    ) || []) as TypesenseDocument[],
     found: result.found || 0,
     page: result.page || 1,
   };
@@ -155,6 +156,7 @@ function buildTypesenseSchema(
       const tsField: TypesenseField = {
         name: field.name,
         type: mapFieldTypeToTypesense(field.type),
+        optional: !field.required, // Make field optional if not required in entity definition
       };
 
       if (field.searchable) {
@@ -169,11 +171,30 @@ function buildTypesenseSchema(
     }
   }
 
-  return {
+  // Find a suitable default sorting field (must be numeric or date and NOT optional)
+  // Typesense requires default_sorting_field to be numeric (int32, int64, float) or date and must not be optional
+  const numericFields = fields.filter(
+    (f) => (f.type === 'int32' || f.type === 'int64' || f.type === 'float') && !f.optional
+  );
+  const dateFields = fields.filter((f) => f.type === 'int64' && !f.optional); // Dates are stored as int64 timestamps
+
+  // Prefer created_at or updated_at if available, otherwise any numeric field (must not be optional)
+  const defaultSortField =
+    dateFields.find((f) => f.name === 'created_at' || f.name === 'updated_at')?.name ||
+    numericFields.find((f) => f.name !== 'id')?.name ||
+    undefined;
+
+  const schema: TypesenseCollectionCreateSchema = {
     name,
     fields,
-    default_sorting_field: 'id',
   };
+
+  // Only set default_sorting_field if we found a valid numeric/date field
+  if (defaultSortField) {
+    schema.default_sorting_field = defaultSortField;
+  }
+
+  return schema;
 }
 
 function mapFieldTypeToTypesense(fieldType: string): TypesenseField['type'] {
@@ -192,4 +213,130 @@ function mapFieldTypeToTypesense(fieldType: string): TypesenseField['type'] {
     default:
       return 'string';
   }
+}
+
+export interface TypesenseHealth {
+  ok: boolean;
+  version?: string;
+  error?: string;
+}
+
+export interface TypesenseMetrics {
+  collections: number;
+  documents: number;
+  memoryUsage?: {
+    used: number;
+    total: number;
+  };
+  cpuUsage?: number;
+}
+
+export interface CollectionStats {
+  name: string;
+  numDocuments: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * Check Typesense server health
+ */
+export async function checkTypesenseHealth(): Promise<TypesenseHealth> {
+  try {
+    const client = getTypesenseClient();
+    const health = await client.health.retrieve();
+    // Typesense health response may have version property
+    const healthResponse = health as { version?: string };
+    return {
+      ok: true,
+      version: healthResponse.version,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Get Typesense server metrics
+ */
+export async function getTypesenseMetrics(_ctx: TenantContext): Promise<TypesenseMetrics> {
+  const client = getTypesenseClient();
+
+  try {
+    // Get all collections
+    const collections = await client.collections().retrieve();
+
+    // Count documents in all collections for this tenant/unit
+    let totalDocuments = 0;
+    const collectionStats: CollectionStats[] = [];
+
+    for (const collection of collections) {
+      try {
+        const stats = await client.collections(collection.name).retrieve();
+        const statsResponse = stats as {
+          num_documents?: number;
+          created_at?: number;
+          updated_at?: number;
+        };
+        const numDocs = statsResponse.num_documents || 0;
+        totalDocuments += numDocs;
+
+        collectionStats.push({
+          name: collection.name,
+          numDocuments: numDocs,
+          createdAt: statsResponse.created_at || 0,
+          updatedAt: statsResponse.updated_at || Date.now() / 1000,
+        });
+      } catch (error) {
+        // Skip collections that can't be accessed
+        console.warn(`Failed to get stats for collection ${collection.name}:`, error);
+      }
+    }
+
+    return {
+      collections: collections.length,
+      documents: totalDocuments,
+    };
+  } catch (error) {
+    throw new Error(
+      `Failed to get Typesense metrics: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/**
+ * Get collection statistics for a specific tenant/unit
+ */
+export async function getCollectionStats(ctx: TenantContext): Promise<CollectionStats[]> {
+  const client = getTypesenseClient();
+  const collections = await client.collections().retrieve();
+  const stats: CollectionStats[] = [];
+
+  const prefix = collectionName(ctx.tenant_id, ctx.unit_id, '');
+
+  for (const collection of collections) {
+    if (collection.name.startsWith(prefix)) {
+      try {
+        const collectionInfo = await client.collections(collection.name).retrieve();
+        const infoResponse = collectionInfo as {
+          num_documents?: number;
+          created_at?: number;
+          updated_at?: number;
+        };
+        stats.push({
+          name: collection.name,
+          numDocuments: infoResponse.num_documents || 0,
+          createdAt: infoResponse.created_at || 0,
+          updatedAt: infoResponse.updated_at || Date.now() / 1000,
+        });
+      } catch (error) {
+        console.warn(`Failed to get stats for collection ${collection.name}:`, error);
+      }
+    }
+  }
+
+  return stats;
 }

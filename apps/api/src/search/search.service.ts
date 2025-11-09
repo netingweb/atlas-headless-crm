@@ -187,4 +187,56 @@ export class SearchService {
       total: results.length,
     };
   }
+
+  /**
+   * Global search across all entities
+   */
+  async globalSearch(
+    ctx: TenantContext,
+    query: string,
+    limit = 10
+  ): Promise<Array<{ entity: string; items: unknown[] }>> {
+    const entities = await this.configLoader.getEntities(ctx);
+    const results: Array<{ entity: string; items: unknown[] }> = [];
+
+    // Search each entity type
+    for (const entityDef of entities) {
+      try {
+        const searchResults = await this.textSearch(ctx, {
+          q: query,
+          entity: entityDef.name,
+          per_page: limit,
+          page: 1,
+        });
+
+        if (searchResults.hits && searchResults.hits.length > 0) {
+          // Map hits to ensure consistent structure
+          const mappedItems = searchResults.hits.map(
+            (hit: {
+              document?: { id?: string; _id?: string; [key: string]: unknown };
+              id?: string;
+              _id?: string;
+              [key: string]: unknown;
+            }) => {
+              // Typesense returns documents directly or wrapped in document property
+              if (hit.document) {
+                const doc = hit.document as { id?: string; _id?: string; [key: string]: unknown };
+                return { ...doc, _id: doc.id || doc._id };
+              }
+              return { ...hit, _id: hit.id || hit._id };
+            }
+          );
+
+          results.push({
+            entity: entityDef.name,
+            items: mappedItems,
+          });
+        }
+      } catch (error) {
+        console.warn(`Global search failed for entity ${entityDef.name}:`, error);
+      }
+    }
+
+    return results;
+  }
 }

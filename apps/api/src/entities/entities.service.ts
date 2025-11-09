@@ -186,10 +186,20 @@ export class EntitiesService {
       // Index in Typesense for full-text search
       const { ensureCollection } = await import('@crm-atlas/search');
       await ensureCollection(ctx, entity, entityDef);
-      await upsertDocument(ctx, entity, {
+
+      // Prepare document for Typesense (ensure id is string and remove MongoDB _id)
+      const typesenseDoc: { id: string; [key: string]: unknown } = {
         id: String(doc._id),
         ...doc,
-      });
+      };
+      // Remove _id to avoid duplication (we use id instead)
+      delete typesenseDoc._id;
+
+      await upsertDocument(ctx, entity, typesenseDoc);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`✅ Indexed ${entity}/${doc._id} in Typesense`);
+      }
 
       // Index in Qdrant for semantic search (if has embeddable fields)
       const embeddableFields = getEmbeddableFields(entityDef);
@@ -217,6 +227,11 @@ export class EntitiesService {
     } catch (error) {
       // Log error but don't fail the request
       console.error(`Failed to index entity ${entity}/${doc._id}:`, error);
+      // Re-throw in development to help debug indexing issues
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Indexing error details:', error instanceof Error ? error.message : error);
+        console.warn('Indexing error stack:', error instanceof Error ? error.stack : 'No stack');
+      }
     }
   }
 

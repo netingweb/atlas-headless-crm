@@ -55,6 +55,7 @@ CRM Atlas follows clear and consistent development principles:
    - Define your custom entities via JSON
    - Add fields, relationships, and validations without touching code
    - Adapt the CRM to your specific needs
+   - **Note**: After modifying `entities.json`, run `pnpm config:sync` to apply changes
 
 3. **📈 Enterprise Scalability**
    - Multi-tenant architecture to manage multiple organizations
@@ -558,13 +559,54 @@ See [config/README.md](config/README.md) for details.
 
 ### Configuration Synchronization
 
-After modifying JSON files:
+**⚠️ IMPORTANT: You must sync after every configuration change!**
+
+After modifying JSON configuration files, you **must** synchronize them to MongoDB:
 
 ```bash
-pnpm config:sync
+# Sync demo tenant
+pnpm config:sync demo
+
+# Or specify a different tenant
+pnpm config:sync <tenant_id>
 ```
 
-This synchronizes JSON configurations with MongoDB.
+#### When to Sync
+
+You **must** run `pnpm config:sync` after modifying:
+
+- ✅ **entities.json** - Adding/modifying/removing entities or fields
+- ✅ **tenant.json** - Tenant configuration changes
+- ✅ **units.json** - Adding/modifying units
+- ✅ **permissions.json** - Role and permission changes
+- ✅ **dictionary.json** - Dictionary changes
+- ✅ **sharing_policy.json** - Sharing policy changes
+- ✅ **workflows.json** - Workflow changes
+- ✅ **mcp.manifest.json** - MCP manifest changes
+
+**Note**: Configuration changes in JSON files are **not automatically applied**. The API loads configurations from MongoDB, so you must sync your changes to the database.
+
+#### What Sync Does
+
+The sync script:
+
+1. Reads all JSON files from `config/{tenant_id}/`
+2. Syncs configurations to MongoDB database
+3. Replaces existing configurations (upsert)
+4. API will reload new configurations on next access (or after cache clear)
+
+#### Clear API Cache (Optional)
+
+After syncing, you can clear the API cache to force immediate reload:
+
+```bash
+curl -X GET "http://localhost:3000/api/demo/config/clear-cache" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+Or restart the API to reload configurations.
+
+See [config/README.md](config/README.md) for more details.
 
 ## 🔒 Authentication
 

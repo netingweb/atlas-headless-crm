@@ -1,9 +1,9 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { connectMongo } from '@crm-atlas/db';
+import { SmartValidationPipe } from './common/pipes/smart-validation.pipe';
 
 /**
  * CRM Atlas API Server
@@ -23,10 +23,45 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter({ logger: true })
   );
 
+  // CORS configuration - register on Fastify instance directly
+  // For development, allow all origins. In production, restrict to specific origins
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const fastifyInstance = app.getHttpAdapter().getInstance();
+
+  const allowedOrigins = [
+    process.env.FRONTEND_URL || 'http://localhost:5173',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ];
+
+  // Register CORS plugin
+  const corsPlugin = await import('@fastify/cors');
+  await fastifyInstance.register(corsPlugin.default, {
+    origin: isDevelopment ? true : allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  });
+
   app.setGlobalPrefix('api');
 
+  // Add hook to handle OPTIONS requests - must be after setGlobalPrefix but handles all routes
+  fastifyInstance.addHook('onRequest', async (request, reply) => {
+    const origin = request.headers.origin as string | undefined;
+    if (request.method === 'OPTIONS') {
+      if (isDevelopment || !origin || allowedOrigins.includes(origin)) {
+        reply.header('Access-Control-Allow-Origin', origin || '*');
+        reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+        reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
+        reply.header('Access-Control-Allow-Credentials', 'true');
+        reply.header('Access-Control-Max-Age', '86400');
+        return reply.code(204).send();
+      }
+    }
+  });
+
   app.useGlobalPipes(
-    new ValidationPipe({
+    new SmartValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
@@ -59,6 +94,9 @@ async function bootstrap(): Promise<void> {
         'Entity CRUD operations (contacts, companies, tasks, notes, opportunities)'
       )
       .addTag('search', 'Search endpoints (full-text and semantic)')
+      .addTag('mcp', 'MCP tools endpoints for AI integration')
+      .addTag('config', 'Configuration endpoints')
+      .addTag('stats', 'Statistics and dashboard endpoints')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
