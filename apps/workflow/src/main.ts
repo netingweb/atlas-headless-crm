@@ -1,3 +1,4 @@
+import { loadRootEnv } from '@crm-atlas/utils';
 import { connectMongo } from '@crm-atlas/db';
 import { WorkflowEngine } from './workflow-engine';
 
@@ -6,6 +7,7 @@ const dbName = process.env.MONGODB_DB_NAME || 'crm_atlas';
 
 async function main(): Promise<void> {
   try {
+    loadRootEnv();
     await connectMongo(mongoUri, dbName);
     console.log('✅ Connesso a MongoDB');
 

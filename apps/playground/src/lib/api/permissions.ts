@@ -40,6 +40,19 @@ export const API_SCOPES: Record<string, string[]> = {
   // MCP APIs
   'mcp.listTools': ['crm:read'],
   'mcp.callTool': ['crm:write', 'crm:read', 'crm:delete'], // Requires at least one
+
+  // Workflows APIs
+  'workflows.list': ['crm:read'],
+  'workflows.get': ['crm:read'],
+  'workflows.create': ['workflows:manage'],
+  'workflows.update': ['workflows:manage'],
+  'workflows.delete': ['workflows:manage'],
+  'workflows.updateStatus': ['workflows:manage'],
+  'workflows.trigger': ['workflows:execute'],
+  'workflows.getExecutions': ['crm:read'],
+  'workflows.getExecutionLog': ['crm:read'],
+  'workflows.getTenantExecutions': ['crm:read'],
+  'workflows.getStats': ['crm:read'],
 };
 
 /**

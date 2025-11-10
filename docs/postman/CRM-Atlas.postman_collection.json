@@ -1048,6 +1048,338 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Workflows",
+      "item": [
+        {
+          "name": "List All Workflows",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "workflows"]
+            },
+            "description": "Get all workflows for a tenant/unit"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Workflow by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows/{{workflow_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "workflows", "{{workflow_id}}"]
+            },
+            "description": "Get a workflow by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Workflow",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('workflow_id', jsonData.workflow_id);",
+                  "    console.log('Workflow ID saved:', jsonData.workflow_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Workflow\",\n  \"type\": \"event\",\n  \"enabled\": true,\n  \"status\": \"active\",\n  \"trigger\": {\n    \"type\": \"event\",\n    \"event\": \"entity.updated\",\n    \"entity\": \"lead\",\n    \"conditions\": [\n      {\n        \"field\": \"status\",\n        \"operator\": \"==\",\n        \"value\": \"hot\"\n      }\n    ]\n  },\n  \"actions\": [\n    {\n      \"type\": \"update\",\n      \"entity\": \"lead\",\n      \"data\": {\n        \"assigned_to\": \"sales_manager_1\"\n      }\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "workflows"]
+            },
+            "description": "Create a new workflow"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Workflow",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Workflow Name\",\n  \"enabled\": true,\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows/{{workflow_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "workflows", "{{workflow_id}}"]
+            },
+            "description": "Update a workflow"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Workflow",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows/{{workflow_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "workflows", "{{workflow_id}}"]
+            },
+            "description": "Delete a workflow"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Workflow Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"inactive\",\n  \"enabled\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows/{{workflow_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{tenant_id}}",
+                "{{unit_id}}",
+                "workflows",
+                "{{workflow_id}}",
+                "status"
+              ]
+            },
+            "description": "Update workflow status (enable/disable)"
+          },
+          "response": []
+        },
+        {
+          "name": "Trigger Workflow",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('execution_id', jsonData.execution_id);",
+                  "    console.log('Execution ID saved:', jsonData.execution_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"context\": {\n    \"entity_id\": \"123\",\n    \"entity_type\": \"lead\",\n    \"status\": \"hot\"\n  },\n  \"actor\": \"user_123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows/{{workflow_id}}/run",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "workflows", "{{workflow_id}}", "run"]
+            },
+            "description": "Trigger a workflow manually"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Workflow Executions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows/{{workflow_id}}/executions?limit=100&offset=0",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{tenant_id}}",
+                "{{unit_id}}",
+                "workflows",
+                "{{workflow_id}}",
+                "executions"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Get execution logs for a workflow"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Execution Log by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows/executions/{{execution_id}}",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{tenant_id}}",
+                "{{unit_id}}",
+                "workflows",
+                "executions",
+                "{{execution_id}}"
+              ]
+            },
+            "description": "Get an execution log by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Tenant Executions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows/executions?limit=100&offset=0&workflowId={{workflow_id}}&status=completed",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{tenant_id}}", "{{unit_id}}", "workflows", "executions"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "workflowId",
+                  "value": "{{workflow_id}}"
+                },
+                {
+                  "key": "status",
+                  "value": "completed"
+                }
+              ]
+            },
+            "description": "Get execution logs for a tenant with filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Workflow Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{tenant_id}}/{{unit_id}}/workflows/{{workflow_id}}/stats",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{tenant_id}}",
+                "{{unit_id}}",
+                "workflows",
+                "{{workflow_id}}",
+                "stats"
+              ]
+            },
+            "description": "Get workflow statistics (total, completed, failed, skipped, average duration, last execution)"
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [
@@ -1093,6 +1425,16 @@
     },
     {
       "key": "opportunity_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "workflow_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "execution_id",
       "value": "",
       "type": "string"
     }

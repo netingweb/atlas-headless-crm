@@ -2,63 +2,46 @@ import { Queue, Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { getDb } from '@crm-atlas/db';
-import { EntityRepository } from '@crm-atlas/db';
 import type { TenantContext } from '@crm-atlas/core';
+import type { WorkflowDefinition, WorkflowCondition, WorkflowOperator } from '@crm-atlas/types';
+import {
+  WorkflowLogger,
+  type ActionExecutionResult,
+  type ConditionEvaluationResult,
+} from './workflow-logger';
+import { ActionRunner, type ActionExecutionContext } from './action-runner';
+import { logger } from '@crm-atlas/utils';
+import { randomUUID } from 'crypto';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-const redis = new Redis(redisUrl);
-
-export interface WorkflowTrigger {
-  type: 'event' | 'scheduled' | 'manual';
-  event?: string; // e.g., "entity.created", "entity.updated"
-  entity?: string;
-  conditions?: Array<{
-    field: string;
-    operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in';
-    value: unknown;
-  }>;
-  schedule?: string; // Cron expression
-}
-
-export interface WorkflowAction {
-  type: 'update' | 'create' | 'notify' | 'assign' | 'webhook';
-  entity?: string;
-  data?: Record<string, unknown>;
-  to?: string; // For notify/assign
-  webhook_url?: string; // For webhook
-  webhook_method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-}
-
-export interface WorkflowDefinition {
-  workflow_id: string;
-  trigger: WorkflowTrigger;
-  actions: WorkflowAction[];
-}
-
-export interface WorkflowExecution {
-  workflow_id: string;
-  tenant_id: string;
-  unit_id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  started_at: Date;
-  completed_at?: Date;
-  error?: string;
-  context: Record<string, unknown>;
-}
+const redis = new Redis(redisUrl, {
+  maxRetriesPerRequest: null, // Required by BullMQ for blocking commands
+});
 
 export class WorkflowEngine {
   private queues: Map<string, Queue> = new Map();
   private workers: Map<string, Worker> = new Map();
   private configLoader: MongoConfigLoader;
-  private repository: EntityRepository;
+  private workflowLogger: WorkflowLogger;
+  private actionRunner: ActionRunner;
+  private eventEmitter: {
+    on: (event: string, listener: (payload: unknown) => void) => void;
+    off: (event: string, listener: (payload: unknown) => void) => void;
+  } | null = null;
+  private eventListeners: Map<string, Array<() => void>> = new Map();
 
-  constructor() {
+  constructor(eventEmitter?: {
+    on: (event: string, listener: (payload: unknown) => void) => void;
+    off: (event: string, listener: (payload: unknown) => void) => void;
+  }) {
     this.configLoader = new MongoConfigLoader(getDb());
-    this.repository = new EntityRepository();
+    this.workflowLogger = new WorkflowLogger();
+    this.actionRunner = new ActionRunner();
+    this.eventEmitter = eventEmitter || null;
   }
 
   async start(): Promise<void> {
-    console.log('🚀 Avvio Workflow Engine...');
+    logger.info('Starting Workflow Engine...');
 
     // Load workflows for all tenants
     const tenants = await this.configLoader.getTenants();
@@ -68,11 +51,11 @@ export class WorkflowEngine {
       const units = await this.configLoader.getUnits(tenant.tenant_id);
 
       for (const unit of units) {
-        this.setupWorkflows(tenant.tenant_id, unit.unit_id, workflows);
+        await this.setupWorkflows(tenant.tenant_id, unit.unit_id, workflows);
       }
     }
 
-    console.log('✅ Workflow Engine avviato');
+    logger.info('Workflow Engine started');
   }
 
   private async loadWorkflows(tenantId: string): Promise<WorkflowDefinition[]> {
@@ -81,32 +64,151 @@ export class WorkflowEngine {
     return (config?.workflows as WorkflowDefinition[]) || [];
   }
 
-  private setupWorkflows(tenantId: string, unitId: string, workflows: WorkflowDefinition[]): void {
+  private async setupWorkflows(
+    tenantId: string,
+    unitId: string,
+    workflows: WorkflowDefinition[]
+  ): Promise<void> {
     for (const workflow of workflows) {
-      const queueName = `workflow:${tenantId}:${unitId}:${workflow.workflow_id}`;
+      // Skip if workflow is not enabled or not active
+      if (!workflow.enabled || workflow.status !== 'active') {
+        logger.debug(`Skipping workflow ${workflow.workflow_id} (disabled or inactive)`);
+        continue;
+      }
+
+      // Use unit_id from workflow if provided, otherwise use the unit from context
+      const workflowUnitId = workflow.unit_id || unitId;
+
+      const queueName = `workflow_${tenantId}_${workflowUnitId}_${workflow.workflow_id}`;
       const queue = new Queue(queueName, { connection: redis });
 
       // Create worker
       const worker = new Worker(
         queueName,
         async (job: Job) => {
-          await this.executeWorkflow(tenantId, unitId, workflow, job.data);
+          await this.executeWorkflow(tenantId, workflowUnitId, workflow, job.data);
         },
         { connection: redis }
       );
 
       worker.on('completed', (job) => {
-        console.log(`✅ Workflow ${workflow.workflow_id} completato: ${job.id}`);
+        logger.info(`Workflow ${workflow.workflow_id} completed`, { jobId: job.id });
       });
 
       worker.on('failed', (job, err) => {
-        console.error(`❌ Workflow ${workflow.workflow_id} fallito: ${job?.id}`, err);
+        logger.error(`Workflow ${workflow.workflow_id} failed`, err, { jobId: job?.id });
       });
 
       this.queues.set(queueName, queue);
       this.workers.set(queueName, worker);
 
-      console.log(`  ✓ Workflow configurato: ${workflow.workflow_id}`);
+      // Setup trigger based on type
+      if (workflow.type === 'event' && workflow.trigger.type === 'event') {
+        this.setupEventTrigger(tenantId, workflowUnitId, workflow);
+      } else if (workflow.type === 'schedule' && workflow.trigger.type === 'schedule') {
+        await this.setupScheduleTrigger(tenantId, workflowUnitId, workflow, queue);
+      }
+      // Manual triggers don't need setup
+
+      logger.info(`Workflow configured: ${workflow.workflow_id}`, {
+        type: workflow.type,
+        tenant: tenantId,
+        unit: workflowUnitId,
+      });
+    }
+  }
+
+  private setupEventTrigger(tenantId: string, unitId: string, workflow: WorkflowDefinition): void {
+    if (!this.eventEmitter) {
+      logger.warn('EventEmitter not available, event-based workflows will not work');
+      return;
+    }
+
+    if (workflow.trigger.type !== 'event') {
+      return;
+    }
+
+    const eventName = workflow.trigger.event;
+    const entityFilter = workflow.trigger.entity;
+
+    const listener = (payload: unknown) => {
+      const eventPayload = payload as Record<string, unknown>;
+      // Check if this event matches the workflow trigger
+      if (eventPayload.tenant_id !== tenantId) {
+        return;
+      }
+
+      if (eventPayload.unit_id !== unitId) {
+        return;
+      }
+
+      if (entityFilter && eventPayload.entity !== entityFilter) {
+        return;
+      }
+
+      // Try to queue the workflow execution
+      this.tryQueueExecution(tenantId, unitId, workflow, eventPayload, 'event').catch((error) => {
+        logger.error(`Failed to queue workflow ${workflow.workflow_id}`, error);
+      });
+    };
+
+    this.eventEmitter.on(eventName, listener);
+
+    // Store listener for cleanup
+    const key = `${tenantId}_${unitId}_${workflow.workflow_id}`;
+    if (!this.eventListeners.has(key)) {
+      this.eventListeners.set(key, []);
+    }
+    this.eventListeners.get(key)!.push(() => {
+      this.eventEmitter?.off(eventName, listener);
+    });
+
+    logger.debug(`Event trigger setup for workflow ${workflow.workflow_id}`, {
+      event: eventName,
+      entity: entityFilter,
+    });
+  }
+
+  private async setupScheduleTrigger(
+    tenantId: string,
+    unitId: string,
+    workflow: WorkflowDefinition,
+    queue: Queue
+  ): Promise<void> {
+    if (workflow.trigger.type !== 'schedule') {
+      return;
+    }
+
+    try {
+      // Validate cron expression (basic validation)
+      if (!workflow.trigger.cron || workflow.trigger.cron.trim() === '') {
+        throw new Error('Cron expression is required');
+      }
+
+      // Add repeatable job
+      await queue.add(
+        'execute',
+        {
+          tenant_id: tenantId,
+          unit_id: unitId,
+          trigger_type: 'schedule',
+        },
+        {
+          repeat: {
+            pattern: workflow.trigger.cron,
+          },
+          jobId: `schedule_${tenantId}_${unitId}_${workflow.workflow_id}`,
+        }
+      );
+
+      logger.debug(`Schedule trigger setup for workflow ${workflow.workflow_id}`, {
+        cron: workflow.trigger.cron,
+      });
+    } catch (error) {
+      logger.error(`Invalid cron expression for workflow ${workflow.workflow_id}`, error as Error, {
+        cron: workflow.trigger.cron,
+      });
+      return;
     }
   }
 
@@ -114,72 +216,305 @@ export class WorkflowEngine {
     tenantId: string,
     unitId: string,
     workflowId: string,
-    context: Record<string, unknown>
-  ): Promise<void> {
-    const queueName = `workflow:${tenantId}:${unitId}:${workflowId}`;
+    context: Record<string, unknown>,
+    actor?: string
+  ): Promise<string> {
+    const workflow = await this.findWorkflow(tenantId, workflowId);
+    if (!workflow) {
+      throw new Error(`Workflow ${workflowId} not found`);
+    }
+
+    const executionId = randomUUID();
+    const queueName = `workflow_${tenantId}_${unitId}_${workflowId}`;
     const queue = this.queues.get(queueName);
 
     if (!queue) {
-      throw new Error(`Workflow ${workflowId} non trovato`);
+      throw new Error(`Workflow ${workflowId} queue not found`);
     }
 
-    await queue.add('execute', context);
-    console.log(`📤 Workflow ${workflowId} triggerato`);
+    // Create execution log
+    const logId = await this.workflowLogger.createExecutionLog(
+      workflow,
+      executionId,
+      'manual',
+      context,
+      actor
+    );
+
+    await queue.add('execute', {
+      ...context,
+      execution_id: executionId,
+      log_id: logId,
+      trigger_type: 'manual',
+      actor,
+    });
+
+    logger.info(`Workflow ${workflowId} triggered manually`, { executionId, actor });
+
+    return executionId;
+  }
+
+  private async tryQueueExecution(
+    tenantId: string,
+    unitId: string,
+    workflow: WorkflowDefinition,
+    context: Record<string, unknown>,
+    triggerType: 'event' | 'schedule'
+  ): Promise<void> {
+    // Check if workflow is enabled
+    if (!workflow.enabled || workflow.status !== 'active') {
+      return;
+    }
+
+    // Evaluate conditions
+    if (
+      workflow.trigger.type !== 'manual' &&
+      'conditions' in workflow.trigger &&
+      workflow.trigger.conditions &&
+      workflow.trigger.conditions.length > 0
+    ) {
+      const conditionsMet = await this.evaluateConditions(
+        workflow.trigger.conditions,
+        context,
+        tenantId
+      );
+      if (!conditionsMet.met) {
+        logger.debug(`Workflow ${workflow.workflow_id} conditions not met, skipping`);
+        return;
+      }
+    }
+
+    // Queue execution
+    const executionId = randomUUID();
+    const queueName = `workflow_${tenantId}_${unitId}_${workflow.workflow_id}`;
+    const queue = this.queues.get(queueName);
+
+    if (!queue) {
+      logger.warn(`Queue not found for workflow ${workflow.workflow_id}`);
+      return;
+    }
+
+    // Create execution log
+    const logId = await this.workflowLogger.createExecutionLog(
+      workflow,
+      executionId,
+      triggerType,
+      context
+    );
+
+    await queue.add('execute', {
+      ...context,
+      execution_id: executionId,
+      log_id: logId,
+      trigger_type: triggerType,
+    });
+
+    logger.info(`Workflow ${workflow.workflow_id} queued for execution`, { executionId });
   }
 
   private async executeWorkflow(
     tenantId: string,
     unitId: string,
     workflow: WorkflowDefinition,
-    context: Record<string, unknown>
+    jobData: Record<string, unknown>
   ): Promise<void> {
     const ctx: TenantContext = { tenant_id: tenantId, unit_id: unitId };
+    const executionId = (jobData.execution_id as string) || randomUUID();
+    const logId = jobData.log_id as string | undefined;
 
-    console.log(`🔄 Esecuzione workflow: ${workflow.workflow_id}`);
-
-    // Check conditions if any
-    if (workflow.trigger.conditions && workflow.trigger.conditions.length > 0) {
-      const conditionsMet = this.evaluateConditions(workflow.trigger.conditions, context);
-      if (!conditionsMet) {
-        console.log(`  ⏭️  Condizioni non soddisfatte, workflow saltato`);
-        return;
-      }
+    // Update log status to running
+    if (logId) {
+      await this.workflowLogger.updateExecutionStatus(logId, 'running');
     }
 
-    // Execute actions
-    for (const action of workflow.actions) {
-      try {
-        await this.executeAction(ctx, action, context);
-      } catch (error) {
-        console.error(`  ❌ Errore esecuzione action ${action.type}:`, error);
-        throw error;
-      }
-    }
+    try {
+      logger.info(`Executing workflow: ${workflow.workflow_id}`, { executionId });
 
-    console.log(`  ✅ Workflow ${workflow.workflow_id} completato`);
+      // Evaluate conditions again (in case context changed)
+      let conditionsMet = { met: true, results: [] as ConditionEvaluationResult[] };
+      if (
+        workflow.trigger.type !== 'manual' &&
+        'conditions' in workflow.trigger &&
+        workflow.trigger.conditions &&
+        workflow.trigger.conditions.length > 0
+      ) {
+        conditionsMet = await this.evaluateConditions(
+          workflow.trigger.conditions,
+          jobData,
+          tenantId
+        );
+
+        // Update log with condition evaluations
+        if (logId) {
+          await this.workflowLogger.addConditionEvaluations(logId, conditionsMet.results);
+        }
+
+        if (!conditionsMet.met) {
+          logger.info(`Workflow ${workflow.workflow_id} conditions not met, skipping`);
+          if (logId) {
+            await this.workflowLogger.updateExecutionStatus(logId, 'skipped');
+          }
+          return;
+        }
+      }
+
+      // Execute actions
+      const actionResults: ActionExecutionResult[] = [];
+      const execContext: ActionExecutionContext = {
+        tenant_id: tenantId,
+        unit_id: unitId,
+        context: jobData,
+        apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
+      };
+
+      for (let i = 0; i < workflow.actions.length; i++) {
+        const action = workflow.actions[i];
+        const actionStartTime = new Date().toISOString();
+
+        // Log action start
+        if (logId) {
+          await this.workflowLogger.addActionExecution(logId, {
+            action_index: i,
+            action_type: action.type,
+            status: 'pending',
+            started_at: actionStartTime,
+          });
+        }
+
+        try {
+          // Update action status to running
+          if (logId) {
+            await this.workflowLogger.updateActionExecution(logId, i, 'running');
+          }
+
+          let result: unknown;
+
+          // Handle chain action specially
+          if (action.type === 'chain') {
+            const chainResult = await this.actionRunner.executeAction(ctx, action, execContext);
+            const chainedWorkflowId = (chainResult as { workflow_id: string }).workflow_id;
+            const chainedContext = (chainResult as { context: Record<string, unknown> }).context;
+
+            // Trigger chained workflow
+            await this.triggerWorkflow(
+              tenantId,
+              unitId,
+              chainedWorkflowId,
+              chainedContext,
+              'system'
+            );
+
+            result = { workflow_id: chainedWorkflowId, triggered: true };
+          } else {
+            result = await this.actionRunner.executeAction(ctx, action, execContext);
+          }
+
+          // Update action status to completed
+          if (logId) {
+            await this.workflowLogger.updateActionExecution(logId, i, 'completed', result);
+          }
+
+          actionResults.push({
+            action_index: i,
+            action_type: action.type,
+            status: 'completed',
+            started_at: actionStartTime,
+            completed_at: new Date().toISOString(),
+            result,
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          // Update action status to failed
+          if (logId) {
+            await this.workflowLogger.updateActionExecution(
+              logId,
+              i,
+              'failed',
+              undefined,
+              errorMessage
+            );
+          }
+
+          actionResults.push({
+            action_index: i,
+            action_type: action.type,
+            status: 'failed',
+            started_at: actionStartTime,
+            completed_at: new Date().toISOString(),
+            error: errorMessage,
+          });
+
+          // Decide whether to continue or fail
+          // For now, we fail on any action error
+          logger.error(
+            `Action ${action.type} failed in workflow ${workflow.workflow_id}`,
+            error as Error
+          );
+          throw error;
+        }
+      }
+
+      // Execute chained workflows if any
+      if (workflow.chained_workflows && workflow.chained_workflows.length > 0) {
+        for (const chainedWorkflowId of workflow.chained_workflows) {
+          await this.triggerWorkflow(tenantId, unitId, chainedWorkflowId, jobData, 'system');
+        }
+      }
+
+      // Update log status to completed
+      if (logId) {
+        await this.workflowLogger.updateExecutionStatus(logId, 'completed');
+      }
+
+      logger.info(`Workflow ${workflow.workflow_id} completed successfully`, { executionId });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Update log status to failed
+      if (logId) {
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        await this.workflowLogger.updateExecutionStatus(logId, 'failed', errorMessage, errorStack);
+      }
+
+      logger.error(`Workflow ${workflow.workflow_id} failed`, error as Error, { executionId });
+      throw error;
+    }
   }
 
-  private evaluateConditions(
-    conditions: WorkflowTrigger['conditions'],
-    context: Record<string, unknown>
-  ): boolean {
-    if (!conditions || conditions.length === 0) return true;
+  private async evaluateConditions(
+    conditions: WorkflowCondition[],
+    context: Record<string, unknown>,
+    tenantId: string
+  ): Promise<{ met: boolean; results: ConditionEvaluationResult[] }> {
+    if (!conditions || conditions.length === 0) {
+      return { met: true, results: [] };
+    }
+
+    const results: ConditionEvaluationResult[] = [];
+    let allMet = true;
 
     for (const condition of conditions) {
       const fieldValue = this.getNestedValue(context, condition.field);
-      const conditionMet = this.evaluateCondition(fieldValue, condition.operator, condition.value);
+      const resolvedValue = await this.resolveConditionValue(condition.value, context, tenantId);
+      const conditionMet = this.evaluateCondition(fieldValue, condition.operator, resolvedValue);
+
+      results.push({
+        condition,
+        result: conditionMet,
+        field_value: fieldValue,
+      });
 
       if (!conditionMet) {
-        return false;
+        allMet = false;
       }
     }
 
-    return true;
+    return { met: allMet, results };
   }
 
   private evaluateCondition(
     fieldValue: unknown,
-    operator: WorkflowTrigger['conditions'][0]['operator'],
+    operator: WorkflowOperator,
     expectedValue: unknown
   ): boolean {
     switch (operator) {
@@ -199,9 +534,105 @@ export class WorkflowEngine {
         return String(fieldValue).includes(String(expectedValue));
       case 'in':
         return Array.isArray(expectedValue) && expectedValue.includes(fieldValue);
+      case 'startsWith':
+        return String(fieldValue).startsWith(String(expectedValue));
+      case 'endsWith':
+        return String(fieldValue).endsWith(String(expectedValue));
+      case 'isEmpty':
+        return fieldValue === undefined || fieldValue === null || fieldValue === '';
+      case 'isNotEmpty':
+        return fieldValue !== undefined && fieldValue !== null && fieldValue !== '';
       default:
         return false;
     }
+  }
+
+  private async resolveConditionValue(
+    value: unknown,
+    context: Record<string, unknown>,
+    tenantId: string
+  ): Promise<unknown> {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    // Handle dictionary references: {{dictionary.key}}
+    if (value.startsWith('{{dictionary.')) {
+      const match = value.match(/\{\{dictionary\.([^}]+)\}\}/);
+      if (match) {
+        const dictKey = match[1];
+        return await this.getDictionaryValue(dictKey, tenantId);
+      }
+    }
+
+    // Handle date expressions: {{today}}, {{today+7d}}
+    if (value.includes('{{today')) {
+      return this.resolveDateExpression(value);
+    }
+
+    // Handle now: {{now}}
+    if (value === '{{now}}') {
+      return new Date().toISOString();
+    }
+
+    // Handle context field access: {{field.path}}
+    if (value.startsWith('{{') && value.endsWith('}}')) {
+      const path = value.substring(2, value.length - 2).trim();
+      return this.getNestedValue(context, path);
+    }
+
+    return value;
+  }
+
+  private async getDictionaryValue(key: string, tenantId: string): Promise<unknown> {
+    try {
+      const db = getDb();
+      const config = await db.collection('dictionaries').findOne({ tenant_id: tenantId });
+      if (config && config.dictionaries) {
+        const dicts = config.dictionaries as Record<string, unknown>;
+        return this.getNestedValue(dicts, key);
+      }
+    } catch (error) {
+      logger.warn(`Failed to load dictionary value for key ${key}`, { error });
+    }
+    return undefined;
+  }
+
+  private resolveDateExpression(expression: string): string {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Match patterns like "{{today+7d}}", "{{today-1d}}", etc.
+    const match = expression.match(/\{\{today([+-])(\d+)([dwmy])\}\}/);
+    if (match) {
+      const operator = match[1];
+      const amount = parseInt(match[2], 10);
+      const unit = match[3];
+
+      let days = 0;
+      switch (unit) {
+        case 'd':
+          days = amount;
+          break;
+        case 'w':
+          days = amount * 7;
+          break;
+        case 'm':
+          days = amount * 30;
+          break;
+        case 'y':
+          days = amount * 365;
+          break;
+      }
+
+      if (operator === '+') {
+        today.setDate(today.getDate() + days);
+      } else {
+        today.setDate(today.getDate() - days);
+      }
+    }
+
+    return today.toISOString().split('T')[0];
   }
 
   private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
@@ -212,85 +643,47 @@ export class WorkflowEngine {
     }, obj as unknown);
   }
 
-  private async executeAction(
-    ctx: TenantContext,
-    action: WorkflowAction,
-    context: Record<string, unknown>
-  ): Promise<void> {
-    switch (action.type) {
-      case 'update': {
-        if (!action.entity || !context.entity_id) {
-          throw new Error('Entity e entity_id richiesti per action update');
-        }
-        await this.repository.update(
-          ctx,
-          action.entity,
-          String(context.entity_id),
-          action.data || {}
-        );
-        console.log(`    ✓ Updated ${action.entity}/${String(context.entity_id)}`);
-        break;
-      }
-
-      case 'create': {
-        if (!action.entity) {
-          throw new Error('Entity richiesta per action create');
-        }
-        const created = await this.repository.create(ctx, action.entity, action.data || {});
-        console.log(`    ✓ Created ${action.entity}/${String((created as { _id: string })._id)}`);
-        break;
-      }
-
-      case 'assign': {
-        if (!action.entity || !context.entity_id || !action.to) {
-          throw new Error('Entity, entity_id e to richiesti per action assign');
-        }
-        await this.repository.update(ctx, action.entity, String(context.entity_id), {
-          assigned_to: action.to,
-        });
-        console.log(`    ✓ Assigned ${action.entity}/${String(context.entity_id)} to ${action.to}`);
-        break;
-      }
-
-      case 'notify': {
-        // Placeholder for notification (email/webhook)
-        console.log(`    📧 Notify ${action.to}: ${JSON.stringify(action.data)}`);
-        break;
-      }
-
-      case 'webhook': {
-        if (!action.webhook_url) {
-          throw new Error('webhook_url richiesta per action webhook');
-        }
-        const method = action.webhook_method || 'POST';
-        await fetch(action.webhook_url, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...context, ...action.data }),
-        });
-        console.log(`    ✓ Webhook chiamato: ${action.webhook_url}`);
-        break;
-      }
-
-      default:
-        throw new Error(`Action type sconosciuto: ${(action as { type: string }).type}`);
-    }
+  private async findWorkflow(
+    tenantId: string,
+    workflowId: string
+  ): Promise<WorkflowDefinition | null> {
+    const workflows = await this.loadWorkflows(tenantId);
+    return workflows.find((w) => w.workflow_id === workflowId) || null;
   }
 
   async stop(): Promise<void> {
-    console.log('🛑 Arresto Workflow Engine...');
+    logger.info('Stopping Workflow Engine...');
 
+    // Remove event listeners
+    for (const listeners of this.eventListeners.values()) {
+      for (const removeListener of listeners) {
+        removeListener();
+      }
+    }
+    this.eventListeners.clear();
+
+    // Close workers
     for (const [name, worker] of this.workers.entries()) {
       await worker.close();
-      console.log(`  ✓ Worker chiuso: ${name}`);
+      logger.debug(`Worker closed: ${name}`);
     }
+    this.workers.clear();
 
+    // Close queues
     for (const [name, queue] of this.queues.entries()) {
       await queue.close();
-      console.log(`  ✓ Queue chiusa: ${name}`);
+      logger.debug(`Queue closed: ${name}`);
     }
+    this.queues.clear();
 
     await redis.quit();
-    console.log('✅ Workflow Engine arrestato');
+    logger.info('Workflow Engine stopped');
+  }
+
+  /**
+   * Get workflow logger instance
+   */
+  getLogger(): WorkflowLogger {
+    return this.workflowLogger;
   }
 }

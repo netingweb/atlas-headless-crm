@@ -86,4 +86,9 @@ export const configApi = {
       return null;
     }
   },
+
+  clearCache: async (tenant: string): Promise<{ message: string }> => {
+    const response = await apiClient.get<{ message: string }>(`/${tenant}/config/clear-cache`);
+    return response.data;
+  },
 };

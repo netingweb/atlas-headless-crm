@@ -101,7 +101,10 @@ export async function upsertDocument(
 ): Promise<void> {
   const client = getTypesenseClient();
   const collName = collectionName(ctx.tenant_id, ctx.unit_id, entity);
-  await client.collections(collName).documents().upsert(doc);
+  // Be tolerant to missing/invalid fields: coerce or drop values that don't match schema
+  await client.collections(collName).documents().upsert(doc, {
+    dirty_values: 'coerce_or_drop',
+  });
 }
 
 export async function deleteDocument(
@@ -148,8 +151,8 @@ function buildTypesenseSchema(
 ): TypesenseCollectionCreateSchema {
   const fields: TypesenseField[] = [
     { name: 'id', type: 'string' },
-    { name: 'tenant_id', type: 'string', facet: true },
-    { name: 'unit_id', type: 'string', facet: true },
+    { name: 'tenant_id', type: 'string', facet: true, optional: true },
+    { name: 'unit_id', type: 'string', facet: true, optional: true },
   ];
 
   for (const field of entityDef.fields) {

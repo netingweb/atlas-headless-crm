@@ -8,6 +8,7 @@ RUN npm install -g pnpm@8.15.0
 # Copy workspace files
 COPY pnpm-workspace.yaml package.json ./
 COPY .npmrc* ./
+COPY pnpm-lock.yaml ./
 
 # Copy all package.json files
 COPY packages/*/package.json ./packages/*/
@@ -32,6 +33,7 @@ RUN npm install -g pnpm@8.15.0
 
 # Copy workspace files
 COPY pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml ./
 COPY packages/*/package.json ./packages/*/
 COPY apps/api/package.json ./apps/api/
 

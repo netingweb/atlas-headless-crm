@@ -1,3 +1,4 @@
+import { loadRootEnv } from '@crm-atlas/utils';
 import { connectMongo, getDb } from '@crm-atlas/db';
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { collectionName } from '@crm-atlas/utils';
@@ -16,6 +17,7 @@ const dbName = process.env.MONGODB_DB_NAME || 'crm_atlas';
 
 export async function backfillIndexes(): Promise<void> {
   console.log('🔄 Avvio backfill indici...');
+  loadRootEnv();
 
   const configLoader = new MongoConfigLoader(getDb());
   const tenants = await configLoader.getTenants();
@@ -99,6 +101,8 @@ async function backfillEntity(
       await upsertDocument(ctx, entity, {
         id: docId,
         ...doc,
+        tenant_id: tenantId,
+        unit_id: unitId,
       });
 
       // Index in Qdrant if has embeddable fields and embeddings provider is configured

@@ -24,7 +24,8 @@ export class EntitiesService {
   private readonly configLoader = new MongoConfigLoader(getDb());
   private readonly validatorCache = new ValidatorCache();
   private readonly relationsService = new RelationsService();
-  private readonly events: EntityEvents | null = null; // Will be injected if EventEmitter2 is available
+
+  constructor(private readonly events?: EntityEvents) {}
 
   async create(
     ctx: TenantContext,
@@ -191,6 +192,9 @@ export class EntitiesService {
       const typesenseDoc: { id: string; [key: string]: unknown } = {
         id: String(doc._id),
         ...doc,
+        // Ensure tenant/unit are always present for Typesense faceting/filters
+        tenant_id: ctx.tenant_id,
+        unit_id: ctx.unit_id,
       };
       // Remove _id to avoid duplication (we use id instead)
       delete typesenseDoc._id;

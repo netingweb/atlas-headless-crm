@@ -1,3 +1,4 @@
+import { loadRootEnv } from '@crm-atlas/utils';
 import { MongoClient } from 'mongodb';
 import { hashPassword } from '@crm-atlas/auth';
 
@@ -8,6 +9,7 @@ const defaultAdminEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@demo.local';
 const defaultAdminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'changeme';
 
 async function seed(): Promise<void> {
+  loadRootEnv();
   const client = new MongoClient(mongoUri);
   await client.connect();
   const db = client.db(dbName);
@@ -88,7 +90,10 @@ async function seed(): Promise<void> {
   const permissionsConfig = {
     tenant_id: defaultTenant,
     roles: [
-      { role: 'admin', scopes: ['crm:read', 'crm:write', 'crm:delete'] },
+      {
+        role: 'admin',
+        scopes: ['crm:read', 'crm:write', 'crm:delete', 'workflows:manage', 'workflows:execute'],
+      },
       { role: 'sales_manager', scopes: ['crm:read', 'crm:write'] },
       { role: 'sales_rep', scopes: ['crm:read'] },
     ],
@@ -106,7 +111,7 @@ async function seed(): Promise<void> {
     email: defaultAdminEmail.toLowerCase(),
     passwordHash,
     roles: ['admin'],
-    scopes: ['crm:read', 'crm:write', 'crm:delete'],
+    scopes: ['crm:read', 'crm:write', 'crm:delete', 'workflows:manage', 'workflows:execute'],
     created_at: new Date(),
     updated_at: new Date(),
   };

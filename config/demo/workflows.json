@@ -3,6 +3,12 @@
   "workflows": [
     {
       "workflow_id": "followup_hot_lead",
+      "tenant_id": "demo",
+      "unit_id": "sales",
+      "name": "Follow up hot lead",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
       "trigger": {
         "type": "event",
         "event": "entity.updated",
@@ -22,8 +28,67 @@
           "data": {
             "assigned_to": "sales_manager_1"
           }
+        },
+        {
+          "type": "create",
+          "entity": "task",
+          "data": {
+            "title": "Follow up hot lead",
+            "type": "follow_up",
+            "due_date": "{{today+1d}}"
+          }
         }
-      ]
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Automatically assign hot leads to sales manager and create follow-up task",
+        "version": 1
+      },
+      "created_at": "2025-01-09T10:00:00Z",
+      "updated_at": "2025-01-09T10:00:00Z"
+    },
+    {
+      "workflow_id": "remind_pending_quotes",
+      "tenant_id": "demo",
+      "unit_id": "sales",
+      "name": "Reminder preventivi in sospeso",
+      "type": "schedule",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "schedule",
+        "cron": "0 8 * * *",
+        "entity": "opportunity",
+        "conditions": [
+          {
+            "field": "status",
+            "operator": "==",
+            "value": "proposal"
+          },
+          {
+            "field": "updated_at",
+            "operator": "<=",
+            "value": "{{today-7d}}"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "notify",
+          "to": "sales_manager_1",
+          "subject": "Reminder: Preventivi in sospeso",
+          "message": "Ci sono preventivi in sospeso da più di 7 giorni che richiedono attenzione."
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Invia reminder giornaliero per preventivi in sospeso da più di 7 giorni",
+        "version": 1
+      },
+      "created_at": "2025-01-09T10:00:00Z",
+      "updated_at": "2025-01-09T10:00:00Z"
     }
   ]
 }

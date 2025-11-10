@@ -1,6 +1,9 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUIStore } from '@/stores/ui-store';
 import { Button } from '@/components/ui/button';
+import { useAuthStore } from '@/stores/auth-store';
+import { useQuery } from '@tanstack/react-query';
+import { configApi } from '@/lib/api/config';
 import {
   LayoutDashboard,
   Users,
@@ -10,23 +13,61 @@ import {
   Target,
   Menu,
   Settings,
+  Workflow,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const menuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-  { icon: Users, label: 'Contacts', path: '/entities/contact', entity: 'contact' },
-  { icon: Building2, label: 'Companies', path: '/entities/company', entity: 'company' },
-  { icon: FileText, label: 'Notes', path: '/entities/note', entity: 'note' },
-  { icon: CheckSquare, label: 'Tasks', path: '/entities/task', entity: 'task' },
-  { icon: Target, label: 'Opportunities', path: '/entities/opportunity', entity: 'opportunity' },
-  { icon: Settings, label: 'Settings', path: '/settings' },
-];
+const entityIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  contact: Users,
+  company: Building2,
+  note: FileText,
+  task: CheckSquare,
+  opportunity: Target,
+};
+
+function toTitle(text: string): string {
+  if (!text) return '';
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { tenantId } = useAuthStore();
+
+  const { data: entityDefs, error: entitiesError } = useQuery({
+    queryKey: ['config-entities', tenantId],
+    queryFn: () => configApi.getEntities(tenantId || ''),
+    enabled: !!tenantId,
+    staleTime: 60_000,
+    retry: 2,
+  });
+
+  // Log error for debugging
+  if (entitiesError) {
+    console.error('Error loading entities for sidebar:', entitiesError);
+  }
+
+  const dynamicItems =
+    (entityDefs || [])
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((def) => {
+        const Icon = entityIconMap[def.name] || FileText;
+        return {
+          icon: Icon,
+          label: toTitle(def.name),
+          path: `/entities/${def.name}`,
+        };
+      }) || [];
+
+  const menuItems = [
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
+    ...dynamicItems,
+    { icon: Workflow, label: 'Workflows', path: '/workflows' },
+    { icon: Settings, label: 'Settings', path: '/settings' },
+  ];
 
   return (
     <aside

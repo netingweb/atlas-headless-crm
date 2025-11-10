@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import type { EmbeddingsProvider, ProviderConfig, ProviderName } from './provider';
 import { OpenAIProvider } from './openai-provider';
 import { JinaProvider } from './jina-provider';

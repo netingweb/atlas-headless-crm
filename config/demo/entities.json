@@ -284,6 +284,62 @@
           "reference_entity": "contact"
         }
       ]
+    },
+    {
+      "name": "product",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "sku",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "category",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "validation": {
+            "enum": [
+              "webmarketing",
+              "development",
+              "consulting",
+              "design",
+              "automation",
+              "training",
+              "support"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

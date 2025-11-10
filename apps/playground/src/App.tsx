@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import EntityList from './pages/EntityList';
 import EntityDetail from './pages/EntityDetail';
+import WorkflowsList from './pages/WorkflowsList';
+import WorkflowDetail from './pages/WorkflowDetail';
 import Settings from './pages/Settings';
 import MainLayout from './components/layout/MainLayout';
 
@@ -37,6 +39,8 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="entities/:entityType" element={<EntityList />} />
             <Route path="entities/:entityType/:id" element={<EntityDetail />} />
+            <Route path="workflows" element={<WorkflowsList />} />
+            <Route path="workflows/:id" element={<WorkflowDetail />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>

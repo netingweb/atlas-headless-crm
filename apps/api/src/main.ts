@@ -1,3 +1,4 @@
+import { loadRootEnv } from '@crm-atlas/utils';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -14,6 +15,8 @@ import { SmartValidationPipe } from './common/pipes/smart-validation.pipe';
  */
 
 async function bootstrap(): Promise<void> {
+  // Ensure .env from monorepo root is loaded
+  loadRootEnv();
   // Debug: Log environment variables status
   console.log('[Bootstrap] Environment variables check:', {
     hasOpenAIKey: !!process.env.OPENAI_API_KEY,

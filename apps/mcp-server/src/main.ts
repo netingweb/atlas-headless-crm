@@ -1,3 +1,4 @@
+import { loadRootEnv } from '@crm-atlas/utils';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -365,6 +366,7 @@ class MCPServer {
 
 async function main(): Promise<void> {
   try {
+    loadRootEnv();
     await connectMongo(mongoUri, dbName);
     console.log('✅ Connesso a MongoDB');
 

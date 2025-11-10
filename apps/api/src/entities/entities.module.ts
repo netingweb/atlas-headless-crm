@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { EntitiesController } from './entities.controller';
 import { EntitiesService } from './entities.service';
 import { RelationsService } from './relations.service';
+import { EntityEvents } from './entities.events';
 
 @Module({
   controllers: [EntitiesController],
-  providers: [EntitiesService, RelationsService],
+  providers: [EntitiesService, RelationsService, EntityEvents],
+  exports: [EntitiesService],
 })
 export class EntitiesModule {}

@@ -1,0 +1,239 @@
+{
+  "description": "Esempio completo di configurazione workflow per Atlas CRM",
+  "examples": [
+    {
+      "name": "Workflow Event-Based - Assegna Lead Caldo",
+      "workflow": {
+        "name": "Assegna Lead Caldo",
+        "type": "event",
+        "enabled": true,
+        "status": "active",
+        "trigger": {
+          "type": "event",
+          "event": "entity.updated",
+          "entity": "lead",
+          "conditions": [
+            {
+              "field": "status",
+              "operator": "==",
+              "value": "hot"
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "update",
+            "entity": "lead",
+            "data": {
+              "assigned_to": "sales_manager_1",
+              "priority": "high"
+            }
+          },
+          {
+            "type": "create",
+            "entity": "task",
+            "data": {
+              "title": "Follow up lead caldo: {{context.entity.name}}",
+              "type": "follow_up",
+              "due_date": "{{today+1d}}",
+              "assigned_to": "sales_manager_1",
+              "related_to": {
+                "entity": "lead",
+                "entity_id": "{{context.entity_id}}"
+              }
+            }
+          },
+          {
+            "type": "notify",
+            "to": "sales_manager_1",
+            "subject": "Nuovo Lead Caldo Assegnato",
+            "message": "Un nuovo lead caldo ({{context.entity.name}}) è stato assegnato a te."
+          }
+        ],
+        "chained_workflows": [],
+        "metadata": {
+          "created_by": "admin",
+          "description": "Assegna automaticamente lead caldi al sales manager e crea task di follow-up",
+          "version": 1
+        }
+      }
+    },
+    {
+      "name": "Workflow Schedule-Based - Reminder Preventivi",
+      "workflow": {
+        "name": "Reminder Preventivi in Sospeso",
+        "type": "schedule",
+        "enabled": true,
+        "status": "active",
+        "trigger": {
+          "type": "schedule",
+          "cron": "0 8 * * *",
+          "entity": "opportunity",
+          "conditions": [
+            {
+              "field": "status",
+              "operator": "==",
+              "value": "proposal"
+            },
+            {
+              "field": "updated_at",
+              "operator": "<=",
+              "value": "{{today-7d}}"
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "notify",
+            "to": "sales_manager_1",
+            "subject": "Reminder: Preventivi in Sospeso",
+            "message": "Ci sono preventivi in sospeso da più di 7 giorni che richiedono attenzione."
+          }
+        ],
+        "chained_workflows": [],
+        "metadata": {
+          "created_by": "admin",
+          "description": "Invia reminder giornaliero alle 8:00 per preventivi in sospeso da più di 7 giorni",
+          "version": 1
+        }
+      }
+    },
+    {
+      "name": "Workflow con Webhook",
+      "workflow": {
+        "name": "Notifica Esterna Lead Caldo",
+        "type": "event",
+        "enabled": true,
+        "status": "active",
+        "trigger": {
+          "type": "event",
+          "event": "entity.created",
+          "entity": "lead",
+          "conditions": [
+            {
+              "field": "status",
+              "operator": "==",
+              "value": "hot"
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "webhook",
+            "webhook_url": "https://external-api.example.com/webhooks/lead-created",
+            "webhook_method": "POST",
+            "headers": {
+              "Authorization": "Bearer YOUR_API_KEY",
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "lead_id": "{{context.entity_id}}",
+              "lead_name": "{{context.entity.name}}",
+              "lead_email": "{{context.entity.email}}",
+              "status": "{{context.entity.status}}",
+              "tenant_id": "{{context.tenant_id}}"
+            },
+            "timeout": 10000
+          }
+        ],
+        "chained_workflows": [],
+        "metadata": {
+          "created_by": "admin",
+          "description": "Invia notifica a sistema esterno quando viene creato un lead caldo",
+          "version": 1
+        }
+      }
+    },
+    {
+      "name": "Workflow con Chain - Sequenza di Azioni",
+      "workflow": {
+        "name": "Processo Completo Nuovo Cliente",
+        "type": "event",
+        "enabled": true,
+        "status": "active",
+        "trigger": {
+          "type": "event",
+          "event": "entity.created",
+          "entity": "company",
+          "conditions": [
+            {
+              "field": "status",
+              "operator": "==",
+              "value": "customer"
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "create",
+            "entity": "task",
+            "data": {
+              "title": "Onboarding nuovo cliente: {{context.entity.name}}",
+              "type": "onboarding",
+              "due_date": "{{today+3d}}",
+              "assigned_to": "account_manager_1"
+            }
+          },
+          {
+            "type": "chain",
+            "workflow_id": "send_welcome_email"
+          },
+          {
+            "type": "chain",
+            "workflow_id": "create_initial_opportunity"
+          }
+        ],
+        "chained_workflows": ["send_welcome_email", "create_initial_opportunity"],
+        "metadata": {
+          "created_by": "admin",
+          "description": "Avvia processo completo di onboarding per nuovi clienti",
+          "version": 1
+        }
+      }
+    },
+    {
+      "name": "Workflow con API Call Interna",
+      "workflow": {
+        "name": "Aggiorna Statistiche Lead",
+        "type": "event",
+        "enabled": true,
+        "status": "active",
+        "trigger": {
+          "type": "event",
+          "event": "entity.updated",
+          "entity": "lead",
+          "conditions": [
+            {
+              "field": "status",
+              "operator": "==",
+              "value": "converted"
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "api_call",
+            "endpoint": "/api/{{context.tenant_id}}/{{context.unit_id}}/stats/update-lead-conversion",
+            "method": "POST",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "lead_id": "{{context.entity_id}}",
+              "converted_at": "{{now}}",
+              "converted_by": "{{context.entity.assigned_to}}"
+            },
+            "timeout": 5000
+          }
+        ],
+        "chained_workflows": [],
+        "metadata": {
+          "created_by": "admin",
+          "description": "Aggiorna statistiche quando un lead viene convertito",
+          "version": 1
+        }
+      }
+    }
+  ],
+  "note": "Quando si crea un workflow tramite API, il campo 'workflow_id' è opzionale e verrà generato automaticamente se non fornito. I campi 'tenant_id', 'unit_id', 'created_at' e 'updated_at' vengono impostati automaticamente dal server."
+}

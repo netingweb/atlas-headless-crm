@@ -1,3 +1,4 @@
+import { loadRootEnv } from '@crm-atlas/utils';
 import { MongoClient } from 'mongodb';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -6,6 +7,7 @@ const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/crm_atlas
 const dbName = process.env.MONGODB_DB_NAME || 'crm_atlas';
 
 async function syncConfig(tenantId: string): Promise<void> {
+  loadRootEnv();
   const client = new MongoClient(mongoUri);
   await client.connect();
   const db = client.db(dbName);
@@ -75,7 +77,7 @@ async function syncConfig(tenantId: string): Promise<void> {
     try {
       const workflowsConfig = JSON.parse(readFileSync(join(configDir, 'workflows.json'), 'utf-8'));
       await db
-        .collection('workflows_config')
+        .collection('workflows')
         .replaceOne({ tenant_id: tenantId }, workflowsConfig, { upsert: true });
       console.log(`✅ Synced workflows.json`);
     } catch {

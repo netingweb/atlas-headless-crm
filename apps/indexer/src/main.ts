@@ -1,3 +1,4 @@
+import { loadRootEnv } from '@crm-atlas/utils';
 import { connectMongo, getDb } from '@crm-atlas/db';
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { collectionName } from '@crm-atlas/utils';
@@ -35,6 +36,7 @@ class IndexerService {
   }
 
   async start(): Promise<void> {
+    loadRootEnv();
     if (this.isRunning) {
       console.log('⚠️  Indexer già in esecuzione');
       return;
@@ -185,6 +187,8 @@ class IndexerService {
     const typesenseDoc: { id: string; [key: string]: unknown } = {
       id: docId,
       ...doc,
+      tenant_id: tenantId,
+      unit_id: unitId,
     };
     // Remove _id to avoid duplication (we use id instead)
     delete typesenseDoc._id;

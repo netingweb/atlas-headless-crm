@@ -51,12 +51,30 @@ const API_CATEGORIES: Record<string, { name: string; apis: string[] }> = {
     name: 'MCP Tools',
     apis: ['mcp.listTools', 'mcp.callTool'],
   },
+  workflows: {
+    name: 'Workflows',
+    apis: [
+      'workflows.list',
+      'workflows.get',
+      'workflows.create',
+      'workflows.update',
+      'workflows.delete',
+      'workflows.updateStatus',
+      'workflows.trigger',
+      'workflows.getExecutions',
+      'workflows.getExecutionLog',
+      'workflows.getTenantExecutions',
+      'workflows.getStats',
+    ],
+  },
 };
 
 const SCOPE_COLORS: Record<string, string> = {
   'crm:read': 'bg-blue-100 text-blue-800',
   'crm:write': 'bg-green-100 text-green-800',
   'crm:delete': 'bg-red-100 text-red-800',
+  'workflows:manage': 'bg-purple-100 text-purple-800',
+  'workflows:execute': 'bg-orange-100 text-orange-800',
 };
 
 export default function APIMethodsTab() {

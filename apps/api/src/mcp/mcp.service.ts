@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, Optional, forwardRef } from '@nestjs/common';
 import { getDb } from '@crm-atlas/db';
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { EntityRepository } from '@crm-atlas/db';
@@ -6,13 +6,20 @@ import { search, searchQdrant } from '@crm-atlas/search';
 import { createEmbeddingsProvider, getProviderConfig } from '@crm-atlas/embeddings';
 import { getEmbeddableFields } from '@crm-atlas/utils';
 import type { TenantContext } from '@crm-atlas/core';
+import { EntitiesService } from '../entities/entities.service';
+import { WorkflowsService } from '../workflows/workflows.service';
 
 @Injectable()
 export class MCPService {
   private configLoader: MongoConfigLoader;
   private repository: EntityRepository;
 
-  constructor() {
+  constructor(
+    private readonly entitiesService: EntitiesService,
+    @Optional()
+    @Inject(forwardRef(() => WorkflowsService))
+    private readonly workflowsService?: WorkflowsService
+  ) {
     this.configLoader = new MongoConfigLoader(getDb());
     this.repository = new EntityRepository();
   }
@@ -81,6 +88,98 @@ export class MCPService {
       });
     }
 
+    // Add workflow tools
+    if (this.workflowsService) {
+      tools.push(
+        {
+          name: 'workflow.list',
+          description: 'List all workflows for a tenant/unit',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+            required: [],
+          },
+        },
+        {
+          name: 'workflow.get',
+          description: 'Get a workflow by ID',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              workflow_id: { type: 'string', description: 'Workflow ID' },
+            },
+            required: ['workflow_id'],
+          },
+        },
+        {
+          name: 'workflow.create',
+          description: 'Create a new workflow',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              workflow: {
+                type: 'object',
+                description: 'Workflow definition',
+              },
+            },
+            required: ['workflow'],
+          },
+        },
+        {
+          name: 'workflow.update',
+          description: 'Update an existing workflow',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              workflow_id: { type: 'string', description: 'Workflow ID' },
+              workflow: {
+                type: 'object',
+                description: 'Workflow updates',
+              },
+            },
+            required: ['workflow_id', 'workflow'],
+          },
+        },
+        {
+          name: 'workflow.delete',
+          description: 'Delete a workflow',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              workflow_id: { type: 'string', description: 'Workflow ID' },
+            },
+            required: ['workflow_id'],
+          },
+        },
+        {
+          name: 'workflow.trigger',
+          description: 'Trigger a workflow manually',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              workflow_id: { type: 'string', description: 'Workflow ID' },
+              context: {
+                type: 'object',
+                description: 'Context data for workflow execution',
+              },
+            },
+            required: ['workflow_id'],
+          },
+        },
+        {
+          name: 'workflow.status',
+          description: 'Get workflow status and statistics',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              workflow_id: { type: 'string', description: 'Workflow ID' },
+            },
+            required: ['workflow_id'],
+          },
+        }
+      );
+    }
+
     return tools;
   }
 
@@ -130,7 +229,8 @@ export class MCPService {
       const ctx: TenantContext = { tenant_id: tenantId, unit_id: unitId };
 
       if (action === 'create') {
-        const created = await this.repository.create(ctx, entity, args);
+        // Use EntitiesService to ensure proper indexing in Typesense and Qdrant
+        const created = await this.entitiesService.create(ctx, entity, args);
         return {
           content: [
             {
@@ -332,6 +432,232 @@ export class MCPService {
           ],
           isError: false,
         };
+      }
+
+      // Handle workflow tools
+      if (name.startsWith('workflow.')) {
+        if (!this.workflowsService) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({ error: 'WorkflowsService not available' }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const ctx: TenantContext = { tenant_id: tenantId, unit_id: unitId };
+        const workflowAction = name.substring('workflow.'.length);
+
+        try {
+          switch (workflowAction) {
+            case 'list': {
+              const workflows = await this.workflowsService.getWorkflows(ctx);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(workflows, null, 2),
+                  },
+                ],
+                isError: false,
+              };
+            }
+
+            case 'get': {
+              const workflowId = args.workflow_id as string;
+              if (!workflowId) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify({ error: 'workflow_id is required' }, null, 2),
+                    },
+                  ],
+                  isError: true,
+                };
+              }
+              const workflow = await this.workflowsService.getWorkflow(ctx, workflowId);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(workflow, null, 2),
+                  },
+                ],
+                isError: false,
+              };
+            }
+
+            case 'create': {
+              const workflow = args.workflow as Record<string, unknown>;
+              if (!workflow) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify({ error: 'workflow is required' }, null, 2),
+                    },
+                  ],
+                  isError: true,
+                };
+              }
+              const created = await this.workflowsService.createWorkflow(ctx, workflow as any);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(created, null, 2),
+                  },
+                ],
+                isError: false,
+              };
+            }
+
+            case 'update': {
+              const workflowId = args.workflow_id as string;
+              const workflow = args.workflow as Record<string, unknown>;
+              if (!workflowId || !workflow) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(
+                        { error: 'workflow_id and workflow are required' },
+                        null,
+                        2
+                      ),
+                    },
+                  ],
+                  isError: true,
+                };
+              }
+              const updated = await this.workflowsService.updateWorkflow(
+                ctx,
+                workflowId,
+                workflow as any
+              );
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(updated, null, 2),
+                  },
+                ],
+                isError: false,
+              };
+            }
+
+            case 'delete': {
+              const workflowId = args.workflow_id as string;
+              if (!workflowId) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify({ error: 'workflow_id is required' }, null, 2),
+                    },
+                  ],
+                  isError: true,
+                };
+              }
+              await this.workflowsService.deleteWorkflow(ctx, workflowId);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({ success: true, message: 'Workflow deleted' }, null, 2),
+                  },
+                ],
+                isError: false,
+              };
+            }
+
+            case 'trigger': {
+              const workflowId = args.workflow_id as string;
+              const context = (args.context as Record<string, unknown>) || {};
+              if (!workflowId) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify({ error: 'workflow_id is required' }, null, 2),
+                    },
+                  ],
+                  isError: true,
+                };
+              }
+              const result = await this.workflowsService.triggerWorkflow(ctx, workflowId, context);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(result, null, 2),
+                  },
+                ],
+                isError: false,
+              };
+            }
+
+            case 'status': {
+              const workflowId = args.workflow_id as string;
+              if (!workflowId) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify({ error: 'workflow_id is required' }, null, 2),
+                    },
+                  ],
+                  isError: true,
+                };
+              }
+              const stats = await this.workflowsService.getWorkflowStats(ctx, workflowId);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(stats, null, 2),
+                  },
+                ],
+                isError: false,
+              };
+            }
+
+            default:
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      { error: `Unknown workflow action: ${workflowAction}` },
+                      null,
+                      2
+                    ),
+                  },
+                ],
+                isError: true,
+              };
+          }
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
       }
 
       return {

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule as NestConfigModule } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
@@ -9,6 +10,7 @@ import { ConfigModule } from './config/config.module';
 import { MCPModule } from './mcp/mcp.module';
 import { StatsModule } from './stats/stats.module';
 import { IndexingModule } from './indexing/indexing.module';
+import { WorkflowsModule } from './workflows/workflows.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CorsInterceptor } from './common/interceptors/cors.interceptor';
 
@@ -19,6 +21,7 @@ import { CorsInterceptor } from './common/interceptors/cors.interceptor';
       envFilePath: ['.env.local', '.env'],
       ignoreEnvFile: false,
     }),
+    EventEmitterModule.forRoot(),
     HealthModule,
     AuthModule,
     EntitiesModule,
@@ -27,6 +30,7 @@ import { CorsInterceptor } from './common/interceptors/cors.interceptor';
     MCPModule,
     StatsModule,
     IndexingModule,
+    WorkflowsModule,
   ],
   providers: [
     {

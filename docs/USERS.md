@@ -9,8 +9,8 @@
 - **Tenant**: `demo`
 - **Unit**: `sales`
 - **Ruolo**: `admin`
-- **Scopes**: `crm:read`, `crm:write`, `crm:delete`
-- **Permessi**: Accesso completo a tutte le funzionalità
+- **Scopes**: `crm:read`, `crm:write`, `crm:delete`, `workflows:manage`, `workflows:execute`
+- **Permessi**: Accesso completo a tutte le funzionalità, inclusa la gestione e l'esecuzione dei workflow
 
 Questo utente viene creato automaticamente quando esegui lo script di seed:
 
@@ -24,8 +24,8 @@ Il sistema definisce 3 ruoli nel file `config/demo/permissions.json`:
 
 ### 1. Admin
 
-- **Scopes**: `crm:read`, `crm:write`, `crm:delete`
-- **Descrizione**: Accesso completo a tutte le operazioni CRUD
+- **Scopes**: `crm:read`, `crm:write`, `crm:delete`, `workflows:manage`, `workflows:execute`
+- **Descrizione**: Accesso completo a tutte le operazioni CRUD e gestione completa dei workflow
 
 ### 2. Sales Manager
 

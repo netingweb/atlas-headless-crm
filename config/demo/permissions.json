@@ -3,7 +3,7 @@
   "roles": [
     {
       "role": "admin",
-      "scopes": ["crm:read", "crm:write", "crm:delete"]
+      "scopes": ["crm:read", "crm:write", "crm:delete", "workflows:manage", "workflows:execute"]
     },
     {
       "role": "sales_manager",
