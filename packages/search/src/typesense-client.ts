@@ -133,9 +133,10 @@ export async function search(
 
   const result = await client.collections(collName).documents().search(searchParams);
   return {
-    hits: (result.hits?.map(
-      (h: { document?: TypesenseDocument }) => (h.document || h) as TypesenseDocument
-    ) || []) as TypesenseDocument[],
+    hits: (result.hits?.map((h: unknown) => {
+      const hit = h as { document?: TypesenseDocument; [key: string]: unknown };
+      return (hit.document || hit) as TypesenseDocument;
+    }) || []) as TypesenseDocument[],
     found: result.found || 0,
     page: result.page || 1,
   };

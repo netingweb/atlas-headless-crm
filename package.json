@@ -2,7 +2,7 @@
   "name": "crm-atlas",
   "version": "0.1.0",
   "private": true,
-  "description": "CRM Atlas - Headless CRM multi-tenant, API-first, MCP-ready",
+  "description": "Atlas CRM Headless - Headless CRM multi-tenant, API-first, MCP-ready",
   "license": "MIT",
   "author": {
     "name": "Luca Mainieri",

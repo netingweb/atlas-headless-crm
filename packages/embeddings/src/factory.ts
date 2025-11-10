@@ -10,6 +10,23 @@ export function createEmbeddingsProvider(
     ? { ...globalCfg, ...tenantOverride }
     : globalCfg;
 
+  // If tenant override doesn't have a valid apiKey (empty or missing), use global config apiKey
+  const tenantApiKey = tenantOverride?.apiKey?.trim();
+  if (tenantOverride && (!tenantApiKey || tenantApiKey === '') && globalCfg.apiKey) {
+    console.log(
+      '[Embeddings Factory] Tenant override has empty apiKey, using global config apiKey'
+    );
+    cfg.apiKey = globalCfg.apiKey;
+  }
+
+  // Final validation log
+  console.log('[Embeddings Factory] Final config:', {
+    provider: cfg.name,
+    hasApiKey: !!cfg.apiKey,
+    apiKeyLength: cfg.apiKey?.length || 0,
+    apiKeyPrefix: cfg.apiKey?.substring(0, 7) + '...' || 'not set',
+  });
+
   switch (cfg.name) {
     case 'openai':
       return new OpenAIProvider(cfg);
@@ -18,7 +35,7 @@ export function createEmbeddingsProvider(
     case 'local':
       throw new Error('Local provider not yet implemented');
     default:
-      throw new Error(`Unsupported provider: ${cfg.name}`);
+      throw new Error(`Unsupported provider: ${String(cfg.name)}`);
   }
 }
 

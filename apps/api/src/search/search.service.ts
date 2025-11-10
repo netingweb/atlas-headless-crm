@@ -211,21 +211,20 @@ export class SearchService {
 
         if (searchResults.hits && searchResults.hits.length > 0) {
           // Map hits to ensure consistent structure
-          const mappedItems = searchResults.hits.map(
-            (hit: {
+          const mappedItems = searchResults.hits.map((hit: unknown) => {
+            const hitObj = hit as {
               document?: { id?: string; _id?: string; [key: string]: unknown };
               id?: string;
               _id?: string;
               [key: string]: unknown;
-            }) => {
-              // Typesense returns documents directly or wrapped in document property
-              if (hit.document) {
-                const doc = hit.document as { id?: string; _id?: string; [key: string]: unknown };
-                return { ...doc, _id: doc.id || doc._id };
-              }
-              return { ...hit, _id: hit.id || hit._id };
+            };
+            // Typesense returns documents directly or wrapped in document property
+            if (hitObj.document) {
+              const doc = hitObj.document as { id?: string; _id?: string; [key: string]: unknown };
+              return { ...doc, _id: doc.id || doc._id };
             }
-          );
+            return { ...hitObj, _id: hitObj.id || hitObj._id };
+          });
 
           results.push({
             entity: entityDef.name,

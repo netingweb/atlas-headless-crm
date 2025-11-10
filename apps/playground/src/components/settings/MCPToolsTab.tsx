@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { Button } from '@/components/ui/button';
 
 export default function MCPToolsTab() {
@@ -185,8 +185,8 @@ export default function MCPToolsTab() {
                   const enabled = isToolEnabled(tool.name);
                   const schema = tool.inputSchema || {};
                   return (
-                    <>
-                      <TableRow key={tool.name} className={isExpanded ? 'bg-gray-50' : ''}>
+                    <Fragment key={tool.name}>
+                      <TableRow className={isExpanded ? 'bg-gray-50' : ''}>
                         <TableCell>
                           <div className="flex items-center">
                             <Checkbox
@@ -237,7 +237,7 @@ export default function MCPToolsTab() {
                         </TableCell>
                       </TableRow>
                       {isExpanded && (
-                        <TableRow key={`${tool.name}-expanded`}>
+                        <TableRow>
                           <TableCell colSpan={5} className="bg-gray-50 p-4">
                             <div className="space-y-4">
                               <div>
@@ -327,7 +327,7 @@ export default function MCPToolsTab() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </TableBody>

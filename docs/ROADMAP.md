@@ -1,4 +1,4 @@
-# CRM Atlas - Roadmap e Prossimi Step
+# Atlas CRM Headless - Roadmap e Prossimi Step
 
 ## ✅ Completato (Fase 1)
 

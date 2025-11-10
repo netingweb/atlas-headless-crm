@@ -28,6 +28,13 @@ export const useAIStore = create<AIState>()(
       config: null,
       disabledTools: new Set<string>(), // Empty set = all tools enabled
       setConfig: (config: AIConfig) => {
+        console.log('[AIStore] Saving config:', {
+          provider: config.provider,
+          model: config.model,
+          hasApiKey: !!config.apiKey,
+          apiKeyLength: config.apiKey?.length,
+          apiKeyPrefix: config.apiKey?.substring(0, 7) + '...',
+        });
         set({ config });
       },
       clearConfig: () => {
@@ -75,14 +82,15 @@ export const useAIStore = create<AIState>()(
         }
         // Log rehydration for debugging
         if (state?.config) {
-          console.log('AI Config rehydrated:', {
+          console.log('[AIStore] Config rehydrated from storage:', {
             provider: state.config.provider,
             model: state.config.model,
             hasApiKey: !!state.config.apiKey,
             apiKeyLength: state.config.apiKey?.length,
+            apiKeyPrefix: state.config.apiKey?.substring(0, 7) + '...',
           });
         } else {
-          console.log('AI Config not found in storage');
+          console.log('[AIStore] No config found in storage');
         }
       },
     }

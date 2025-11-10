@@ -10,7 +10,7 @@ class ApiClient {
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 10000, // 10 seconds timeout
+      timeout: 60000, // 60 seconds timeout (embeddings generation can take time)
       headers: {
         'Content-Type': 'application/json',
       },

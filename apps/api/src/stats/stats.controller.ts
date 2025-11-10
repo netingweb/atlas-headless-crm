@@ -8,7 +8,7 @@ import {
   ApiOkResponse,
   ApiResponse,
 } from '@nestjs/swagger';
-import { StatsService } from './stats.service';
+import { StatsService, StatsResponse } from './stats.service';
 import type { TenantContext } from '@crm-atlas/core';
 import { JwtAuthGuard, ScopesGuard, AuthScopes } from '@crm-atlas/auth';
 

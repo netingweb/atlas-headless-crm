@@ -1,4 +1,4 @@
-# Modello Dati CRM Atlas
+# Modello Dati Atlas CRM Headless
 
 ## Struttura delle Entità
 

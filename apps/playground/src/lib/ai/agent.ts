@@ -16,11 +16,12 @@ function createLLM(config: AIConfig): ChatOpenAI {
     throw new Error('API key is required. Please configure it in Settings > AI Engine.');
   }
 
-  console.log('Creating LLM with config:', {
+  console.log('[Agent] Creating LLM with config:', {
     provider: config.provider,
     model: config.model,
     hasApiKey: !!apiKey,
-    apiKeyPrefix: apiKey.substring(0, 7),
+    apiKeyLength: apiKey.length,
+    apiKeyPrefix: apiKey.substring(0, 7) + '...',
   });
 
   if (config.provider === 'azure') {
@@ -37,7 +38,7 @@ function createLLM(config: AIConfig): ChatOpenAI {
 
   // Default to OpenAI
   // LangChain v1.0: Pass both apiKey and openAIApiKey for maximum compatibility
-  console.log('Creating ChatOpenAI with both apiKey and openAIApiKey parameters');
+  console.log('[Agent] Creating ChatOpenAI with both apiKey and openAIApiKey parameters');
 
   const llmConfig = {
     model: config.model,
@@ -47,10 +48,13 @@ function createLLM(config: AIConfig): ChatOpenAI {
     openAIApiKey: apiKey, // Explicit parameter name
   };
 
-  console.log('LLM Config:', {
+  console.log('[Agent] LLM Config:', {
     model: llmConfig.model,
+    temperature: llmConfig.temperature,
+    maxTokens: llmConfig.maxTokens,
     hasApiKey: !!llmConfig.apiKey,
     hasOpenAIApiKey: !!llmConfig.openAIApiKey,
+    apiKeyPrefix: llmConfig.apiKey?.substring(0, 7) + '...',
   });
 
   return new ChatOpenAI(llmConfig);
@@ -159,6 +163,16 @@ function createToolFromMCP(
           };
           if (mcpResult.isError) {
             const errorText = mcpResult.content.map((c) => c.text).join('\n');
+
+            // Provide helpful error message for OpenAI API key issues
+            if (errorText.includes('OpenAI API key is required')) {
+              throw new Error(
+                'Backend requires OpenAI API key for semantic search. ' +
+                  'Please configure OPENAI_API_KEY environment variable on the API server, ' +
+                  'or configure embeddingsProvider.apiKey in the tenant configuration.'
+              );
+            }
+
             throw new Error(errorText);
           }
           // Return the text content
@@ -189,12 +203,20 @@ export async function createAgent(
   ctx: TenantContext,
   disabledToolNames?: Set<string>
 ): Promise<Agent> {
-  console.log('createAgent called with config:', {
+  // Validate API key before proceeding
+  const apiKey = config.apiKey?.trim();
+  if (!apiKey || apiKey === '') {
+    throw new Error('API key is required. Please configure it in Settings > AI Engine.');
+  }
+
+  console.log('[Agent] createAgent called with config:', {
     provider: config.provider,
     model: config.model,
-    hasApiKey: !!config.apiKey,
-    apiKeyLength: config.apiKey?.length,
-    apiKeyPrefix: config.apiKey?.substring(0, 7),
+    hasApiKey: !!apiKey,
+    apiKeyLength: apiKey.length,
+    apiKeyPrefix: apiKey.substring(0, 7) + '...',
+    tenant: ctx.tenant_id,
+    unit: ctx.unit_id,
   });
 
   // Load MCP tools
@@ -360,7 +382,6 @@ export async function* runAgentStream(
     // Stream initial thinking/content
     for await (const chunk of stream) {
       if (chunk.content) {
-        fullContent += chunk.content;
         yield { type: 'content', content: chunk.content };
       }
 
@@ -478,7 +499,6 @@ export async function* runAgentStream(
 
         for await (const chunk of finalStream) {
           if (chunk.content) {
-            finalContent += chunk.content;
             yield { type: 'content', content: chunk.content };
           }
         }

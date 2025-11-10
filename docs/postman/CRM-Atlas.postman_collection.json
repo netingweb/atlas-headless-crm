@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "CRM Atlas API",
-    "description": "Complete API collection for CRM Atlas - Headless CRM multi-tenant with relational data",
+    "name": "Atlas CRM Headless API",
+    "description": "Complete API collection for Atlas CRM Headless - Headless CRM multi-tenant with relational data",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "crm-atlas"
   },

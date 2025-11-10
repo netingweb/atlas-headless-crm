@@ -17,6 +17,7 @@
   "dependencies": {
     "@crm-atlas/core": "workspace:*",
     "@crm-atlas/types": "workspace:*",
+    "@nestjs/core": "^10.3.0",
     "argon2": "^0.31.2",
     "jsonwebtoken": "^9.0.2"
   },

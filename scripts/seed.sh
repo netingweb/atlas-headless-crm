@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "Seeding CRM Atlas database..."
+echo "Seeding Atlas CRM Headless database..."
 
 # Build seed script
 pnpm build

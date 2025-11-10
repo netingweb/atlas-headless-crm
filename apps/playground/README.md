@@ -1,6 +1,6 @@
-# CRM Atlas Playground
+# Atlas CRM Headless Playground
 
-Playground PWA client for testing and demonstrating CRM Atlas Headless CRM functionality.
+Playground PWA client for testing and demonstrating Atlas CRM Headless functionality.
 
 ## Features
 
@@ -52,7 +52,7 @@ apps/playground/
 
 ## API Integration
 
-The playground connects to the CRM Atlas API running on `http://localhost:3000` by default.
+The playground connects to the Atlas CRM Headless API running on `http://localhost:3000` by default.
 
 Make sure the API server is running before starting the playground:
 

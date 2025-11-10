@@ -11,7 +11,7 @@
 
 ```bash
 git clone <repo-url>
-cd crm-atlas
+cd atlas-headless-crm
 ```
 
 2. Copy environment file:
@@ -24,8 +24,11 @@ cp .env.example .env
 
 ```bash
 EMBEDDINGS_PROVIDER=openai
-OPENAI_API_KEY=your-key-here
+OPENAI_API_KEY=sk-your-actual-api-key-here
 ```
+
+**Important**: The `OPENAI_API_KEY` is required for semantic search functionality.
+See [OpenAI Setup Guide](openai-setup.md) for detailed configuration instructions.
 
 4. Start all services:
 

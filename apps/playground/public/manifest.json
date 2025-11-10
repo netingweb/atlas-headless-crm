@@ -1,7 +1,7 @@
 {
-  "name": "CRM Atlas Playground",
-  "short_name": "CRM Playground",
-  "description": "Playground for testing CRM Atlas Headless CRM",
+  "name": "Atlas CRM Headless Playground",
+  "short_name": "Atlas CRM Playground",
+  "description": "Playground for testing Atlas CRM Headless",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

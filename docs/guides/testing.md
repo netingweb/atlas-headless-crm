@@ -2,7 +2,7 @@
 
 ## Overview
 
-CRM Atlas usa Jest come framework di test. Ogni package ha la sua configurazione Jest e può essere testato indipendentemente.
+Atlas CRM Headless usa Jest come framework di test. Ogni package ha la sua configurazione Jest e può essere testato indipendentemente.
 
 ## Struttura Test
 

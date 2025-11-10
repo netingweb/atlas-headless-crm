@@ -1,4 +1,4 @@
-# Configurazioni CRM Atlas
+# Configurazioni Atlas CRM Headless
 
 Questa directory contiene le configurazioni JSON-driven per ogni tenant.
 

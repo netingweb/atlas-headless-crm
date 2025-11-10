@@ -34,20 +34,25 @@ export default function Login() {
       setUser(user);
       toast({
         title: 'Login successful',
-        description: 'Welcome to CRM Atlas Playground',
+        description: 'Welcome to Atlas CRM Headless Playground',
       });
       navigate('/');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
       let errorMessage = 'Invalid credentials';
 
-      if (!error.response) {
-        // Network error
-        errorMessage =
-          'Network error: Unable to connect to the API server. Please ensure the API is running on http://localhost:3000';
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
+      if (error && typeof error === 'object' && 'response' in error) {
+        const apiError = error as { response?: { data?: { message?: string } }; message?: string };
+        if (!apiError.response) {
+          // Network error
+          errorMessage =
+            'Network error: Unable to connect to the API server. Please ensure the API is running on http://localhost:3000';
+        } else if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message;
+        } else if (apiError.message) {
+          errorMessage = apiError.message;
+        }
+      } else if (error instanceof Error) {
         errorMessage = error.message;
       }
 
@@ -65,7 +70,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>CRM Atlas Playground</CardTitle>
+          <CardTitle>Atlas CRM Headless Playground</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent>

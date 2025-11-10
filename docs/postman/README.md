@@ -1,6 +1,6 @@
-# Postman Collection - CRM Atlas API
+# Postman Collection - Atlas CRM Headless API
 
-Collection completa per testare tutti gli endpoint dell'API CRM Atlas.
+Collection completa per testare tutti gli endpoint dell'API Atlas CRM Headless.
 
 ## Importazione
 
@@ -9,11 +9,11 @@ Collection completa per testare tutti gli endpoint dell'API CRM Atlas.
 3. Seleziona i file:
    - `CRM-Atlas.postman_collection.json`
    - `CRM-Atlas.postman_environment.json`
-4. Seleziona l'ambiente "CRM Atlas - Local"
+4. Seleziona l'ambiente "Atlas CRM Headless - Local"
 
 ## Setup Iniziale
 
-1. **Seleziona l'ambiente**: "CRM Atlas - Local" nel dropdown in alto a destra
+1. **Seleziona l'ambiente**: "Atlas CRM Headless - Local" nel dropdown in alto a destra
 2. **Esegui il Login**: Vai in "Authentication" → "Login"
    - Il token verrà salvato automaticamente nella variabile `auth_token`
 3. **Verifica le variabili**: Assicurati che `base_url` sia `http://localhost:3000`

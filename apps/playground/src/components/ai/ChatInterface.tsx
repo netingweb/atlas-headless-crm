@@ -51,11 +51,21 @@ export default function ChatInterface() {
       try {
         setError(null);
         setLoading(true);
-        console.log('Initializing agent with config:', {
+
+        // Verify API key is present and not empty
+        const apiKey = config.apiKey?.trim();
+        if (!apiKey || apiKey === '') {
+          throw new Error('API key is required. Please configure it in Settings > AI Engine.');
+        }
+
+        console.log('[ChatInterface] Initializing agent with config:', {
           provider: config.provider,
           model: config.model,
-          hasApiKey: !!config.apiKey,
-          apiKeyLength: config.apiKey?.length,
+          hasApiKey: !!apiKey,
+          apiKeyLength: apiKey.length,
+          apiKeyPrefix: apiKey.substring(0, 7) + '...',
+          tenantId,
+          unitId,
         });
         const agent = await createAgent(
           config,

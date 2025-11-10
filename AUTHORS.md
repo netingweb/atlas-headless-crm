@@ -5,11 +5,11 @@
 **Luca Mainieri**
 
 - Website: [www.neting.it](https://www.neting.it)
-- Project: CRM Atlas
+- Project: Atlas CRM Headless
 
 ## Acknowledgments
 
-CRM Atlas is built with amazing open-source technologies:
+Atlas CRM Headless is built with amazing open-source technologies:
 
 - [NestJS](https://nestjs.com/) - Progressive Node.js framework
 - [Fastify](https://www.fastify.io/) - Fast and low overhead web framework

@@ -154,13 +154,29 @@ export class MCPService {
             if (embeddableFields.length > 0) {
               const tenantConfig = await this.configLoader.getTenant(tenantId);
               const globalConfig = getProviderConfig();
+
+              // Debug logging
+              console.log('[MCP Service] Embeddings config:', {
+                provider: globalConfig.name,
+                hasApiKey: !!globalConfig.apiKey,
+                apiKeyLength: globalConfig.apiKey?.length,
+                apiKeyPrefix: globalConfig.apiKey?.substring(0, 7) + '...',
+                tenantOverride: tenantConfig?.embeddingsProvider
+                  ? {
+                      name: tenantConfig.embeddingsProvider.name,
+                      hasApiKey: !!tenantConfig.embeddingsProvider.apiKey,
+                    }
+                  : null,
+                envVar: process.env.OPENAI_API_KEY ? 'present' : 'missing',
+              });
+
               const provider = createEmbeddingsProvider(
                 globalConfig,
                 tenantConfig?.embeddingsProvider
               );
               const [queryVector] = await provider.embedTexts([query]);
 
-              const results = await searchQdrant(tenantId, entity, {
+              const semanticResults = await searchQdrant(tenantId, entity, {
                 vector: queryVector,
                 limit,
                 filter: {
@@ -171,11 +187,90 @@ export class MCPService {
                 },
               });
 
+              console.log(`[MCP Service] Semantic search results for ${entity}:`, {
+                query,
+                resultsCount: semanticResults.length,
+                results: semanticResults.slice(0, 2), // Log first 2 results
+              });
+
+              // For semantic-only search: if no results, fallback to text search
+              if (searchType === 'semantic' && semanticResults.length === 0) {
+                console.log(`[MCP Service] No semantic results, falling back to text search`);
+                const textResults = await search(ctx, entity, {
+                  q: query,
+                  per_page: limit,
+                  page: 1,
+                });
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(textResults, null, 2),
+                    },
+                  ],
+                  isError: false,
+                };
+              }
+
+              // For hybrid search: combine semantic and text results
+              if (searchType === 'hybrid') {
+                const textResults = await search(ctx, entity, {
+                  q: query,
+                  per_page: limit,
+                  page: 1,
+                });
+
+                // Combine results: prioritize semantic, add text results not in semantic
+                const semanticIds = new Set(semanticResults.map((r) => String(r.id)));
+                const combinedResults = [
+                  ...semanticResults.map((r) => ({
+                    id: r.id,
+                    score: r.score,
+                    payload: r.payload,
+                    source: 'semantic' as const,
+                  })),
+                  ...textResults.hits
+                    .filter((h) => {
+                      const id = String(
+                        (h as { id?: string; _id?: string }).id ||
+                          (h as { id?: string; _id?: string })._id
+                      );
+                      return !semanticIds.has(id);
+                    })
+                    .map((h) => ({
+                      id:
+                        (h as { id?: string; _id?: string }).id ||
+                        (h as { id?: string; _id?: string })._id,
+                      score: 0.5, // Lower score for text-only results
+                      payload: h as Record<string, unknown>,
+                      source: 'text' as const,
+                    })),
+                ].slice(0, limit);
+
+                console.log(`[MCP Service] Hybrid search results for ${entity}:`, {
+                  query,
+                  semanticCount: semanticResults.length,
+                  textCount: textResults.hits.length,
+                  combinedCount: combinedResults.length,
+                });
+
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(combinedResults, null, 2),
+                    },
+                  ],
+                  isError: false,
+                };
+              }
+
+              // Pure semantic search with results
               return {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify(results, null, 2),
+                    text: JSON.stringify(semanticResults, null, 2),
                   },
                 ],
                 isError: false,
@@ -189,6 +284,16 @@ export class MCPService {
           q: query,
           per_page: limit,
           page: 1,
+        });
+
+        console.log(`[MCP Service] Text search results for ${entity}:`, {
+          query,
+          found: results.found,
+          hitsCount: results.hits.length,
+          hits: results.hits.slice(0, 2).map((h: { id?: string; name?: string }) => ({
+            id: h.id,
+            name: h.name,
+          })),
         });
 
         return {

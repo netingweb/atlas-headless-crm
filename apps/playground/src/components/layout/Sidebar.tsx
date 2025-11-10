@@ -39,7 +39,9 @@ export default function Sidebar() {
         <Button variant="ghost" size="icon" onClick={toggleSidebar}>
           <Menu className="h-5 w-5" />
         </Button>
-        {!sidebarCollapsed && <span className="ml-2 text-lg font-semibold">CRM Atlas</span>}
+        {!sidebarCollapsed && (
+          <span className="ml-2 text-lg font-semibold">Atlas CRM Headless</span>
+        )}
       </div>
       <nav className="p-4">
         <ul className="space-y-1">

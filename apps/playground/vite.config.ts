@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icons/*.png'],
       manifest: {
-        name: 'CRM Atlas Playground',
-        short_name: 'CRM Playground',
-        description: 'Playground for testing CRM Atlas Headless CRM',
+        name: 'Atlas CRM Headless Playground',
+        short_name: 'Atlas CRM Playground',
+        description: 'Playground for testing Atlas CRM Headless',
         theme_color: '#ffffff',
         icons: [
           {

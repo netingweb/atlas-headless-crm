@@ -6,7 +6,7 @@ import { connectMongo } from '@crm-atlas/db';
 import { SmartValidationPipe } from './common/pipes/smart-validation.pipe';
 
 /**
- * CRM Atlas API Server
+ * Atlas CRM Headless API Server
  * Headless CRM multi-tenant, API-first, MCP-ready
  *
  * @author Luca Mainieri - www.neting.it
@@ -14,6 +14,15 @@ import { SmartValidationPipe } from './common/pipes/smart-validation.pipe';
  */
 
 async function bootstrap(): Promise<void> {
+  // Debug: Log environment variables status
+  console.log('[Bootstrap] Environment variables check:', {
+    hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+    openAIKeyLength: process.env.OPENAI_API_KEY?.length || 0,
+    openAIKeyPrefix: process.env.OPENAI_API_KEY?.substring(0, 7) + '...' || 'not set',
+    embeddingsProvider: process.env.EMBEDDINGS_PROVIDER || 'openai (default)',
+    nodeEnv: process.env.NODE_ENV || 'not set',
+  });
+
   const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/crm_atlas';
   const dbName = process.env.MONGODB_DB_NAME || 'crm_atlas';
   await connectMongo(mongoUri, dbName);
@@ -71,7 +80,7 @@ async function bootstrap(): Promise<void> {
   // Swagger/OpenAPI configuration
   try {
     const config = new DocumentBuilder()
-      .setTitle('CRM Atlas API')
+      .setTitle('Atlas CRM Headless API')
       .setDescription(
         'Headless CRM multi-tenant, API-first, MCP-ready. Complete API documentation for managing contacts, companies, tasks, notes, and opportunities.'
       )

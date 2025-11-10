@@ -1,7 +1,7 @@
 {
   "name": "crm-atlas-sales",
   "version": "0.1.0",
-  "description": "CRM Atlas MCP tools for sales operations",
+  "description": "Atlas CRM Headless MCP tools for sales operations",
   "tools": [
     {
       "name": "create_lead",

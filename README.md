@@ -1,4 +1,4 @@
-# CRM Atlas
+# Atlas CRM Headless
 
 **Headless CRM multi-tenant, API-first, MCP-ready, open source.**
 
@@ -9,11 +9,11 @@
 
 ## 📖 Introduction
 
-CRM Atlas is a modern and flexible CRM platform designed to be completely **headless**, **multi-tenant**, and ready for integration with AI assistants via the Model Context Protocol (MCP).
+Atlas CRM Headless is a modern and flexible CRM platform designed to be completely **headless**, **multi-tenant**, and ready for integration with AI assistants via the Model Context Protocol (MCP).
 
-### What is CRM Atlas?
+### What is Atlas CRM Headless?
 
-CRM Atlas is a headless CRM system that completely separates business logic from the user interface, allowing you to build any type of frontend (web, mobile, desktop) using the same powerful and flexible API. Unlike traditional CRMs, CRM Atlas is designed to be:
+Atlas CRM Headless is a headless CRM system that completely separates business logic from the user interface, allowing you to build any type of frontend (web, mobile, desktop) using the same powerful and flexible API. Unlike traditional CRMs, Atlas CRM Headless is designed to be:
 
 - **API-first**: All functionality is accessible via REST API, enabling integrations with any technology
 - **Multi-tenant & Multi-unit**: Native support for complex organizations with multiple divisions and operational units
@@ -22,7 +22,7 @@ CRM Atlas is a headless CRM system that completely separates business logic from
 
 ### 🎯 Goals and Objectives
 
-CRM Atlas was created to solve the main problems of traditional CRMs:
+Atlas CRM Headless was created to solve the main problems of traditional CRMs:
 
 1. **Flexibility**: Allow organizations to completely customize the CRM without source code modifications
 2. **Scalability**: Support organizations of any size with multi-tenant architecture
@@ -32,7 +32,7 @@ CRM Atlas was created to solve the main problems of traditional CRMs:
 
 ### 🏛️ Development Principles
 
-CRM Atlas follows clear and consistent development principles:
+Atlas CRM Headless follows clear and consistent development principles:
 
 - **Headless Architecture**: Complete separation between backend and frontend for maximum flexibility
 - **Configuration over Code**: Configuration via JSON instead of code modifications
@@ -42,7 +42,7 @@ CRM Atlas follows clear and consistent development principles:
 - **Documentation First**: Complete and always up-to-date documentation
 - **Open Standards**: Use of open standards (REST, OpenAPI, MCP) for maximum interoperability
 
-### ✨ Why Use CRM Atlas?
+### ✨ Why Use Atlas CRM Headless?
 
 #### Main Benefits
 
@@ -726,13 +726,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Luca Mainieri**
 
 - Website: [www.neting.it](https://www.neting.it)
-- Project: CRM Atlas
+- Project: Atlas CRM Headless
 
 For a complete list of contributors and acknowledgments, see [AUTHORS.md](AUTHORS.md).
 
 ## 🙏 Acknowledgments
 
-CRM Atlas is built with amazing open-source technologies:
+Atlas CRM Headless is built with amazing open-source technologies:
 
 - [NestJS](https://nestjs.com/) - Progressive Node.js framework
 - [Fastify](https://www.fastify.io/) - Fast and low overhead web framework

@@ -1,6 +1,6 @@
-# Contributing to CRM Atlas
+# Contributing to Atlas CRM Headless
 
-Thank you for your interest in contributing to CRM Atlas! 🎉
+Thank you for your interest in contributing to Atlas CRM Headless! 🎉
 
 ## Code of Conduct
 

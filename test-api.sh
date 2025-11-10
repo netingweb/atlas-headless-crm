@@ -1,11 +1,11 @@
 #!/bin/bash
-# Script di test rapido per CRM Atlas API
+# Script di test rapido per Atlas CRM Headless API
 
 API_URL="http://localhost:3000/api"
 TENANT="demo"
 UNIT="sales"
 
-echo "🧪 Testing CRM Atlas API..."
+echo "🧪 Testing Atlas CRM Headless API..."
 echo ""
 
 # 1. Health Check

@@ -2,7 +2,7 @@
 
 ## 📋 Panoramica
 
-Il playground di CRM Atlas utilizza un'architettura modulare per gestire le chiamate API. Tutte le API sono organizzate in moduli separati nella cartella `apps/playground/src/lib/api/` e vengono utilizzate attraverso React Query per la gestione dello stato e del caching.
+Il playground di Atlas CRM Headless utilizza un'architettura modulare per gestire le chiamate API. Tutte le API sono organizzate in moduli separati nella cartella `apps/playground/src/lib/api/` e vengono utilizzate attraverso React Query per la gestione dello stato e del caching.
 
 ## 🔐 Sistema di Permessi
 
