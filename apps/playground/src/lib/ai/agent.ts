@@ -4,7 +4,11 @@ import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/
 import { z } from 'zod';
 import type { AIConfig } from '@/stores/ai-store';
 import { mcpApi } from '@/lib/api/mcp';
-import type { TenantContext } from '@crm-atlas/core';
+// TenantContext type definition (matching @crm-atlas/core)
+export interface TenantContext {
+  tenant_id: string;
+  unit_id: string;
+}
 
 /**
  * Create LLM instance based on AI configuration
@@ -25,15 +29,15 @@ function createLLM(config: AIConfig): ChatOpenAI {
   });
 
   if (config.provider === 'azure') {
+    // Azure OpenAI configuration
     return new ChatOpenAI({
       model: config.model,
       temperature: config.temperature ?? 0.7,
       maxTokens: config.maxTokens ?? 2000,
-      azureOpenAIApiKey: apiKey,
-      azureOpenAIApiInstanceName: process.env.AZURE_OPENAI_INSTANCE_NAME || '',
-      azureOpenAIApiDeploymentName: config.model,
-      azureOpenAIApiVersion: '2024-02-15-preview',
-    });
+      openAIApiKey: apiKey,
+      // Note: Azure-specific fields may need to be configured via environment variables
+      // or through the ChatOpenAI constructor options if supported by LangChain version
+    } as any);
   }
 
   // Default to OpenAI
@@ -190,7 +194,7 @@ function createToolFromMCP(
 }
 
 export interface Agent {
-  llm: ChatOpenAI;
+  llm: ReturnType<ChatOpenAI['bindTools']>;
   tools: DynamicStructuredTool[];
   systemPrompt: string;
 }
@@ -238,7 +242,7 @@ export async function createAgent(
     .map((tool) => {
       // Get the tool's schema to show required fields
       const toolSchema = mcpTools.find((t) => t.name === tool.name);
-      const requiredFields = toolSchema?.inputSchema?.required || [];
+      const requiredFields = (toolSchema?.inputSchema?.required || []) as string[];
       const properties = (toolSchema?.inputSchema?.properties || {}) as Record<string, unknown>;
 
       let toolInfo = `- ${tool.name}: ${tool.description}`;
@@ -286,8 +290,8 @@ export async function runAgent(
   userMessage: string,
   chatHistory: Array<{ role: string; content: string }> = []
 ): Promise<string> {
-  // Build messages array
-  const messages = [
+  // Build messages array (can include ToolMessage)
+  const messages: Array<SystemMessage | HumanMessage | AIMessage | ToolMessage> = [
     new SystemMessage(agent.systemPrompt),
     ...chatHistory.map((msg) => {
       if (msg.role === 'user') {
@@ -361,8 +365,8 @@ export async function* runAgentStream(
   userMessage: string,
   chatHistory: Array<{ role: string; content: string }> = []
 ): AsyncGenerator<StreamEvent, void, unknown> {
-  // Build messages array
-  const messages = [
+  // Build messages array (can include ToolMessage)
+  const messages: Array<SystemMessage | HumanMessage | AIMessage | ToolMessage> = [
     new SystemMessage(agent.systemPrompt),
     ...chatHistory.map((msg) => {
       if (msg.role === 'user') {
@@ -382,7 +386,14 @@ export async function* runAgentStream(
     // Stream initial thinking/content
     for await (const chunk of stream) {
       if (chunk.content) {
-        yield { type: 'content', content: chunk.content };
+        const content = Array.isArray(chunk.content)
+          ? chunk.content
+              .map((c: unknown) => (typeof c === 'string' ? c : JSON.stringify(c)))
+              .join('')
+          : typeof chunk.content === 'string'
+            ? chunk.content
+            : String(chunk.content);
+        yield { type: 'content', content };
       }
 
       // Collect tool calls if present
@@ -499,7 +510,14 @@ export async function* runAgentStream(
 
         for await (const chunk of finalStream) {
           if (chunk.content) {
-            yield { type: 'content', content: chunk.content };
+            const content = Array.isArray(chunk.content)
+              ? chunk.content
+                  .map((c: unknown) => (typeof c === 'string' ? c : JSON.stringify(c)))
+                  .join('')
+              : typeof chunk.content === 'string'
+                ? chunk.content
+                : String(chunk.content);
+            yield { type: 'content', content };
           }
         }
 

@@ -75,9 +75,9 @@ export const useAIStore = create<AIState>()(
       }),
       onRehydrateStorage: () => (state) => {
         // Convert Array back to Set after rehydration
-        if (state?.disabledTools) {
+        if (state && state.disabledTools) {
           state.disabledTools = new Set(state.disabledTools as unknown as string[]);
-        } else {
+        } else if (state) {
           state.disabledTools = new Set<string>();
         }
         // Log rehydration for debugging

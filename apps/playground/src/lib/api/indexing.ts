@@ -1,5 +1,10 @@
 import { apiClient } from './client';
-import type { TenantContext } from '@crm-atlas/core';
+
+// TenantContext type definition (matching @crm-atlas/core)
+export interface TenantContext {
+  tenant_id: string;
+  unit_id: string;
+}
 
 export interface TypesenseHealth {
   ok: boolean;

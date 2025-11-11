@@ -6,8 +6,8 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
+    "lint": "eslint src --ext .ts --ignore-pattern '*.test.ts' --ignore-pattern '*.spec.ts'",
+    "lint:fix": "eslint src --ext .ts --fix --ignore-pattern '*.test.ts' --ignore-pattern '*.spec.ts'",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",

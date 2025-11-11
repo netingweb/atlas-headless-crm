@@ -88,7 +88,7 @@ export default function EntityDetail() {
     enabled: !!tenantId && !!entityType,
     retry: 2,
     staleTime: 0, // Always fetch fresh data
-    cacheTime: 0, // Don't cache
+    gcTime: 0, // Don't cache (gcTime replaces cacheTime in react-query v5)
   });
 
   // Get entity data
@@ -108,8 +108,8 @@ export default function EntityDetail() {
     if (isNew) {
       // Initialize with defaults for new entity
       const defaults: Record<string, unknown> = {};
-      if (entityDef) {
-        entityDef.fields.forEach((field) => {
+      if (entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)) {
+        entityDef.fields.forEach((field: { name: string; default?: unknown }) => {
           if (field.default !== undefined) {
             defaults[field.name] = field.default;
           }
@@ -309,13 +309,13 @@ export default function EntityDetail() {
             </SelectTrigger>
             <SelectContent>
               {referenceOptions?.map((option) => {
-                const displayName =
-                  option.name ||
+                const optionId = (option._id || option.id || '') as string | number;
+                const displayName = (option.name ||
                   option.title ||
                   option.email ||
-                  String(option._id || option.id || '');
+                  String(optionId)) as string;
                 return (
-                  <SelectItem key={option._id || option.id} value={String(option._id || option.id)}>
+                  <SelectItem key={String(optionId)} value={String(optionId)}>
                     {displayName}
                   </SelectItem>
                 );
@@ -527,27 +527,50 @@ export default function EntityDetail() {
                 <div className="border-t pt-6">
                   <h3 className="text-lg font-semibold mb-4">Fields</h3>
                   <div className="grid gap-4 md:grid-cols-2">
-                    {entityDef.fields.map((field) => {
-                      // Skip readonly fields (already shown above)
-                      if (READONLY_FIELDS.includes(field.name)) {
-                        return null;
-                      }
-                      // For reference fields, we need to load options
-                      if (field.type === 'reference' && field.reference_entity) {
-                        return (
-                          <ReferenceField
-                            key={field.name}
-                            field={field}
-                            value={formData[field.name]}
-                            onChange={(value) => handleFieldChange(field.name, value)}
-                            referenceEntity={field.reference_entity}
-                            tenantId={tenantId || ''}
-                            unitId={unitId || ''}
-                          />
-                        );
-                      }
-                      return renderField(field);
-                    })}
+                    {entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)
+                      ? entityDef.fields.map(
+                          (field: {
+                            name: string;
+                            type:
+                              | 'string'
+                              | 'number'
+                              | 'boolean'
+                              | 'text'
+                              | 'url'
+                              | 'email'
+                              | 'date'
+                              | 'json'
+                              | 'reference';
+                            required: boolean;
+                            indexed: boolean;
+                            searchable: boolean;
+                            embeddable: boolean;
+                            reference_entity?: string;
+                            default?: unknown;
+                            validation?: Record<string, unknown>;
+                          }) => {
+                            // Skip readonly fields (already shown above)
+                            if (READONLY_FIELDS.includes(field.name)) {
+                              return null;
+                            }
+                            // For reference fields, we need to load options
+                            if (field.type === 'reference' && field.reference_entity) {
+                              return (
+                                <ReferenceField
+                                  key={field.name}
+                                  field={field}
+                                  value={formData[field.name]}
+                                  onChange={(value) => handleFieldChange(field.name, value)}
+                                  referenceEntity={field.reference_entity}
+                                  tenantId={tenantId || ''}
+                                  unitId={unitId || ''}
+                                />
+                              );
+                            }
+                            return renderField(field);
+                          }
+                        )
+                      : null}
                   </div>
                 </div>
 
@@ -728,10 +751,13 @@ function ReferenceField({
         </SelectTrigger>
         <SelectContent>
           {options?.map((option) => {
-            const displayName =
-              option.name || option.title || option.email || String(option._id || option.id || '');
+            const optionId = (option._id || option.id || '') as string | number;
+            const displayName = (option.name ||
+              option.title ||
+              option.email ||
+              String(optionId)) as string;
             return (
-              <SelectItem key={option._id || option.id} value={String(option._id || option.id)}>
+              <SelectItem key={String(optionId)} value={String(optionId)}>
                 {displayName}
               </SelectItem>
             );

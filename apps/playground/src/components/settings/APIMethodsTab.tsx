@@ -118,9 +118,11 @@ export default function APIMethodsTab() {
   const userScopes = new Set<string>(user.scopes || []);
   if (permissions) {
     for (const role of user.roles || []) {
-      const rolePerm = permissions.roles.find((r) => r.role === role);
+      const rolePerm = permissions.roles.find(
+        (r: { role: string; scopes: string[] }) => r.role === role
+      );
       if (rolePerm) {
-        rolePerm.scopes.forEach((scope) => userScopes.add(scope));
+        rolePerm.scopes.forEach((scope: string) => userScopes.add(scope));
       }
     }
   }

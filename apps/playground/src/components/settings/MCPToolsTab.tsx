@@ -259,7 +259,9 @@ export default function MCPToolsTab() {
                                   </pre>
                                 </div>
                               </div>
-                              {schema.properties && Object.keys(schema.properties).length > 0 && (
+                              {schema.properties &&
+                              Object.keys(schema.properties as Record<string, unknown>).length >
+                                0 ? (
                                 <div>
                                   <h4 className="text-sm font-semibold text-gray-700 mb-2">
                                     Properties
@@ -314,7 +316,7 @@ export default function MCPToolsTab() {
                                     </ul>
                                   </div>
                                 </div>
-                              )}
+                              ) : null}
                               <div className="text-sm text-gray-600">
                                 <p>
                                   <strong>Required fields:</strong>{' '}

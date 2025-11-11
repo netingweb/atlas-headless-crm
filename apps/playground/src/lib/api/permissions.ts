@@ -71,7 +71,9 @@ export function hasScope(
   // Check role-based scopes if permissions config is provided
   if (permissions) {
     for (const role of user.roles) {
-      const rolePerm = permissions.roles.find((r) => r.role === role);
+      const rolePerm = permissions.roles.find(
+        (r: { role: string; scopes: string[] }) => r.role === role
+      );
       if (rolePerm && rolePerm.scopes.includes(requiredScope)) {
         return true;
       }
@@ -155,10 +157,10 @@ export function filterAvailableApis<T extends Record<string, unknown>>(
     });
 
     if (apiMethod && isApiAvailable(apiMethod, user, permissions)) {
-      filtered[key as keyof T] = value;
+      filtered[key as keyof T] = value as T[keyof T];
     } else if (!apiMethod) {
       // Unknown API method - include by default
-      filtered[key as keyof T] = value;
+      filtered[key as keyof T] = value as T[keyof T];
     }
   }
 
