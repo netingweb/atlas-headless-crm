@@ -68,9 +68,13 @@ Atlas CRM Headless follows clear and consistent development principles:
    - Hybrid search combining both technologies
 
 5. **🤖 Intelligent Automation**
-   - Workflow engine based on events, schedules, or manual triggers
-   - Complex automation with condition evaluation
-   - Integration with external webhooks
+   - Complete workflow engine with event-based, scheduled, and manual triggers
+   - Complex automation with advanced condition evaluation
+   - Multiple action types: update, create, delete, notify, assign, webhook, API call, MCP tool
+   - Workflow chaining for complex automation sequences
+   - Full execution logging and audit trail
+   - Frontend UI for workflow management and testing
+   - Integration with external webhooks and APIs
 
 6. **🧠 AI Integration**
    - Native MCP server for integration with AI assistants
@@ -125,9 +129,13 @@ Atlas CRM Headless follows clear and consistent development principles:
 
 ### Automation
 
-- **Workflow Engine**: Automation based on events, schedules, or manual triggers with BullMQ
-- **Action Types**: Update, Create, Notify, Assign, Webhook
-- **Condition Evaluation**: Advanced condition evaluation system for complex workflows
+- **Workflow Engine**: Complete automation engine based on events, schedules, or manual triggers with BullMQ
+- **Trigger Types**: Event-based (entity.created, entity.updated, entity.deleted), scheduled (cron), and manual
+- **Action Types**: Update, Create, Delete, Notify, Assign, Webhook, API Call, MCP Tool, Chain
+- **Condition Evaluation**: Advanced condition evaluation system with support for complex operators and dictionary values
+- **Workflow Chaining**: Execute workflows in sequence for complex automations
+- **Execution Logging**: Complete audit trail of all workflow executions with detailed logs
+- **Frontend UI**: Full-featured workflow management interface in the playground with execution history
 
 ### AI Integration
 
@@ -292,7 +300,7 @@ See [docs/guides/indexer.md](docs/guides/indexer.md) for details.
 
 ### 3. Workflow Engine (`apps/workflow`)
 
-Automation engine based on events, schedules, or manual triggers.
+Complete automation engine based on events, schedules, or manual triggers with full execution logging.
 
 **Start:**
 
@@ -302,15 +310,26 @@ pnpm workflow
 
 **Features:**
 
-- Event-based triggers (entity.created, entity.updated, entity.deleted)
-- Scheduled triggers (cron expressions)
-- Manual triggers
-- Action types: update, create, notify, assign, webhook
-- Condition evaluation engine
+- **Trigger Types**:
+  - Event-based: Triggered by entity events (created, updated, deleted)
+  - Scheduled: Cron-based scheduled execution
+  - Manual: On-demand execution via API or UI
+- **Action Types**: Update, Create, Delete, Notify, Assign, Webhook, API Call, MCP Tool, Chain
+- **Condition Evaluation**: Advanced condition system with operators (==, !=, >, <, contains, in, etc.)
+- **Template Values**: Dynamic data access using `{{field.path}}`, `{{dictionary.key}}`, `{{today+7d}}`
+- **Workflow Chaining**: Execute workflows in sequence for complex automations
+- **Execution Logging**: Complete audit trail with execution history, status, duration, and error tracking
+- **Frontend UI**: Full-featured workflow management in playground:
+  - Workflow list with status and last execution
+  - Workflow detail page with form and JSON views
+  - Execute Now button for manual testing
+  - Execution history tab with detailed logs
 
-**Configuration**: Workflows are defined in `config/{tenant_id}/workflows.json`
+**Configuration**: Workflows are defined in `config/{tenant_id}/workflows.json` or via REST API
 
-See [docs/guides/workflow-engine.md](docs/guides/workflow-engine.md) for details.
+**REST API**: Complete CRUD API for workflow management with execution endpoints
+
+See [docs/guides/workflow-engine.md](docs/guides/workflow-engine.md) for complete details.
 
 ### 4. MCP Server (`apps/mcp-server`)
 
@@ -506,6 +525,53 @@ POST /api/:tenant/:unit/search/hybrid
 Body: { q, entity, semantic_weight, text_weight, limit }
 ```
 
+#### Workflow Management
+
+```bash
+# List workflows
+GET /api/:tenant/:unit/workflows
+
+# Get workflow
+GET /api/:tenant/:unit/workflows/:id
+
+# Create workflow
+POST /api/:tenant/:unit/workflows
+Body: { name, type, enabled, status, trigger, actions, ... }
+
+# Update workflow
+PUT /api/:tenant/:unit/workflows/:id
+Body: { name, trigger, actions, ... }
+
+# Delete workflow
+DELETE /api/:tenant/:unit/workflows/:id
+
+# Update workflow status
+PATCH /api/:tenant/:unit/workflows/:id/status
+Body: { status, enabled }
+
+# Execute workflow manually
+POST /api/:tenant/:unit/workflows/:id/run
+Body: { context?, actor? }
+
+# Get workflow executions
+GET /api/:tenant/:unit/workflows/:id/executions?limit=100&offset=0
+
+# Get execution log
+GET /api/:tenant/:unit/workflows/executions/:logId
+
+# Get all executions
+GET /api/:tenant/:unit/workflows/executions?limit=100&offset=0
+
+# Get workflow statistics
+GET /api/:tenant/:unit/workflows/:id/stats
+```
+
+**Permissions**:
+
+- `crm:read` - Read workflows and execution logs
+- `workflows:manage` - Create, update, delete workflows
+- `workflows:execute` - Execute workflows manually
+
 ## ⚙️ Configuration
 
 ### Environment Variables
@@ -692,6 +758,8 @@ The project includes GitHub Actions workflows:
 
 ## 📚 Complete Documentation
 
+### Guides
+
 - [Quick Start Guide](docs/guides/quickstart.md)
 - [Running & Testing](docs/guides/running-and-testing.md)
 - [Data Model](docs/guides/data-model.md)
@@ -699,6 +767,13 @@ The project includes GitHub Actions workflows:
 - [Indexer Service](docs/guides/indexer.md)
 - [Workflow Engine](docs/guides/workflow-engine.md)
 - [MCP Server](docs/guides/mcp-server.md)
+
+### Examples
+
+- [Create Workflow Example](docs/examples/create-workflow-example.md) - Complete guide for creating and managing workflows
+
+### Other
+
 - [Roadmap](docs/ROADMAP.md)
 - [Postman Collection](docs/postman/README.md)
 
