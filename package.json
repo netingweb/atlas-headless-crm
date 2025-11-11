@@ -17,8 +17,9 @@
     "url": "https://github.com/netingweb/atlas-headless-crm/issues"
   },
   "scripts": {
-    "dev": "pnpm --filter @crm-atlas/api dev",
-    "dev:backend": "pnpm -w -r --filter @crm-atlas/utils --filter @crm-atlas/embeddings --filter @crm-atlas/search build && pnpm --filter @crm-atlas/api --filter @crm-atlas/indexer --filter @crm-atlas/workflow --filter @crm-atlas/mcp-server --parallel dev",
+    "dev": "lsof -ti:3000 | xargs kill -9 2>/dev/null || true && pnpm --filter @crm-atlas/api dev",
+    "kill:port": "lsof -ti:3000 | xargs kill -9 2>/dev/null || echo 'No process found on port 3000'",
+    "dev:backend": "lsof -ti:3000 | xargs kill -9 2>/dev/null || true && pnpm -w -r --filter @crm-atlas/utils --filter @crm-atlas/embeddings --filter @crm-atlas/search build && pnpm --filter @crm-atlas/api --filter @crm-atlas/indexer --filter @crm-atlas/workflow --filter @crm-atlas/mcp-server --parallel dev",
     "dev:playground": "pnpm --filter @crm-atlas/playground dev",
     "start": "pnpm --filter @crm-atlas/api start",
     "build": "pnpm -r --filter './apps/*' --filter './packages/*' build",

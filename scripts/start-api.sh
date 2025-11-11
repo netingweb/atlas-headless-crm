@@ -34,6 +34,14 @@ if [ -z "$OPENAI_API_KEY" ] && [ "${EMBEDDINGS_PROVIDER:-openai}" = "openai" ]; 
   echo "Semantic search will not work without it."
 fi
 
+# Kill any existing process on port 3000
+echo "🔍 Checking for existing processes on port 3000..."
+if lsof -ti:3000 > /dev/null 2>&1; then
+  echo "⚠️  Found existing process on port 3000, killing it..."
+  lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+  sleep 1
+fi
+
 # Start the API
 echo "🚀 Starting API server..."
 echo "📝 Environment variables loaded from .env"
