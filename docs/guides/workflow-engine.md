@@ -338,13 +338,13 @@ Il Workflow Engine è nativamente MCP-compatible. Tutti i workflow possono esser
 
 ### Tool MCP disponibili
 
-- `workflow.list` - Elenca workflow disponibili
-- `workflow.get` - Ottieni un workflow per ID
-- `workflow.create` - Crea un nuovo workflow via AI
-- `workflow.update` - Modifica uno esistente
-- `workflow.delete` - Elimina workflow
-- `workflow.trigger` - Esegue un workflow manualmente
-- `workflow.status` - Recupera stato e statistiche
+- `workflow_list` - Elenca workflow disponibili
+- `workflow_get` - Ottieni un workflow per ID
+- `workflow_create` - Crea un nuovo workflow via AI
+- `workflow_update` - Modifica uno esistente
+- `workflow_delete` - Elimina workflow
+- `workflow_trigger` - Esegue un workflow manualmente
+- `workflow_status` - Recupera stato e statistiche
 
 ## Sistema di Logging
 

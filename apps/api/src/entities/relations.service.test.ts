@@ -1,12 +1,53 @@
 import { RelationsService } from './relations.service';
+import { EntityRepository } from '@crm-atlas/db';
 import type { TenantContext } from '@crm-atlas/core';
 import type { EntityDefinition } from '@crm-atlas/types';
+
+const mockDb = {
+  collection: jest.fn(() => ({
+    findOne: jest.fn(),
+    find: jest.fn(() => ({
+      toArray: jest.fn(),
+    })),
+  })),
+};
+
+jest.mock('@crm-atlas/db', () => ({
+  ...jest.requireActual('@crm-atlas/db'),
+  getDb: jest.fn(() => mockDb),
+  EntityRepository: jest.fn(),
+}));
+
+jest.mock('@crm-atlas/config', () => ({
+  ...jest.requireActual('@crm-atlas/config'),
+  MongoConfigLoader: jest.fn().mockImplementation(() => ({
+    getEntity: jest.fn(),
+    getTenant: jest.fn(),
+    getUnits: jest.fn(),
+    getUnit: jest.fn(),
+    getEntities: jest.fn(),
+    getPermissions: jest.fn(),
+  })),
+}));
 
 describe('RelationsService', () => {
   let service: RelationsService;
   let ctx: TenantContext;
+  let mockRepository: jest.Mocked<EntityRepository>;
 
   beforeEach(() => {
+    mockRepository = {
+      findById: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      find: jest.fn(),
+    } as any;
+
+    (EntityRepository as jest.MockedClass<typeof EntityRepository>).mockImplementation(
+      () => mockRepository as any
+    );
+
     service = new RelationsService();
     ctx = { tenant_id: 'test', unit_id: 'test-unit' };
   });
@@ -58,10 +99,13 @@ describe('RelationsService', () => {
       };
 
       const doc = { _id: '123', name: 'Test Contact', company_id: 'company-123' };
+      const companyDoc = { _id: 'company-123', name: 'Test Company' };
 
-      // Mock would be needed for full test
+      mockRepository.findById.mockResolvedValue(companyDoc as any);
+
       const result = await service.populateReferences(ctx, entityDef, doc);
       expect(result).toBeDefined();
+      expect(result.company_id).toBe('company-123');
     });
   });
 });

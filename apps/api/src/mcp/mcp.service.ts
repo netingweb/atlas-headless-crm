@@ -92,7 +92,7 @@ export class MCPService {
     if (this.workflowsService) {
       tools.push(
         {
-          name: 'workflow.list',
+          name: 'workflow_list',
           description: 'List all workflows for a tenant/unit',
           inputSchema: {
             type: 'object',
@@ -101,7 +101,7 @@ export class MCPService {
           },
         },
         {
-          name: 'workflow.get',
+          name: 'workflow_get',
           description: 'Get a workflow by ID',
           inputSchema: {
             type: 'object',
@@ -112,7 +112,7 @@ export class MCPService {
           },
         },
         {
-          name: 'workflow.create',
+          name: 'workflow_create',
           description: 'Create a new workflow',
           inputSchema: {
             type: 'object',
@@ -126,7 +126,7 @@ export class MCPService {
           },
         },
         {
-          name: 'workflow.update',
+          name: 'workflow_update',
           description: 'Update an existing workflow',
           inputSchema: {
             type: 'object',
@@ -141,7 +141,7 @@ export class MCPService {
           },
         },
         {
-          name: 'workflow.delete',
+          name: 'workflow_delete',
           description: 'Delete a workflow',
           inputSchema: {
             type: 'object',
@@ -152,7 +152,7 @@ export class MCPService {
           },
         },
         {
-          name: 'workflow.trigger',
+          name: 'workflow_trigger',
           description: 'Trigger a workflow manually',
           inputSchema: {
             type: 'object',
@@ -167,7 +167,7 @@ export class MCPService {
           },
         },
         {
-          name: 'workflow.status',
+          name: 'workflow_status',
           description: 'Get workflow status and statistics',
           inputSchema: {
             type: 'object',
@@ -435,7 +435,7 @@ export class MCPService {
       }
 
       // Handle workflow tools
-      if (name.startsWith('workflow.')) {
+      if (name.startsWith('workflow_')) {
         if (!this.workflowsService) {
           return {
             content: [
@@ -449,7 +449,7 @@ export class MCPService {
         }
 
         const ctx: TenantContext = { tenant_id: tenantId, unit_id: unitId };
-        const workflowAction = name.substring('workflow.'.length);
+        const workflowAction = name.substring('workflow_'.length);
 
         try {
           switch (workflowAction) {

@@ -9,7 +9,31 @@ import type { TenantContext } from '@crm-atlas/core';
 import { NotFoundError, ValidationError } from '@crm-atlas/core';
 import type { EntityDefinition } from '@crm-atlas/types';
 
-jest.mock('@crm-atlas/db');
+const mockDb = {
+  collection: jest.fn(() => ({
+    findOne: jest.fn(),
+    find: jest.fn(() => ({
+      toArray: jest.fn(),
+    })),
+  })),
+};
+
+jest.mock('@crm-atlas/db', () => ({
+  ...jest.requireActual('@crm-atlas/db'),
+  getDb: jest.fn(() => mockDb),
+  EntityRepository: jest.fn(),
+}));
+jest.mock('@crm-atlas/config', () => ({
+  ...jest.requireActual('@crm-atlas/config'),
+  MongoConfigLoader: jest.fn().mockImplementation(() => ({
+    getEntity: jest.fn(),
+    getTenant: jest.fn(),
+    getUnits: jest.fn(),
+    getUnit: jest.fn(),
+    getEntities: jest.fn(),
+    getPermissions: jest.fn(),
+  })),
+}));
 jest.mock('@crm-atlas/search');
 
 describe('EntitiesService', () => {
@@ -31,10 +55,25 @@ describe('EntitiesService', () => {
       find: jest.fn(),
     } as any;
 
-    configLoader = {
+    // Mock EntityRepository to return our mock instance
+    (EntityRepository as jest.MockedClass<typeof EntityRepository>).mockImplementation(
+      () => repository as any
+    );
+
+    // Create a mock instance of MongoConfigLoader
+    const mockConfigLoaderInstance = {
       getEntity: jest.fn(),
       getTenant: jest.fn(),
-    } as any;
+      getUnits: jest.fn(),
+      getUnit: jest.fn(),
+      getEntities: jest.fn(),
+      getPermissions: jest.fn(),
+    };
+
+    (MongoConfigLoader as jest.MockedClass<typeof MongoConfigLoader>).mockImplementation(
+      () => mockConfigLoaderInstance as any
+    );
+    configLoader = mockConfigLoaderInstance as any;
 
     validatorCache = new ValidatorCache();
 
@@ -45,10 +84,6 @@ describe('EntitiesService', () => {
         {
           provide: EntityRepository,
           useValue: repository,
-        },
-        {
-          provide: MongoConfigLoader,
-          useValue: configLoader,
         },
         {
           provide: ValidatorCache,

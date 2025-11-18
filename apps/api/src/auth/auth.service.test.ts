@@ -7,7 +7,11 @@ import type { TenantContext } from '@crm-atlas/core';
 jest.mock('@crm-atlas/db');
 jest.mock('@crm-atlas/auth', () => ({
   hashPassword: jest.fn((pwd) => Promise.resolve(`hashed_${pwd}`)),
-  verifyPassword: jest.fn((pwd, hash) => Promise.resolve(hash === `hashed_${pwd}`)),
+  verifyPassword: jest.fn((hash, pwd) => {
+    // hash è il primo parametro (passwordHash dal DB)
+    // pwd è il secondo parametro (password fornita)
+    return Promise.resolve(hash === `hashed_${pwd}`);
+  }),
   signJwt: jest.fn(() => 'mock-jwt-token'),
 }));
 
@@ -41,7 +45,7 @@ describe('AuthService', () => {
         _id: '123',
         tenant_id: 'test',
         email: 'test@example.com',
-        password: 'hashed_password123',
+        passwordHash: 'hashed_password123',
       };
 
       mockDb.collection().findOne.mockResolvedValue(user);
@@ -65,7 +69,7 @@ describe('AuthService', () => {
         _id: '123',
         tenant_id: 'test',
         email: 'test@example.com',
-        password: 'hashed_wrong_password',
+        passwordHash: 'hashed_wrong_password',
       };
 
       mockDb.collection().findOne.mockResolvedValue(user);
