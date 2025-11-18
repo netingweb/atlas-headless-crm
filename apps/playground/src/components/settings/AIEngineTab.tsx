@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/select';
 import { useAIStore, providerModels, type AIProvider } from '@/stores/ai-store';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, Eye, EyeOff } from 'lucide-react';
+import { ToastAction } from '@/components/ui/toast';
+import { Save, Eye, EyeOff, Copy } from 'lucide-react';
 
 const aiConfigSchema = z.object({
   provider: z.enum(['openai', 'azure']),
@@ -87,10 +88,26 @@ export default function AIEngineTab() {
       });
     } catch (error) {
       console.error('Error saving config:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save configuration';
       toast({
         title: 'Configuration error',
-        description: error instanceof Error ? error.message : 'Failed to save configuration',
+        description: errorMessage,
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText(errorMessage).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     }
   };

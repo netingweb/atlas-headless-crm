@@ -58,8 +58,31 @@ export const entitiesApi = {
     id: string,
     data: Record<string, unknown>
   ): Promise<Entity> => {
-    const response = await apiClient.put<Entity>(`/${tenant}/${unit}/${entity}/${id}`, data);
-    return response.data;
+    console.log('[Client API] Update request:', {
+      tenant,
+      unit,
+      entity,
+      id,
+      dataKeys: Object.keys(data),
+      data,
+    });
+
+    try {
+      const response = await apiClient.put<Entity>(`/${tenant}/${unit}/${entity}/${id}`, data);
+      console.log('[Client API] Update response:', {
+        status: response.status,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('[Client API] Update error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+      });
+      throw error;
+    }
   },
 
   delete: async (tenant: string, unit: string, entity: string, id: string): Promise<void> => {

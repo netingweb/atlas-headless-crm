@@ -722,6 +722,19 @@ function ReferenceField({
 
   const isReadonly = READONLY_FIELDS.includes(field.name);
 
+  // Use local state to ensure Select is always controlled
+  // Use a sentinel value "__none__" to represent "no selection" instead of undefined
+  // Hooks must be called before any conditional returns
+  const NONE_VALUE = '__none__';
+  const [selectValue, setSelectValue] = useState<string>(
+    value != null ? String(value) : NONE_VALUE
+  );
+
+  // Sync local state with prop value when it changes
+  useEffect(() => {
+    setSelectValue(value != null ? String(value) : NONE_VALUE);
+  }, [value]);
+
   if (isReadonly) {
     return (
       <div className="space-y-2">
@@ -740,8 +753,12 @@ function ReferenceField({
         {field.required && <span className="text-red-500 ml-1">*</span>}
       </Label>
       <Select
-        value={value ? String(value) : undefined}
-        onValueChange={(val) => onChange(val || null)}
+        value={selectValue}
+        onValueChange={(val) => {
+          setSelectValue(val);
+          // Convert sentinel value to null for the parent component
+          onChange(val === NONE_VALUE ? null : val);
+        }}
         disabled={isLoading}
       >
         <SelectTrigger>
@@ -750,6 +767,7 @@ function ReferenceField({
           />
         </SelectTrigger>
         <SelectContent>
+          {!field.required && <SelectItem value={NONE_VALUE}>None</SelectItem>}
           {options?.map((option) => {
             const optionId = (option._id || option.id || '') as string | number;
             const displayName = (option.name ||

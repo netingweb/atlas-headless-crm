@@ -27,12 +27,18 @@ export const WorkflowConditionSchema = z.object({
 
 export type WorkflowCondition = z.infer<typeof WorkflowConditionSchema>;
 
+// Logic operator for combining conditions
+export const ConditionLogicSchema = z.enum(['AND', 'OR']);
+
+export type ConditionLogic = z.infer<typeof ConditionLogicSchema>;
+
 // Event trigger
 export const EventTriggerSchema = z.object({
   type: z.literal('event'),
   event: z.enum(['entity.created', 'entity.updated', 'entity.deleted']),
   entity: z.string().optional(),
   conditions: z.array(WorkflowConditionSchema).optional(),
+  logic: ConditionLogicSchema.optional(), // How to combine conditions: AND (all must be true) or OR (at least one must be true). Defaults to AND if not specified.
 });
 
 export type EventTrigger = z.infer<typeof EventTriggerSchema>;
@@ -43,6 +49,7 @@ export const ScheduleTriggerSchema = z.object({
   cron: z.string(), // Cron expression
   entity: z.string().optional(),
   conditions: z.array(WorkflowConditionSchema).optional(),
+  logic: ConditionLogicSchema.optional(), // How to combine conditions: AND (all must be true) or OR (at least one must be true). Defaults to AND if not specified.
 });
 
 export type ScheduleTrigger = z.infer<typeof ScheduleTriggerSchema>;

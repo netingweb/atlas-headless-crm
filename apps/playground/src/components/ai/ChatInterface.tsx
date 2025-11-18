@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Loader2, AlertCircle } from 'lucide-react';
+import { Send, Loader2, AlertCircle, Copy } from 'lucide-react';
 import { useAIStore } from '@/stores/ai-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { createAgent, runAgentStream, type Agent } from '@/lib/ai/agent';
 import { useToast } from '@/components/ui/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 
 interface Message {
   id: string;
@@ -88,6 +89,21 @@ export default function ChatInterface() {
           title: 'Agent initialization failed',
           description: errorMessage,
           variant: 'destructive',
+          action: (
+            <ToastAction
+              altText="Copy error message"
+              onClick={() => {
+                navigator.clipboard.writeText(errorMessage).then(() => {
+                  toast({
+                    title: 'Copied',
+                    description: 'Error message copied to clipboard',
+                  });
+                });
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </ToastAction>
+          ),
         });
       }
     };
@@ -102,6 +118,23 @@ export default function ChatInterface() {
           title: 'Agent not ready',
           description: 'Please configure your AI engine in Settings',
           variant: 'destructive',
+          action: (
+            <ToastAction
+              altText="Copy error message"
+              onClick={() => {
+                navigator.clipboard
+                  .writeText('Please configure your AI engine in Settings')
+                  .then(() => {
+                    toast({
+                      title: 'Copied',
+                      description: 'Error message copied to clipboard',
+                    });
+                  });
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </ToastAction>
+          ),
         });
       }
       return;
@@ -201,6 +234,21 @@ export default function ChatInterface() {
         title: 'Error',
         description: errorMessage,
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText(errorMessage).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     } finally {
       setLoading(false);

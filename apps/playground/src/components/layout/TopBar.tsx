@@ -14,8 +14,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Search, LogOut, User, Building2, Loader2 } from 'lucide-react';
+import { Search, LogOut, User, Building2, Loader2, Copy } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 
 export default function TopBar() {
   const navigate = useNavigate();
@@ -70,6 +71,23 @@ export default function TopBar() {
         title: 'Search failed',
         description: 'Unable to perform search. Please try again.',
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard
+                .writeText('Unable to perform search. Please try again.')
+                .then(() => {
+                  toast({
+                    title: 'Copied',
+                    description: 'Error message copied to clipboard',
+                  });
+                });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
       setSearchResults([]);
     } finally {

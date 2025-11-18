@@ -17,8 +17,19 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Save, Copy, Play, Loader2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Save,
+  Copy,
+  Play,
+  Loader2,
+  TestTube,
+  Clipboard,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import type { WorkflowExecutionLog } from '@crm-atlas/types';
@@ -40,7 +51,7 @@ export default function WorkflowDetail() {
     trigger: {
       type: 'event',
       event: 'entity.updated',
-    },
+    } as WorkflowDefinition['trigger'],
     actions: [],
   });
 
@@ -48,6 +59,10 @@ export default function WorkflowDetail() {
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [executeContext, setExecuteContext] = useState<string>('{}');
   const [executeActor, setExecuteActor] = useState<string>('');
+  const [showTestDialog, setShowTestDialog] = useState(false);
+  const [testContext, setTestContext] = useState<string>('{}');
+  const [testResult, setTestResult] = useState<unknown | null>(null);
+  const [expandedExecutions, setExpandedExecutions] = useState<Set<string>>(new Set());
 
   // Get workflow data
   const { data: workflow, isLoading } = useQuery({
@@ -74,7 +89,7 @@ export default function WorkflowDetail() {
         trigger: {
           type: 'event',
           event: 'entity.updated',
-        },
+        } as WorkflowDefinition['trigger'],
         actions: [],
       });
     } else if (workflow) {
@@ -100,10 +115,30 @@ export default function WorkflowDetail() {
       navigate(`/workflows/${data.workflow_id}`);
     },
     onError: (error: any) => {
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Failed to create workflow';
+      const errorDetails = error.response?.data?.errors || error.response?.data || error;
+      const errorText =
+        typeof errorDetails === 'string' ? errorMessage : JSON.stringify(errorDetails, null, 2);
       toast({
         title: 'Error',
-        description: error.response?.data?.message || error.message || 'Failed to create workflow',
+        description: errorMessage,
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error details"
+            onClick={() => {
+              navigator.clipboard.writeText(errorText).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error details copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     },
   });
@@ -122,10 +157,30 @@ export default function WorkflowDetail() {
       queryClient.invalidateQueries({ queryKey: ['workflow', tenantId, unitId, id] });
     },
     onError: (error: any) => {
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Failed to update workflow';
+      const errorDetails = error.response?.data?.errors || error.response?.data || error;
+      const errorText =
+        typeof errorDetails === 'string' ? errorMessage : JSON.stringify(errorDetails, null, 2);
       toast({
         title: 'Error',
-        description: error.response?.data?.message || error.message || 'Failed to update workflow',
+        description: errorMessage,
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error details"
+            onClick={() => {
+              navigator.clipboard.writeText(errorText).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error details copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     },
   });
@@ -147,10 +202,66 @@ export default function WorkflowDetail() {
       setExecuteActor('');
     },
     onError: (error: any) => {
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Failed to trigger workflow';
+      const errorDetails = error.response?.data?.errors || error.response?.data || error;
+      const errorText =
+        typeof errorDetails === 'string' ? errorMessage : JSON.stringify(errorDetails, null, 2);
       toast({
         title: 'Error',
-        description: error.response?.data?.message || error.message || 'Failed to trigger workflow',
+        description: errorMessage,
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error details"
+            onClick={() => {
+              navigator.clipboard.writeText(errorText).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error details copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
+      });
+    },
+  });
+
+  // Test workflow mutation
+  const testMutation = useMutation({
+    mutationFn: (context?: Record<string, unknown>) =>
+      workflowsApi.test(tenantId || '', unitId || '', id || '', context),
+    onSuccess: (data) => {
+      setTestResult(data);
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Failed to test workflow';
+      const errorDetails = error.response?.data?.errors || error.response?.data || error;
+      const errorText =
+        typeof errorDetails === 'string' ? errorMessage : JSON.stringify(errorDetails, null, 2);
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error details"
+            onClick={() => {
+              navigator.clipboard.writeText(errorText).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error details copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     },
   });
@@ -161,6 +272,23 @@ export default function WorkflowDetail() {
         title: 'Error',
         description: 'Please save the workflow before executing it',
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard
+                .writeText('Please save the workflow before executing it')
+                .then(() => {
+                  toast({
+                    title: 'Copied',
+                    description: 'Error message copied to clipboard',
+                  });
+                });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
       return;
     }
@@ -174,6 +302,63 @@ export default function WorkflowDetail() {
         title: 'Error',
         description: 'Invalid JSON in context field',
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText('Invalid JSON in context field').then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
+      });
+    }
+  };
+
+  const handleTest = () => {
+    if (!id || id === 'new') {
+      toast({
+        title: 'Error',
+        description: 'Please save the workflow before testing it',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const context = testContext.trim() ? JSON.parse(testContext) : undefined;
+      setTestResult(null);
+      // Save the context used for the test (so it can be restored when clicking "Run Another Test")
+      if (context) {
+        setTestContext(JSON.stringify(context, null, 2));
+      }
+      testMutation.mutate(context);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Invalid JSON in context field',
+        variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText('Invalid JSON in context field').then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     }
   };
@@ -185,6 +370,23 @@ export default function WorkflowDetail() {
           title: 'Error',
           description: 'Please fill in all required fields (name, trigger, actions)',
           variant: 'destructive',
+          action: (
+            <ToastAction
+              altText="Copy error message"
+              onClick={() => {
+                navigator.clipboard
+                  .writeText('Please fill in all required fields (name, trigger, actions)')
+                  .then(() => {
+                    toast({
+                      title: 'Copied',
+                      description: 'Error message copied to clipboard',
+                    });
+                  });
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </ToastAction>
+          ),
         });
         return;
       }
@@ -241,14 +443,49 @@ export default function WorkflowDetail() {
         </div>
         <div className="flex items-center gap-2">
           {!isNew && (
-            <Button
-              variant="outline"
-              onClick={() => setShowExecuteDialog(true)}
-              disabled={triggerMutation.isPending}
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Execute Now
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowTestDialog(true);
+                  setTestResult(null);
+                  // Pre-fill context based on workflow
+                  const defaultContext: Record<string, unknown> = {
+                    tenant_id: tenantId || 'demo',
+                    unit_id: unitId || 'sales',
+                  };
+                  if (
+                    formData.type === 'event' &&
+                    formData.trigger &&
+                    'event' in formData.trigger
+                  ) {
+                    defaultContext.event = formData.trigger.event;
+                    if (formData.trigger.entity) {
+                      defaultContext.entity = formData.trigger.entity;
+                      defaultContext.entity_id = 'test_entity_id';
+                      // Add data object with entity fields for condition evaluation
+                      // When entity.updated is emitted, entity data is in data.*
+                      defaultContext.data = {
+                        status: 'customer', // Example field - user should update with real entity data
+                      };
+                    }
+                  }
+                  setTestContext(JSON.stringify(defaultContext, null, 2));
+                }}
+                disabled={testMutation.isPending}
+              >
+                <TestTube className="h-4 w-4 mr-2" />
+                Test Workflow
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowExecuteDialog(true)}
+                disabled={triggerMutation.isPending}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Execute Now
+              </Button>
+            </>
           )}
           <Button variant="outline" onClick={copyToClipboard}>
             <Copy className="h-4 w-4 mr-2" />
@@ -441,8 +678,9 @@ export default function WorkflowDetail() {
                     <table className="w-full">
                       <thead className="bg-gray-50">
                         <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-8"></th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Execution ID
+                            Job ID
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                             Trigger
@@ -456,48 +694,244 @@ export default function WorkflowDetail() {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                             Completed
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Duration
-                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {executions.map((execution) => (
-                          <tr key={execution.log_id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
-                              {execution.log_id.substring(0, 8)}...
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm capitalize">
-                              {execution.trigger_type}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <Badge
-                                variant={
-                                  execution.status === 'completed'
-                                    ? 'default'
-                                    : execution.status === 'failed'
-                                      ? 'destructive'
-                                      : 'secondary'
-                                }
+                        {executions.map((execution) => {
+                          const isExpanded = expandedExecutions.has(execution.log_id);
+                          return (
+                            <>
+                              <tr
+                                key={execution.log_id}
+                                className="cursor-pointer hover:bg-gray-50"
+                                onClick={() => {
+                                  const newExpanded = new Set(expandedExecutions);
+                                  if (isExpanded) {
+                                    newExpanded.delete(execution.log_id);
+                                  } else {
+                                    newExpanded.add(execution.log_id);
+                                  }
+                                  setExpandedExecutions(newExpanded);
+                                }}
                               >
-                                {execution.status}
-                              </Badge>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {format(new Date(execution.started_at), 'PPp')}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {execution.completed_at
-                                ? format(new Date(execution.completed_at), 'PPp')
-                                : '-'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {execution.duration_ms
-                                ? `${(execution.duration_ms / 1000).toFixed(2)}s`
-                                : '-'}
-                            </td>
-                          </tr>
-                        ))}
+                                <td className="px-4 py-4 text-center">
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
+                                  {execution.execution_id.substring(0, 8)}...
+                                </td>
+                                <td className="px-6 py-4 text-sm">
+                                  <div className="space-y-1">
+                                    <div className="capitalize font-medium">
+                                      {execution.trigger_type}
+                                    </div>
+                                    {execution.trigger_event && (
+                                      <div className="text-xs text-gray-500">
+                                        Event: {execution.trigger_event}
+                                      </div>
+                                    )}
+                                    {execution.trigger_entity && (
+                                      <div className="text-xs text-gray-500">
+                                        Entity: {execution.trigger_entity}
+                                        {execution.trigger_entity_id &&
+                                          ` (${execution.trigger_entity_id.substring(0, 8)}...)`}
+                                      </div>
+                                    )}
+                                    {execution.actor && (
+                                      <div className="text-xs text-gray-500">
+                                        Actor: {execution.actor}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                  <Badge
+                                    variant={
+                                      execution.status === 'completed'
+                                        ? 'success'
+                                        : execution.status === 'failed'
+                                          ? 'destructive'
+                                          : execution.status === 'skipped'
+                                            ? 'destructive'
+                                            : 'secondary'
+                                    }
+                                  >
+                                    {execution.status}
+                                  </Badge>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {format(new Date(execution.started_at), 'PPp')}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {execution.completed_at
+                                    ? format(new Date(execution.completed_at), 'PPp')
+                                    : '-'}
+                                </td>
+                              </tr>
+                              {isExpanded && (
+                                <tr key={`${execution.log_id}-details`}>
+                                  <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                                    <div className="space-y-4">
+                                      {/* Workflow Definition */}
+                                      {workflow && (
+                                        <div>
+                                          <h4 className="text-sm font-semibold mb-2">
+                                            Workflow Definition
+                                          </h4>
+                                          <pre className="text-xs bg-white p-3 rounded border overflow-x-auto">
+                                            {JSON.stringify(workflow, null, 2)}
+                                          </pre>
+                                        </div>
+                                      )}
+
+                                      {/* Context */}
+                                      {execution.context && (
+                                        <div>
+                                          <h4 className="text-sm font-semibold mb-2">Context</h4>
+                                          <pre className="text-xs bg-white p-3 rounded border overflow-x-auto">
+                                            {JSON.stringify(execution.context, null, 2)}
+                                          </pre>
+                                        </div>
+                                      )}
+
+                                      {/* Conditions Evaluated */}
+                                      {execution.conditions_evaluated &&
+                                        execution.conditions_evaluated.length > 0 && (
+                                          <div>
+                                            <h4 className="text-sm font-semibold mb-2">
+                                              Conditions Evaluated
+                                            </h4>
+                                            <div className="space-y-2">
+                                              {execution.conditions_evaluated.map(
+                                                (condition, idx) => (
+                                                  <div
+                                                    key={idx}
+                                                    className="bg-white p-3 rounded border text-sm"
+                                                  >
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                      <Badge
+                                                        variant={
+                                                          condition.result
+                                                            ? 'success'
+                                                            : 'destructive'
+                                                        }
+                                                      >
+                                                        {condition.result ? '✓' : '✗'}
+                                                      </Badge>
+                                                      <span className="font-mono">
+                                                        {condition.condition.field}{' '}
+                                                        {condition.condition.operator}{' '}
+                                                        {JSON.stringify(condition.condition.value)}
+                                                      </span>
+                                                    </div>
+                                                    {condition.field_value !== undefined && (
+                                                      <div className="text-xs text-gray-500 mt-1">
+                                                        Field value:{' '}
+                                                        {JSON.stringify(condition.field_value)}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                )
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                      {/* Actions Executed */}
+                                      {execution.actions_executed &&
+                                        execution.actions_executed.length > 0 && (
+                                          <div>
+                                            <h4 className="text-sm font-semibold mb-2">
+                                              Actions Executed
+                                            </h4>
+                                            <div className="space-y-2">
+                                              {execution.actions_executed.map((action, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className="bg-white p-3 rounded border text-sm"
+                                                >
+                                                  <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                      <Badge
+                                                        variant={
+                                                          action.status === 'completed'
+                                                            ? 'success'
+                                                            : action.status === 'failed'
+                                                              ? 'destructive'
+                                                              : 'secondary'
+                                                        }
+                                                      >
+                                                        Action {action.action_index + 1}:{' '}
+                                                        {action.action_type} - {action.status}
+                                                      </Badge>
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                      {action.duration_ms
+                                                        ? `${(action.duration_ms / 1000).toFixed(2)}s`
+                                                        : '-'}
+                                                    </div>
+                                                  </div>
+                                                  {action.result != null && (
+                                                    <div className="mt-2">
+                                                      <p className="text-xs font-medium mb-1">
+                                                        Result:
+                                                      </p>
+                                                      <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto">
+                                                        {JSON.stringify(action.result, null, 2)}
+                                                      </pre>
+                                                    </div>
+                                                  )}
+                                                  {action.error && (
+                                                    <div className="mt-2">
+                                                      <p className="text-xs font-medium text-red-600 mb-1">
+                                                        Error:
+                                                      </p>
+                                                      <p className="text-xs text-red-600">
+                                                        {action.error}
+                                                      </p>
+                                                    </div>
+                                                  )}
+                                                  <div className="text-xs text-gray-500 mt-1">
+                                                    Started:{' '}
+                                                    {format(new Date(action.started_at), 'PPp')}
+                                                    {action.completed_at &&
+                                                      ` | Completed: ${format(new Date(action.completed_at), 'PPp')}`}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                      {/* Error */}
+                                      {execution.error && (
+                                        <div>
+                                          <h4 className="text-sm font-semibold mb-2 text-red-600">
+                                            Error
+                                          </h4>
+                                          <div className="bg-red-50 border border-red-200 p-3 rounded text-sm">
+                                            <p className="text-red-800 font-medium">
+                                              {execution.error}
+                                            </p>
+                                            {execution.error_stack && (
+                                              <pre className="text-xs text-red-600 mt-2 overflow-x-auto">
+                                                {execution.error_stack}
+                                              </pre>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -582,6 +1016,373 @@ export default function WorkflowDetail() {
                   )}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Test Dialog */}
+      {showTestDialog && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => {
+            setShowTestDialog(false);
+            setTestContext('{}');
+            setTestResult(null);
+          }}
+        >
+          <Card
+            className="w-full max-w-4xl m-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader>
+              <CardTitle>Test Workflow</CardTitle>
+              <CardDescription>
+                Simulate workflow execution without actually executing it. This will validate the
+                workflow and show what would happen.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!testResult ? (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm font-medium text-blue-900 mb-1">Current Context Info:</p>
+                    <div className="text-xs text-blue-700 space-y-1">
+                      <div>
+                        <span className="font-medium">Tenant ID:</span>{' '}
+                        <code className="bg-blue-100 px-1 rounded">{tenantId || 'not set'}</code>
+                      </div>
+                      <div>
+                        <span className="font-medium">Unit ID:</span>{' '}
+                        <code className="bg-blue-100 px-1 rounded">{unitId || 'not set'}</code>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-2">
+                        These values will be automatically included in the test context if not
+                        specified.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="test-context">Context (JSON)</Label>
+                    <Textarea
+                      id="test-context"
+                      value={testContext}
+                      onChange={(e) => setTestContext(e.target.value)}
+                      placeholder={`{
+  "event": "entity.updated",
+  "entity": "contact",
+  "entity_id": "123",
+  "tenant_id": "${tenantId || 'demo'}",
+  "unit_id": "${unitId || 'sales'}",
+  "data": {
+    "status": "customer"
+  }
+}`}
+                      rows={10}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-sm text-gray-500">
+                      Optional: Provide context data as JSON. This simulates the event/data that
+                      would trigger the workflow. For event triggers, include: event, entity,
+                      entity_id, tenant_id, unit_id, and a{' '}
+                      <code className="bg-gray-100 px-1 rounded">data</code> object with entity
+                      fields needed for conditions (e.g.,{' '}
+                      <code className="bg-gray-100 px-1 rounded">data.status</code>).
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowTestDialog(false);
+                        setTestContext('{}');
+                        setTestResult(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleTest} disabled={testMutation.isPending}>
+                      {testMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <TestTube className="h-4 w-4 mr-2" />
+                          Run Test
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">Test Results</h3>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(JSON.stringify(testResult, null, 2));
+                          toast({
+                            title: 'Copied',
+                            description: 'Test result copied to clipboard',
+                          });
+                        }}
+                      >
+                        <Clipboard className="h-4 w-4 mr-2" />
+                        Copy Result
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setTestResult(null);
+                          // Keep the previous context instead of resetting to empty
+                          // The context is already in testContext from the previous test
+                        }}
+                      >
+                        Run Another Test
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Test Info */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Test Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div>
+                        <span className="font-medium">Tested by:</span>{' '}
+                        {(testResult as any)?.test_info?.tested_by?.email ||
+                          (testResult as any)?.test_info?.tested_by?.user_id ||
+                          'Unknown'}
+                      </div>
+                      <div>
+                        <span className="font-medium">Tenant:</span>{' '}
+                        {(testResult as any)?.test_info?.tested_by?.tenant_id}
+                      </div>
+                      {(testResult as any)?.test_info?.tested_by?.unit_id && (
+                        <div>
+                          <span className="font-medium">Unit:</span>{' '}
+                          {(testResult as any)?.test_info?.tested_by?.unit_id}
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-medium">Tested at:</span>{' '}
+                        {format(new Date((testResult as any)?.test_info?.tested_at), 'PPp')}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Trigger Evaluation */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Trigger Evaluation</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            (testResult as any)?.trigger_evaluation?.would_trigger
+                              ? 'success'
+                              : 'destructive'
+                          }
+                        >
+                          {(testResult as any)?.trigger_evaluation?.would_trigger
+                            ? 'Would Trigger'
+                            : 'Would Not Trigger'}
+                        </Badge>
+                        <span className="text-sm text-gray-500">
+                          Type: {(testResult as any)?.trigger_evaluation?.trigger_type}
+                        </span>
+                      </div>
+                      {(testResult as any)?.trigger_evaluation?.reason && (
+                        <p className="text-sm text-gray-600">
+                          {(testResult as any)?.trigger_evaluation?.reason}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Conditions Evaluation */}
+                  {(testResult as any)?.conditions_evaluation && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Conditions Evaluation</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              (testResult as any)?.conditions_evaluation?.met
+                                ? 'success'
+                                : 'destructive'
+                            }
+                          >
+                            {(testResult as any)?.conditions_evaluation?.met
+                              ? 'All Met'
+                              : 'Not Met'}
+                          </Badge>
+                          {formData.trigger &&
+                            'logic' in formData.trigger &&
+                            formData.trigger.logic && (
+                              <span className="text-xs text-gray-500">
+                                Logic:{' '}
+                                <code className="bg-gray-100 px-1 rounded">
+                                  {formData.trigger.logic}
+                                </code>
+                              </span>
+                            )}
+                        </div>
+                        <div className="space-y-2 mt-2">
+                          {(testResult as any)?.conditions_evaluation?.results?.map(
+                            (condition: any, idx: number) => (
+                              <div key={idx} className="border rounded p-2 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={condition.result ? 'success' : 'destructive'}>
+                                    {condition.result ? '✓' : '✗'}
+                                  </Badge>
+                                  <span className="font-mono">
+                                    {condition.condition.field} {condition.condition.operator}{' '}
+                                    {JSON.stringify(condition.condition.value)}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Field value: {JSON.stringify(condition.field_value)}
+                                  {condition.resolved_value !== undefined &&
+                                    ` | Resolved: ${JSON.stringify(condition.resolved_value)}`}
+                                </div>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Actions Simulation */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Actions Simulation</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="text-sm text-gray-600 mb-2">
+                        Total: {(testResult as any)?.summary?.total_actions} | Valid:{' '}
+                        {(testResult as any)?.summary?.valid_actions} | Invalid:{' '}
+                        {(testResult as any)?.summary?.invalid_actions}
+                      </div>
+                      <div className="space-y-2">
+                        {(testResult as any)?.actions_simulation?.map((action: any) => (
+                          <div key={action.action_index} className="border rounded p-3 text-sm">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <Badge variant={action.would_execute ? 'success' : 'destructive'}>
+                                  Action {action.action_index + 1}: {action.action_type}
+                                </Badge>
+                                {action.would_execute ? (
+                                  <Badge variant="success">Would Execute</Badge>
+                                ) : (
+                                  <Badge variant="destructive">Would Not Execute</Badge>
+                                )}
+                              </div>
+                            </div>
+                            {action.validation?.errors && action.validation.errors.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-red-600">Errors:</p>
+                                <ul className="list-disc list-inside text-xs text-red-600">
+                                  {action.validation.errors.map((error: string, idx: number) => (
+                                    <li key={idx}>{error}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {action.validation?.warnings &&
+                              action.validation.warnings.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium text-yellow-600">Warnings:</p>
+                                  <ul className="list-disc list-inside text-xs text-yellow-600">
+                                    {action.validation.warnings.map(
+                                      (warning: string, idx: number) => (
+                                        <li key={idx}>{warning}</li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                            {action.simulated_result && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium">Simulated Result:</p>
+                                <pre className="text-xs bg-gray-50 p-2 rounded mt-1 overflow-x-auto">
+                                  {JSON.stringify(action.simulated_result, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                            {action.resolved_data && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium">Resolved Data:</p>
+                                <pre className="text-xs bg-gray-50 p-2 rounded mt-1 overflow-x-auto">
+                                  {JSON.stringify(action.resolved_data, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Summary */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            (testResult as any)?.summary?.would_execute ? 'success' : 'destructive'
+                          }
+                          className="text-base"
+                        >
+                          {(testResult as any)?.summary?.would_execute
+                            ? '✓ Workflow Would Execute Successfully'
+                            : '✗ Workflow Would Not Execute'}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 text-sm space-y-1">
+                        <div>
+                          Trigger:{' '}
+                          {(testResult as any)?.trigger_evaluation?.would_trigger ? '✓' : '✗'}
+                        </div>
+                        <div>
+                          Conditions: {(testResult as any)?.summary?.conditions_met ? '✓' : '✗'}
+                        </div>
+                        <div>
+                          Actions: {(testResult as any)?.summary?.valid_actions}/
+                          {(testResult as any)?.summary?.total_actions} valid
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowTestDialog(false);
+                        setTestContext('{}');
+                        setTestResult(null);
+                      }}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

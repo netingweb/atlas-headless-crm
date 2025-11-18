@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { RefreshCw } from 'lucide-react';
+import { ToastAction } from '@/components/ui/toast';
+import { RefreshCw, Copy } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { configApi } from '@/lib/api/config';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,6 +19,21 @@ export default function CacheTab() {
         title: 'Missing tenant',
         description: 'Please login/select a tenant first.',
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText('Please login/select a tenant first.').then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
       return;
     }
@@ -45,6 +61,21 @@ export default function CacheTab() {
         title: 'Error',
         description: message,
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText(message).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     } finally {
       setLoading(false);

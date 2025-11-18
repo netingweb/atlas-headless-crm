@@ -135,4 +135,17 @@ export const workflowsApi = {
     );
     return response.data;
   },
+
+  test: async (
+    tenant: string,
+    unit: string,
+    workflowId: string,
+    context?: Record<string, unknown>
+  ): Promise<unknown> => {
+    const response = await apiClient.post<unknown>(
+      `/${tenant}/${unit}/workflows/${workflowId}/test`,
+      { context }
+    );
+    return response.data;
+  },
 };

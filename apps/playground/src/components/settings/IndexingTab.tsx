@@ -3,8 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { indexingApi, type TypesenseHealth, type TypesenseMetrics } from '@/lib/api/indexing';
 import { useAuthStore } from '@/stores/auth-store';
-import { Loader2, CheckCircle2, XCircle, RefreshCw, Database } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, RefreshCw, Database, Copy } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { formatDate } from '@/lib/utils';
 
 export default function IndexingTab() {
@@ -54,14 +55,45 @@ export default function IndexingTab() {
           title: 'Backfill failed',
           description: data.message,
           variant: 'destructive',
+          action: (
+            <ToastAction
+              altText="Copy error message"
+              onClick={() => {
+                navigator.clipboard.writeText(data.message).then(() => {
+                  toast({
+                    title: 'Copied',
+                    description: 'Error message copied to clipboard',
+                  });
+                });
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </ToastAction>
+          ),
         });
       }
     },
     onError: (error: any) => {
+      const errorMessage = error.message || 'Failed to trigger backfill';
       toast({
         title: 'Backfill error',
-        description: error.message || 'Failed to trigger backfill',
+        description: errorMessage,
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText(errorMessage).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     },
   });

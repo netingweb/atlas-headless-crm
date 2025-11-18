@@ -2,7 +2,6 @@
   "tenant_id": "demo",
   "workflows": [
     {
-      "workflow_id": "followup_hot_lead",
       "tenant_id": "demo",
       "unit_id": "sales",
       "name": "Follow up hot lead",
@@ -44,12 +43,9 @@
         "created_by": "system",
         "description": "Automatically assign hot leads to sales manager and create follow-up task",
         "version": 1
-      },
-      "created_at": "2025-01-09T10:00:00Z",
-      "updated_at": "2025-01-09T10:00:00Z"
+      }
     },
     {
-      "workflow_id": "remind_pending_quotes",
       "tenant_id": "demo",
       "unit_id": "sales",
       "name": "Reminder preventivi in sospeso",
@@ -86,9 +82,136 @@
         "created_by": "system",
         "description": "Invia reminder giornaliero per preventivi in sospeso da più di 7 giorni",
         "version": 1
+      }
+    },
+    {
+      "tenant_id": "demo",
+      "unit_id": "sales",
+      "name": "Test Conditions AND",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "event",
+        "event": "entity.updated",
+        "entity": "contact",
+        "conditions": [
+          {
+            "field": "status",
+            "operator": "==",
+            "value": "customer"
+          },
+          {
+            "field": "priority",
+            "operator": "==",
+            "value": "high"
+          }
+        ],
+        "logic": "AND"
       },
-      "created_at": "2025-01-09T10:00:00Z",
-      "updated_at": "2025-01-09T10:00:00Z"
+      "actions": [
+        {
+          "type": "update",
+          "entity": "contact",
+          "data": {
+            "last_updated_by_workflow": "test_and"
+          }
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Test workflow with AND conditions - both status==customer AND priority==high must be true",
+        "version": 1
+      }
+    },
+    {
+      "tenant_id": "demo",
+      "unit_id": "sales",
+      "name": "Test Conditions OR",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "event",
+        "event": "entity.updated",
+        "entity": "contact",
+        "conditions": [
+          {
+            "field": "status",
+            "operator": "==",
+            "value": "customer"
+          },
+          {
+            "field": "status",
+            "operator": "==",
+            "value": "lead"
+          }
+        ],
+        "logic": "OR"
+      },
+      "actions": [
+        {
+          "type": "update",
+          "entity": "contact",
+          "data": {
+            "last_updated_by_workflow": "test_or"
+          }
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Test workflow with OR conditions - status==customer OR status==lead (at least one must be true)",
+        "version": 1
+      }
+    },
+    {
+      "tenant_id": "demo",
+      "unit_id": "sales",
+      "name": "Qualifica nuovo contact",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "event",
+        "event": "entity.updated",
+        "entity": "contact",
+        "conditions": [
+          {
+            "field": "status",
+            "operator": "==",
+            "value": "new"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "create",
+          "entity": "task",
+          "data": {
+            "title": "Attivare qualifica per {{data.name}}",
+            "description": "Task di follow-up per qualificare il nuovo contact",
+            "type": "follow_up",
+            "contact_id": "{{entity_id}}",
+            "due_date": "{{today+1d}}",
+            "status": "not_started"
+          }
+        },
+        {
+          "type": "update",
+          "entity": "contact",
+          "data": {
+            "status": "pre_qualification"
+          }
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Quando un contact viene aggiornato con status 'new', crea un task di follow-up per attivare la qualifica e imposta lo status del contact a 'pre_qualification'",
+        "version": 1
+      }
     }
   ]
 }

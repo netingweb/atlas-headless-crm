@@ -2,6 +2,7 @@ import { loadRootEnv } from '@crm-atlas/utils';
 import { MongoClient } from 'mongodb';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { randomUUID } from 'crypto';
 
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/crm_atlas';
 const dbName = process.env.MONGODB_DB_NAME || 'crm_atlas';
@@ -76,12 +77,52 @@ async function syncConfig(tenantId: string): Promise<void> {
     // Sync workflows config (if exists)
     try {
       const workflowsConfig = JSON.parse(readFileSync(join(configDir, 'workflows.json'), 'utf-8'));
-      await db
+
+      // Generate UUID for workflows that don't have workflow_id
+      if (workflowsConfig.workflows && Array.isArray(workflowsConfig.workflows)) {
+        const now = new Date().toISOString();
+        let generatedCount = 0;
+        for (const workflow of workflowsConfig.workflows) {
+          if (!workflow.workflow_id) {
+            workflow.workflow_id = randomUUID();
+            generatedCount++;
+            console.log(
+              `  Generated UUID for workflow: ${workflow.name} -> ${workflow.workflow_id}`
+            );
+          }
+          // Ensure created_at and updated_at are set if missing
+          if (!workflow.created_at) {
+            workflow.created_at = now;
+          }
+          if (!workflow.updated_at) {
+            workflow.updated_at = now;
+          }
+        }
+        console.log(
+          `  Total workflows: ${workflowsConfig.workflows.length}, Generated UUIDs: ${generatedCount}`
+        );
+      }
+
+      const result = await db
         .collection('workflows')
         .replaceOne({ tenant_id: tenantId }, workflowsConfig, { upsert: true });
-      console.log(`✅ Synced workflows.json`);
-    } catch {
-      console.log(`ℹ️  workflows.json not found, skipping`);
+
+      console.log(
+        `✅ Synced workflows.json (${result.modifiedCount} modified, ${result.upsertedCount} inserted)`
+      );
+
+      // Verify workflows were saved
+      const saved = await db.collection('workflows').findOne({ tenant_id: tenantId });
+      if (saved && saved.workflows) {
+        console.log(`  Verified: ${saved.workflows.length} workflows saved in database`);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        console.log(`ℹ️  workflows.json not found, skipping`);
+      } else {
+        console.error(`❌ Error syncing workflows.json:`, error);
+        throw error;
+      }
     }
 
     // Sync MCP manifest (if exists)

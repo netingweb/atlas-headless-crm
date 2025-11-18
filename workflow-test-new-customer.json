@@ -1,0 +1,62 @@
+{
+  "workflow_definition": {
+    "workflow_id": "pre_qualify_new_customer",
+    "tenant_id": "demo",
+    "unit_id": "sales",
+    "name": "Pre-qualifica nuovo customer",
+    "type": "event",
+    "enabled": true,
+    "status": "active",
+    "trigger": {
+      "type": "event",
+      "event": "entity.updated",
+      "entity": "contact",
+      "conditions": [
+        {
+          "field": "status",
+          "operator": "==",
+          "value": "new"
+        },
+        {
+          "field": "created_at",
+          "operator": ">",
+          "value": "{{today-1d}}"
+        }
+      ],
+      "logic": "AND"
+    },
+    "actions": [
+      {
+        "type": "create",
+        "entity": "task",
+        "data": {
+          "title": "Contattare per pre qualifica",
+          "type": "call",
+          "status": "pending",
+          "contact_id": "{{context.entity_id}}",
+          "description": "Nuovo customer creato ieri o oggi - richiede pre qualifica",
+          "due_date": "{{today+1d}}"
+        }
+      }
+    ],
+    "chained_workflows": [],
+    "metadata": {
+      "created_by": "system",
+      "description": "Crea task di pre-qualifica per nuovi customer creati ieri o oggi",
+      "version": 1
+    }
+  },
+  "test_context": {
+    "tenant_id": "demo",
+    "unit_id": "sales",
+    "event": "entity.updated",
+    "entity": "contact",
+    "entity_id": "6910a3fc394b7aee9163c13f",
+    "data": {
+      "status": "new",
+      "created_at": "2025-01-11T10:00:00.000Z",
+      "name": "Nuovo Customer Test",
+      "email": "test@example.com"
+    }
+  }
+}

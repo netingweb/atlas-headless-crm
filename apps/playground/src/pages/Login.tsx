@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { Info } from 'lucide-react';
+import { ToastAction } from '@/components/ui/toast';
+import { Info, Copy } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -60,6 +61,21 @@ export default function Login() {
         title: 'Login failed',
         description: errorMessage,
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText(errorMessage).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     } finally {
       setLoading(false);

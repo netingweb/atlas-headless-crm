@@ -104,13 +104,25 @@ export class EntitiesService {
     id: string,
     data: Record<string, unknown>
   ): Promise<unknown> {
+    console.log('[EntitiesService] Update called:', {
+      tenant_id: ctx.tenant_id,
+      unit_id: ctx.unit_id,
+      entity,
+      id,
+      dataKeys: Object.keys(data),
+      data,
+    });
+
     const entityDef = await this.ensureEntityExists(ctx, entity);
+    console.log('[EntitiesService] Entity definition loaded:', entityDef.name);
+
     // Clear cache to ensure latest schema is used
     this.validatorCache.clear(ctx.tenant_id);
     const validator = this.validatorCache.getOrCompile(ctx.tenant_id, entity, entityDef);
     const valid = validator(data);
 
     if (!valid) {
+      console.log('[EntitiesService] Validation failed:', validator.errors);
       const errors =
         validator.errors?.map((err) => {
           const path =
@@ -126,22 +138,34 @@ export class EntitiesService {
       throw new ValidationError(`Validation failed: ${errorMessages}`, errors);
     }
 
+    console.log('[EntitiesService] Validation passed');
+
     // Validate referenced entities exist
     await this.relationsService.validateReferences(ctx, entityDef, data);
+    console.log('[EntitiesService] References validated');
 
     const updated = await this.repository.update(ctx, entity, id, data);
+    console.log('[EntitiesService] Repository update result:', {
+      success: !!updated,
+      updatedId: updated ? (updated as any)._id : null,
+    });
+
     if (!updated) {
+      console.log('[EntitiesService] Update failed: throwing NotFoundError');
       throw new NotFoundError(`Resource not found: ${entity}/${id}`);
     }
 
     // Re-index in Typesense and Qdrant
+    console.log('[EntitiesService] Re-indexing entity');
     await this.indexEntity(ctx, entity, entityDef, updated as unknown as Record<string, unknown>);
 
     // Emit event for workflow engine (if available)
     if (this.events) {
+      console.log('[EntitiesService] Emitting entity.updated event');
       this.events.emitEntityUpdated(ctx.tenant_id, ctx.unit_id, entity, id, data);
     }
 
+    console.log('[EntitiesService] Update completed successfully');
     return updated;
   }
 

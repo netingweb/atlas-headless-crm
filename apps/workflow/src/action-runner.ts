@@ -381,13 +381,40 @@ export class ActionRunner {
       resolved = resolved.replace(match[0], stringValue);
     }
 
-    // If the entire template was a single expression, return the value directly
+    // If the entire template was a single expression, return the value directly (not the string)
     if (matches.length === 1 && matches[0][0] === template) {
-      return matches[0][1].startsWith('dictionary.') ||
-        matches[0][1].startsWith('today') ||
-        matches[0][1] === 'now'
-        ? this.resolveTemplateValue(template, context)
-        : resolved;
+      const expression = matches[0][1].trim();
+      let value: unknown;
+
+      // Handle dictionary references: {{dictionary.key}}
+      if (expression.startsWith('dictionary.')) {
+        const dictKey = expression.substring('dictionary.'.length);
+        value = this.getDictionaryValue(dictKey, context);
+      }
+      // Handle date calculations: {{today+7d}}, {{today-1d}}
+      else if (expression.startsWith('today')) {
+        value = this.resolveDateExpression(expression);
+      }
+      // Handle now: {{now}}
+      else if (expression === 'now') {
+        value = new Date().toISOString();
+      }
+      // Handle context field access: {{field.path}}
+      else {
+        value = this.getNestedValue(context, expression);
+      }
+
+      // If the resolved value is a string that contains template syntax, resolve it recursively
+      if (typeof value === 'string' && value.includes('{{') && value !== template) {
+        return this.resolveTemplateValue(value, context);
+      }
+
+      return value;
+    }
+
+    // If resolved still contains template syntax, resolve recursively (but prevent infinite loops)
+    if (typeof resolved === 'string' && resolved.includes('{{') && resolved !== template) {
+      return this.resolveTemplateValue(resolved, context);
     }
 
     return resolved;

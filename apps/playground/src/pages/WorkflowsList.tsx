@@ -3,11 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
 import { workflowsApi } from '@/lib/api/workflows';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Play, Pause, Eye } from 'lucide-react';
+import { Plus, Trash2, Play, Pause, Eye, Copy } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 
 export default function WorkflowsList() {
   const navigate = useNavigate();
@@ -38,10 +39,26 @@ export default function WorkflowsList() {
       });
     },
     onError: (error: any) => {
+      const errorMessage = error.message || 'Failed to delete workflow';
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete workflow',
+        description: errorMessage,
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText(errorMessage).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     },
   });
@@ -64,10 +81,26 @@ export default function WorkflowsList() {
       });
     },
     onError: (error: any) => {
+      const errorMessage = error.message || 'Failed to update workflow status';
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update workflow status',
+        description: errorMessage,
         variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText(errorMessage).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
       });
     },
   });
@@ -131,6 +164,9 @@ export default function WorkflowsList() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -153,6 +189,31 @@ export default function WorkflowsList() {
                     const lastExecution = getLastExecution(workflow.workflow_id);
                     return (
                       <tr key={workflow.workflow_id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="text-blue-600 hover:underline font-mono"
+                              onClick={() => navigate(`/workflows/${workflow.workflow_id}`)}
+                            >
+                              {workflow.workflow_id}
+                            </button>
+                            <button
+                              type="button"
+                              className="p-1 rounded hover:bg-gray-100"
+                              onClick={() => {
+                                navigator.clipboard.writeText(workflow.workflow_id);
+                                toast({
+                                  title: 'Copied',
+                                  description: 'Workflow ID copied to clipboard',
+                                });
+                              }}
+                              aria-label="Copy workflow ID"
+                            >
+                              <Copy className="h-4 w-4 text-gray-500" />
+                            </button>
+                          </div>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           {workflow.name}
                         </td>
@@ -207,7 +268,7 @@ export default function WorkflowsList() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                       No workflows found
                     </td>
                   </tr>

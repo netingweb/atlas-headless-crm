@@ -19,8 +19,11 @@ import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import { TriggerWorkflowDto } from './dto/trigger-workflow.dto';
 import { UpdateWorkflowStatusDto } from './dto/update-status.dto';
+import { TestWorkflowDto } from './dto/test-workflow.dto';
 import type { TenantContext } from '@crm-atlas/core';
 import type { WorkflowDefinition, WorkflowExecutionLog } from '@crm-atlas/types';
+import type { AuthenticatedRequest } from '@crm-atlas/auth';
+import { Request } from '@nestjs/common';
 
 @ApiTags('workflows')
 @Controller(':tenant/:unit/workflows')
@@ -33,7 +36,11 @@ export class WorkflowsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all workflows for a tenant/unit' })
   @ApiResponse({ status: 200, description: 'List of workflows' })
-  async getWorkflows(@Param() ctx: TenantContext): Promise<WorkflowDefinition[]> {
+  async getWorkflows(
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string
+  ): Promise<WorkflowDefinition[]> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.workflowsService.getWorkflows(ctx);
   }
 
@@ -45,9 +52,11 @@ export class WorkflowsController {
   @ApiResponse({ status: 200, description: 'Workflow definition' })
   @ApiResponse({ status: 404, description: 'Workflow not found' })
   async getWorkflow(
-    @Param() ctx: TenantContext,
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
     @Param('id') workflowId: string
   ): Promise<WorkflowDefinition> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.workflowsService.getWorkflow(ctx, workflowId);
   }
 
@@ -60,9 +69,11 @@ export class WorkflowsController {
   @ApiResponse({ status: 400, description: 'Invalid workflow definition' })
   @HttpCode(HttpStatus.CREATED)
   async createWorkflow(
-    @Param() ctx: TenantContext,
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
     @Body() createDto: CreateWorkflowDto
   ): Promise<WorkflowDefinition> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.workflowsService.createWorkflow(ctx, createDto as any);
   }
 
@@ -75,10 +86,12 @@ export class WorkflowsController {
   @ApiResponse({ status: 404, description: 'Workflow not found' })
   @ApiResponse({ status: 400, description: 'Invalid workflow definition' })
   async updateWorkflow(
-    @Param() ctx: TenantContext,
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
     @Param('id') workflowId: string,
     @Body() updateDto: UpdateWorkflowDto
   ): Promise<WorkflowDefinition> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.workflowsService.updateWorkflow(ctx, workflowId, updateDto as any);
   }
 
@@ -91,9 +104,11 @@ export class WorkflowsController {
   @ApiResponse({ status: 404, description: 'Workflow not found' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteWorkflow(
-    @Param() ctx: TenantContext,
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
     @Param('id') workflowId: string
   ): Promise<void> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.workflowsService.deleteWorkflow(ctx, workflowId);
   }
 
@@ -105,10 +120,12 @@ export class WorkflowsController {
   @ApiResponse({ status: 200, description: 'Workflow status updated' })
   @ApiResponse({ status: 404, description: 'Workflow not found' })
   async updateWorkflowStatus(
-    @Param() ctx: TenantContext,
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
     @Param('id') workflowId: string,
     @Body() statusDto: UpdateWorkflowStatusDto
   ): Promise<WorkflowDefinition> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.workflowsService.updateWorkflowStatus(
       ctx,
       workflowId,
@@ -117,18 +134,43 @@ export class WorkflowsController {
     );
   }
 
+  @Post(':id/test')
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('crm:read')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Test/simulate workflow execution without executing it' })
+  @ApiResponse({ status: 200, description: 'Workflow test simulation result' })
+  @ApiResponse({ status: 404, description: 'Workflow not found' })
+  async testWorkflow(
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
+    @Param('id') workflowId: string,
+    @Body() testDto: TestWorkflowDto,
+    @Request() req: AuthenticatedRequest
+  ): Promise<unknown> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
+    const userInfo = {
+      userId: req.user?.sub,
+      email: undefined, // JwtPayload doesn't include email, would need to fetch from DB
+      name: undefined, // JwtPayload doesn't include name, would need to fetch from DB
+    };
+    return this.workflowsService.testWorkflow(ctx, workflowId, testDto.context || {}, userInfo);
+  }
+
   @Post(':id/run')
   @UseGuards(JwtAuthGuard, ScopesGuard)
   @AuthScopes('workflows:execute')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Trigger a workflow manually' })
-  @ApiResponse({ status: 200, description: 'Workflow triggered' })
+  @ApiResponse({ status: 200, description: 'Workflow triggered and queued for execution' })
   @ApiResponse({ status: 404, description: 'Workflow not found' })
   async triggerWorkflow(
-    @Param() ctx: TenantContext,
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
     @Param('id') workflowId: string,
     @Body() triggerDto: TriggerWorkflowDto
-  ): Promise<{ execution_id: string }> {
+  ): Promise<{ execution_id: string; message: string }> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.workflowsService.triggerWorkflow(
       ctx,
       workflowId,
@@ -144,11 +186,13 @@ export class WorkflowsController {
   @ApiOperation({ summary: 'Get execution logs for a workflow' })
   @ApiResponse({ status: 200, description: 'List of execution logs' })
   async getWorkflowExecutions(
-    @Param() ctx: TenantContext,
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
     @Param('id') workflowId: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number
   ): Promise<WorkflowExecutionLog[]> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.workflowsService.getWorkflowExecutions(
       ctx,
       workflowId,
@@ -175,7 +219,8 @@ export class WorkflowsController {
   @ApiOperation({ summary: 'Get execution logs for a tenant' })
   @ApiResponse({ status: 200, description: 'List of execution logs' })
   async getTenantExecutions(
-    @Param() ctx: TenantContext,
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
     @Query('workflowId') workflowId?: string,
@@ -184,6 +229,7 @@ export class WorkflowsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string
   ): Promise<WorkflowExecutionLog[]> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.workflowsService.getTenantExecutions(
       ctx,
       limit ? parseInt(String(limit), 10) : 100,
@@ -205,7 +251,8 @@ export class WorkflowsController {
   @ApiOperation({ summary: 'Get workflow statistics' })
   @ApiResponse({ status: 200, description: 'Workflow statistics' })
   async getWorkflowStats(
-    @Param() ctx: TenantContext,
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
     @Param('id') workflowId: string
   ): Promise<{
     total: number;
@@ -215,6 +262,7 @@ export class WorkflowsController {
     average_duration_ms: number;
     last_execution: string | null;
   }> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.workflowsService.getWorkflowStats(ctx, workflowId);
   }
 }
