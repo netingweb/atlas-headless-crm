@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EntitiesService } from './entities.service';
 import { RelationsService } from './relations.service';
+import { EntityEvents } from './entities.events';
 import { EntityRepository } from '@crm-atlas/db';
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { ValidatorCache } from '@crm-atlas/core';
@@ -52,6 +53,14 @@ describe('EntitiesService', () => {
         {
           provide: ValidatorCache,
           useValue: validatorCache,
+        },
+        {
+          provide: EntityEvents,
+          useValue: {
+            emitEntityCreated: jest.fn(),
+            emitEntityUpdated: jest.fn(),
+            emitEntityDeleted: jest.fn(),
+          },
         },
       ],
     }).compile();
