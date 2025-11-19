@@ -1,4 +1,4 @@
-import { Module, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Module, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { DocumentsController } from './documents.controller';
 import { DocumentsQueueController } from './documents-queue.controller';
 import { DocumentsService } from './documents.service';
@@ -10,14 +10,19 @@ import { DocumentProcessingWorker } from './documents.worker';
   exports: [DocumentsService, DocumentProcessingWorker],
 })
 export class DocumentsModule implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(DocumentsModule.name);
+
   constructor(private readonly worker: DocumentProcessingWorker) {}
 
   async onModuleInit(): Promise<void> {
     try {
       await this.worker.start();
-      console.log('✅ Document Processing Worker started');
+      this.logger.log('Document Processing Worker started');
     } catch (error) {
-      console.error('⚠️ Failed to start Document Processing Worker:', error);
+      this.logger.error(
+        'Failed to start Document Processing Worker',
+        error instanceof Error ? error.stack : String(error)
+      );
       // Continue without worker - processing will be queued but not processed
     }
   }
@@ -25,9 +30,12 @@ export class DocumentsModule implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     try {
       await this.worker.stop();
-      console.log('✅ Document Processing Worker stopped');
+      this.logger.log('Document Processing Worker stopped');
     } catch (error) {
-      console.error('⚠️ Error stopping Document Processing Worker:', error);
+      this.logger.error(
+        'Error stopping Document Processing Worker',
+        error instanceof Error ? error.stack : String(error)
+      );
     }
   }
 }

@@ -142,7 +142,7 @@
         {
           "name": "title",
           "type": "string",
-          "required": false,
+          "required": true,
           "indexed": true,
           "searchable": true,
           "embeddable": true
@@ -154,6 +154,26 @@
           "indexed": false,
           "searchable": true,
           "embeddable": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "default": "to do",
+          "validation": {
+            "enum": ["to do", "pending", "on going", "done", "canceled", "archived"]
+          }
+        },
+        {
+          "name": "expiration_date_time",
+          "type": "datetime",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
         },
         {
           "name": "company_id",

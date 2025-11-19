@@ -131,4 +131,19 @@ export class MongoConfigLoader implements ConfigLoader {
     this.cache.setDocumentsConfig(tenantId, config);
     return config;
   }
+
+  /**
+   * Clear entities cache for a specific tenant or all tenants
+   * Useful after syncing entity configurations to ensure fresh schemas are loaded
+   */
+  clearEntitiesCache(tenantId?: string): void {
+    this.cache.clearEntities(tenantId);
+  }
+
+  /**
+   * Clear all configuration cache for a specific tenant or all tenants
+   */
+  clearCache(tenantId?: string): void {
+    this.cache.clear(tenantId);
+  }
 }

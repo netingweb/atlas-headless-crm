@@ -5,6 +5,7 @@ export const FieldTypeSchema = z.enum([
   'number',
   'boolean',
   'date',
+  'datetime',
   'email',
   'url',
   'text',

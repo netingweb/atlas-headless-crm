@@ -50,8 +50,10 @@ Appunti e note relative a companies o contacts.
 
 **Campi:**
 
-- `title` (string, optional) - Titolo della nota
+- `title` (string, required) - Titolo della nota
 - `content` (text, required) - Contenuto della nota
+- `status` (string, required) - Stato della nota (enum: "to do", "pending", "on going", "done", "canceled", "archived"), default: "to do"
+- `expiration_date_time` (datetime, required) - Data e ora di scadenza della nota
 - `company_id` (reference → company, optional) - Relazione con l'azienda
 - `contact_id` (reference → contact, optional) - Relazione con il contatto
 
@@ -94,6 +96,290 @@ Opportunità di vendita.
 **Relazioni:**
 
 - Associata a una `company` e un `contact`
+
+## Tipi di Campo Supportati
+
+Il sistema supporta diversi tipi di campo per definire le proprietà delle entità. Ogni campo può avere le seguenti proprietà:
+
+- `name` (string, required) - Nome del campo
+- `type` (FieldType, required) - Tipo del campo (vedi tipi supportati sotto)
+- `required` (boolean, default: false) - Se il campo è obbligatorio
+- `indexed` (boolean, default: false) - Se il campo deve essere indicizzato per ricerche/filtri
+- `searchable` (boolean, default: false) - Se il campo è ricercabile tramite full-text search
+- `embeddable` (boolean, default: false) - Se il campo deve essere utilizzato per semantic search
+- `default` (any, optional) - Valore di default per il campo
+- `validation` (object, optional) - Regole di validazione aggiuntive (es. enum, min, max)
+- `reference_entity` (string, optional) - Per campi di tipo `reference`, specifica l'entità referenziata
+
+### Tipi di Campo Disponibili
+
+#### `string`
+
+Campo di testo semplice, limitato in lunghezza.
+
+**Esempio:**
+
+```json
+{
+  "name": "name",
+  "type": "string",
+  "required": true,
+  "indexed": true,
+  "searchable": true
+}
+```
+
+#### `text`
+
+Campo di testo lungo, adatto per descrizioni e contenuti estesi.
+
+**Esempio:**
+
+```json
+{
+  "name": "description",
+  "type": "text",
+  "required": false,
+  "indexed": false,
+  "searchable": true,
+  "embeddable": true
+}
+```
+
+#### `number`
+
+Campo numerico (intero o decimale).
+
+**Esempio:**
+
+```json
+{
+  "name": "value",
+  "type": "number",
+  "required": false,
+  "indexed": true,
+  "searchable": false
+}
+```
+
+#### `boolean`
+
+Campo booleano (true/false).
+
+**Esempio:**
+
+```json
+{
+  "name": "is_active",
+  "type": "boolean",
+  "required": false,
+  "indexed": true,
+  "searchable": false
+}
+```
+
+#### `email`
+
+Campo email con validazione automatica del formato.
+
+**Esempio:**
+
+```json
+{
+  "name": "email",
+  "type": "email",
+  "required": true,
+  "indexed": true,
+  "searchable": true
+}
+```
+
+#### `url`
+
+Campo URL con validazione automatica del formato.
+
+**Esempio:**
+
+```json
+{
+  "name": "website",
+  "type": "url",
+  "required": false,
+  "indexed": true,
+  "searchable": false
+}
+```
+
+#### `date`
+
+Campo per date senza ora. Formato: `YYYY-MM-DD` (ISO 8601 date).
+
+**Caratteristiche:**
+
+- **Formato**: `YYYY-MM-DD` (es. `2024-12-25`)
+- **Validazione**: Pattern `^\\d{4}-\\d{2}-\\d{2}$`
+- **UI**: Input HTML5 `type="date"`
+- **Storage**: Stringa ISO date in MongoDB
+- **Indexing**: Convertito in timestamp `int64` per Typesense
+
+**Quando usare:**
+
+- Date di scadenza senza ora specifica
+- Date di nascita
+- Date di inizio/fine periodo
+- Qualsiasi campo dove l'ora non è rilevante
+
+**Esempio:**
+
+```json
+{
+  "name": "due_date",
+  "type": "date",
+  "required": false,
+  "indexed": true,
+  "searchable": false,
+  "embeddable": false
+}
+```
+
+**Esempio di valore:**
+
+```json
+{
+  "due_date": "2024-12-25"
+}
+```
+
+#### `datetime`
+
+Campo per date con ora. Formato: ISO 8601 datetime (`YYYY-MM-DDTHH:mm:ss.sssZ` o `YYYY-MM-DDTHH:mm:ss`).
+
+**Caratteristiche:**
+
+- **Formato**: ISO 8601 datetime (es. `2024-12-25T14:30:00.000Z` o `2024-12-25T14:30:00`)
+- **Validazione**: Formato `date-time` (ISO 8601 completo)
+- **UI**: Input HTML5 `type="datetime-local"` con conversione automatica a ISO 8601
+- **Storage**: Stringa ISO datetime in MongoDB
+- **Indexing**: Convertito in timestamp `int64` per Typesense
+
+**Quando usare:**
+
+- Timestamp precisi con ora
+- Scadenze con ora specifica
+- Eventi schedulati
+- Log di attività con timestamp
+- Qualsiasi campo dove l'ora è importante
+
+**Esempio:**
+
+```json
+{
+  "name": "expiration_date_time",
+  "type": "datetime",
+  "required": true,
+  "indexed": true,
+  "searchable": false,
+  "embeddable": false
+}
+```
+
+**Esempio di valore:**
+
+```json
+{
+  "expiration_date_time": "2024-12-25T14:30:00.000Z"
+}
+```
+
+**Nota sulla conversione UI:**
+Il campo `datetime` viene visualizzato come `datetime-local` nell'interfaccia utente, che utilizza il formato `YYYY-MM-DDTHH:mm` (senza timezone). Il sistema converte automaticamente questo valore in formato ISO 8601 completo (con timezone) quando viene salvato.
+
+#### `json`
+
+Campo per dati JSON strutturati.
+
+**Esempio:**
+
+```json
+{
+  "name": "metadata",
+  "type": "json",
+  "required": false,
+  "indexed": false,
+  "searchable": false
+}
+```
+
+#### `reference`
+
+Campo di riferimento a un'altra entità. Richiede `reference_entity` per specificare l'entità target.
+
+**Esempio:**
+
+```json
+{
+  "name": "company_id",
+  "type": "reference",
+  "required": false,
+  "indexed": true,
+  "searchable": false,
+  "embeddable": false,
+  "reference_entity": "company"
+}
+```
+
+### Confronto tra `date` e `datetime`
+
+| Caratteristica  | `date`                    | `datetime`                 |
+| --------------- | ------------------------- | -------------------------- |
+| **Formato**     | `YYYY-MM-DD`              | `YYYY-MM-DDTHH:mm:ss.sssZ` |
+| **Include ora** | ❌ No                     | ✅ Sì                      |
+| **UI Input**    | `type="date"`             | `type="datetime-local"`    |
+| **Use case**    | Scadenze, date di nascita | Timestamp precisi, eventi  |
+| **Esempio**     | `2024-12-25`              | `2024-12-25T14:30:00.000Z` |
+
+### Validazione con Enum
+
+Per campi di tipo `string`, puoi definire valori consentiti usando `validation.enum`:
+
+```json
+{
+  "name": "status",
+  "type": "string",
+  "required": true,
+  "indexed": true,
+  "searchable": false,
+  "embeddable": false,
+  "default": "to do",
+  "validation": {
+    "enum": ["to do", "pending", "on going", "done", "canceled", "archived"]
+  }
+}
+```
+
+### Valori di Default
+
+Puoi definire valori di default per qualsiasi tipo di campo:
+
+```json
+{
+  "name": "status",
+  "type": "string",
+  "required": true,
+  "default": "to do"
+}
+```
+
+Per campi `date` e `datetime`, il default può essere una stringa nel formato appropriato:
+
+```json
+{
+  "name": "created_at",
+  "type": "datetime",
+  "required": true,
+  "default": "2024-01-01T00:00:00.000Z"
+}
+```
 
 ## Dizionari (Dictionaries)
 
@@ -168,6 +454,8 @@ POST /api/demo/sales/note
 {
   "title": "Prima chiamata",
   "content": "Contatto interessato alla soluzione enterprise. Budget approvato.",
+  "status": "done",
+  "expiration_date_time": "2024-12-31T23:59:59.000Z",
   "contact_id": "<contact_id>"
 }
 ```

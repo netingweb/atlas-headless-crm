@@ -80,4 +80,12 @@ export class ConfigCache {
       this.documentsCache.clear();
     }
   }
+
+  clearEntities(tenantId?: string): void {
+    if (tenantId) {
+      this.entitiesCache.delete(tenantId);
+    } else {
+      this.entitiesCache.clear();
+    }
+  }
 }

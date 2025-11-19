@@ -1,36 +1,13 @@
 import { apiClient } from './client';
-import type { PermissionsConfig } from '@crm-atlas/types';
+import type { PermissionsConfig, EntityDefinition } from '@crm-atlas/types';
+
+export type { EntityDefinition };
 
 export interface UnitConfig {
   unit_id: string;
   name: string;
   tenant_id: string;
   settings: Record<string, unknown>;
-}
-
-export interface EntityDefinition {
-  name: string;
-  fields: Array<{
-    name: string;
-    type:
-      | 'string'
-      | 'number'
-      | 'boolean'
-      | 'date'
-      | 'email'
-      | 'url'
-      | 'text'
-      | 'json'
-      | 'reference';
-    required: boolean;
-    indexed: boolean;
-    searchable: boolean;
-    embeddable: boolean;
-    reference_entity?: string;
-    default?: unknown;
-    validation?: Record<string, unknown>;
-  }>;
-  indexes?: Array<Record<string, unknown>>;
 }
 
 export const configApi = {

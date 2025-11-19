@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
 import { entitiesApi, type Entity } from '@/lib/api/entities';
 import { configApi, type EntityDefinition } from '@/lib/api/config';
+import type { FieldDefinition } from '@crm-atlas/types';
 import { apiClient } from '@/lib/api/client';
 import { isApiAvailable } from '@/lib/api/permissions';
 import { Button } from '@/components/ui/button';
@@ -646,6 +647,29 @@ export default function EntityDetail() {
       );
     }
 
+    if (field.type === 'datetime') {
+      return (
+        <div key={field.name} className="space-y-2">
+          <Label htmlFor={field.name}>
+            {field.name}
+            {field.required && <span className="text-red-500 ml-1">*</span>}
+          </Label>
+          <Input
+            id={field.name}
+            type="datetime-local"
+            value={fieldValue ? new Date(fieldValue as string).toISOString().slice(0, 16) : ''}
+            onChange={(e) => {
+              // Convert datetime-local format (YYYY-MM-DDTHH:mm) to ISO 8601
+              const localDateTime = e.target.value;
+              const isoDateTime = localDateTime ? new Date(localDateTime).toISOString() : '';
+              handleFieldChange(field.name, isoDateTime);
+            }}
+            required={field.required}
+          />
+        </div>
+      );
+    }
+
     if (field.type === 'number') {
       return (
         <div key={field.name} className="space-y-2">
@@ -846,58 +870,37 @@ export default function EntityDetail() {
                   <h3 className="text-lg font-semibold mb-4">Fields</h3>
                   <div className="grid gap-4 md:grid-cols-2">
                     {entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)
-                      ? entityDef.fields.map(
-                          (field: {
-                            name: string;
-                            type:
-                              | 'string'
-                              | 'number'
-                              | 'boolean'
-                              | 'text'
-                              | 'url'
-                              | 'email'
-                              | 'date'
-                              | 'json'
-                              | 'reference';
-                            required: boolean;
-                            indexed: boolean;
-                            searchable: boolean;
-                            embeddable: boolean;
-                            reference_entity?: string;
-                            default?: unknown;
-                            validation?: Record<string, unknown>;
-                          }) => {
-                            // Skip readonly fields (already shown above)
-                            if (READONLY_FIELDS.includes(field.name)) {
-                              return null;
-                            }
-                            // Special handling for related_entity_id in documents - use renderField which has special logic
-                            // This must be checked BEFORE the generic reference field handler
-                            if (field.name === 'related_entity_id' && entityType === 'document') {
-                              return renderField(field);
-                            }
-                            // For reference fields, we need to load options
-                            // Skip related_entity_id for documents as it's handled above
-                            if (
-                              field.type === 'reference' &&
-                              field.reference_entity &&
-                              !(field.name === 'related_entity_id' && entityType === 'document')
-                            ) {
-                              return (
-                                <ReferenceField
-                                  key={field.name}
-                                  field={field}
-                                  value={formData[field.name]}
-                                  onChange={(value) => handleFieldChange(field.name, value)}
-                                  referenceEntity={field.reference_entity}
-                                  tenantId={tenantId || ''}
-                                  unitId={unitId || ''}
-                                />
-                              );
-                            }
+                      ? entityDef.fields.map((field: FieldDefinition) => {
+                          // Skip readonly fields (already shown above)
+                          if (READONLY_FIELDS.includes(field.name)) {
+                            return null;
+                          }
+                          // Special handling for related_entity_id in documents - use renderField which has special logic
+                          // This must be checked BEFORE the generic reference field handler
+                          if (field.name === 'related_entity_id' && entityType === 'document') {
                             return renderField(field);
                           }
-                        )
+                          // For reference fields, we need to load options
+                          // Skip related_entity_id for documents as it's handled above
+                          if (
+                            field.type === 'reference' &&
+                            field.reference_entity &&
+                            !(field.name === 'related_entity_id' && entityType === 'document')
+                          ) {
+                            return (
+                              <ReferenceField
+                                key={field.name}
+                                field={field}
+                                value={formData[field.name]}
+                                onChange={(value) => handleFieldChange(field.name, value)}
+                                referenceEntity={field.reference_entity}
+                                tenantId={tenantId || ''}
+                                unitId={unitId || ''}
+                              />
+                            );
+                          }
+                          return renderField(field);
+                        })
                       : null}
                   </div>
                 </div>

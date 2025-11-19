@@ -213,6 +213,7 @@ function mapFieldTypeToTypesense(fieldType: string): TypesenseField['type'] {
     case 'boolean':
       return 'bool';
     case 'date':
+    case 'datetime':
       return 'int64';
     default:
       return 'string';

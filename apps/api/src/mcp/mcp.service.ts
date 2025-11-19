@@ -1,4 +1,4 @@
-import { Injectable, Inject, Optional, forwardRef } from '@nestjs/common';
+import { Injectable, Inject, Optional, forwardRef, Logger } from '@nestjs/common';
 import { getDb } from '@crm-atlas/db';
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { EntityRepository } from '@crm-atlas/db';
@@ -11,6 +11,7 @@ import { WorkflowsService } from '../workflows/workflows.service';
 
 @Injectable()
 export class MCPService {
+  private readonly logger = new Logger(MCPService.name);
   private configLoader: MongoConfigLoader;
   private repository: EntityRepository;
 
@@ -28,6 +29,10 @@ export class MCPService {
     tenantId: string,
     unitId: string
   ): Promise<Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>> {
+    // Clear entities cache before generating tools to ensure we have the latest entity schemas
+    // This ensures that after a sync, the MCP tools reflect the updated schemas
+    this.configLoader.clearEntitiesCache(tenantId);
+
     const units = await this.configLoader.getUnits(tenantId);
     const entities = await this.configLoader.getEntities({
       tenant_id: tenantId,
@@ -57,11 +62,15 @@ export class MCPService {
       // Search entity tool
       tools.push({
         name: `search_${entity.name}`,
-        description: `Search for ${entity.name} using text or semantic search`,
+        description: `Search for ${entity.name} using text or semantic search. Use '*' as query for generic search (all results). Set count_only to true to get only the count without results.`,
         inputSchema: {
           type: 'object',
           properties: {
-            query: { type: 'string', description: 'Search query' },
+            query: {
+              type: 'string',
+              description: 'Search query. Use "*" for generic search (all results)',
+              default: '*',
+            },
             type: {
               type: 'string',
               enum: ['text', 'semantic', 'hybrid'],
@@ -69,8 +78,13 @@ export class MCPService {
               default: 'hybrid',
             },
             limit: { type: 'number', description: 'Result limit', default: 10 },
+            count_only: {
+              type: 'boolean',
+              description: 'If true, return only the count without results',
+              default: false,
+            },
           },
-          required: ['query'],
+          required: [],
         },
       });
 
@@ -82,6 +96,51 @@ export class MCPService {
           type: 'object',
           properties: {
             id: { type: 'string', description: 'Entity ID' },
+          },
+          required: ['id'],
+        },
+      });
+
+      // Update entity tool
+      tools.push({
+        name: `update_${entity.name}`,
+        description: `Update an existing ${entity.name} in CRM by ID. This is a destructive action that requires explicit confirmation. First call will return a preview of the action - call again with confirmed=true to execute. IMPORTANT: If you don't know the entity ID, first use search_${entity.name} to find it, or use global_search if the entity type is unknown.`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: `Entity ID to update (REQUIRED). If ID is unknown, first search using search_${entity.name} with a descriptive query, or use global_search if entity type is unknown.`,
+            },
+            confirmed: {
+              type: 'boolean',
+              description:
+                'Set to true to confirm and execute the update. First call without this parameter will return a preview requiring confirmation.',
+              default: false,
+            },
+            ...this.buildEntityProperties(entity),
+          },
+          required: ['id'],
+        },
+      });
+
+      // Delete entity tool
+      tools.push({
+        name: `delete_${entity.name}`,
+        description: `Delete a ${entity.name} from CRM by ID. This is a destructive action that requires explicit confirmation. First call will return a preview of the action - call again with confirmed=true to execute. IMPORTANT: If you don't know the entity ID, first use search_${entity.name} to find it, or use global_search if the entity type is unknown.`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: `Entity ID to delete (REQUIRED). If ID is unknown, first search using search_${entity.name} with a descriptive query, or use global_search if entity type is unknown.`,
+            },
+            confirmed: {
+              type: 'boolean',
+              description:
+                'Set to true to confirm and execute the deletion. First call without this parameter will return a preview requiring confirmation.',
+              default: false,
+            },
           },
           required: ['id'],
         },
@@ -180,23 +239,113 @@ export class MCPService {
       );
     }
 
+    // Global search tool - search across all entities
+    tools.push({
+      name: 'global_search',
+      description:
+        'Search across all entity types simultaneously using hybrid search (text + semantic). Returns results grouped by entity type.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search query to find across all entities',
+          },
+          type: {
+            type: 'string',
+            enum: ['text', 'semantic', 'hybrid'],
+            description: 'Search type',
+            default: 'hybrid',
+          },
+          limit: {
+            type: 'number',
+            description: 'Result limit per entity type',
+            default: 10,
+          },
+          count_only: {
+            type: 'boolean',
+            description: 'If true, return only counts per entity type without results',
+            default: false,
+          },
+        },
+        required: ['query'],
+      },
+    });
+
     return tools;
   }
 
+  /**
+   * Generate a view link for an entity
+   */
+  private generateEntityViewLink(entityType: string, entityId: string): string {
+    return `/entities/${entityType}/${entityId}`;
+  }
+
+  /**
+   * Add view links to search results
+   */
+  private addViewLinksToResults(
+    results: unknown[],
+    entityType: string
+  ): Array<Record<string, unknown> & { view_link?: string }> {
+    return results.map((result: unknown) => {
+      const resultObj = result as Record<string, unknown>;
+      // Try multiple ID field names (Typesense uses 'id', MongoDB uses '_id')
+      const id =
+        resultObj._id ||
+        resultObj.id ||
+        (resultObj as { document?: { id?: string; _id?: string } }).document?.id ||
+        (resultObj as { document?: { id?: string; _id?: string } }).document?._id;
+
+      if (id && typeof id === 'string') {
+        const enhanced = {
+          ...resultObj,
+          view_link: this.generateEntityViewLink(entityType, id),
+          // Add prominent link field for LLM visibility
+          '🔗 VIEW_LINK': this.generateEntityViewLink(entityType, id),
+        };
+        return enhanced;
+      }
+
+      // If no ID found, return as-is but log warning
+      this.logger.warn(`No ID found in result for ${entityType}`, { keys: Object.keys(resultObj) });
+      return resultObj;
+    });
+  }
+
   private buildEntityProperties(entity: {
-    fields: Array<{ name: string; type: string; required: boolean }>;
+    fields: Array<{
+      name: string;
+      type: string;
+      required: boolean;
+      validation?: { enum?: unknown[]; [key: string]: unknown };
+      default?: unknown;
+      description?: string;
+      reference_entity?: string;
+    }>;
   }): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
 
     for (const field of entity.fields) {
       const schema: Record<string, unknown> = {};
 
+      // Set type based on field type
       switch (field.type) {
         case 'string':
-        case 'email':
-        case 'url':
         case 'text':
           schema.type = 'string';
+          break;
+        case 'email':
+          schema.type = 'string';
+          schema.format = 'email';
+          schema.description = 'Email address in format user@example.com';
+          break;
+        case 'url':
+          schema.type = 'string';
+          schema.format = 'uri';
+          schema.description =
+            'Website URL in valid format: https://www.example.com (must include https:// protocol and full domain)';
           break;
         case 'number':
           schema.type = 'number';
@@ -207,9 +356,37 @@ export class MCPService {
         case 'date':
           schema.type = 'string';
           schema.format = 'date';
+          schema.description = 'Date in format YYYY-MM-DD';
+          break;
+        case 'datetime':
+          schema.type = 'string';
+          schema.format = 'date-time';
+          schema.description =
+            'Date and time in ISO 8601 format (YYYY-MM-DDTHH:mm:ss) or use relative references like "oggi", "domani", "tra un\'ora"';
+          break;
+        case 'reference':
+          schema.type = 'string';
+          schema.description = `Reference to ${field.reference_entity || 'entity'} ID`;
           break;
         default:
           schema.type = 'string';
+      }
+
+      // Handle enum validation
+      if (field.validation?.enum && Array.isArray(field.validation.enum)) {
+        schema.enum = field.validation.enum;
+        schema.description =
+          ((schema.description as string) || '') + ` (enum: ${field.validation.enum.join(', ')})`;
+      }
+
+      // Add default value if present
+      if (field.default !== undefined) {
+        schema.default = field.default;
+      }
+
+      // Add field description if present
+      if (field.description) {
+        schema.description = field.description;
       }
 
       properties[field.name] = schema;
@@ -244,10 +421,18 @@ export class MCPService {
 
       if (action === 'search') {
         const searchType = (args.type as string) || 'hybrid';
-        const query = args.query as string;
+        const query = (args.query as string) || '*';
         const limit = (args.limit as number) || 10;
+        const countOnly = (args.count_only as boolean) || false;
 
-        if (searchType === 'semantic' || searchType === 'hybrid') {
+        // Normalize wildcard query
+        const normalizedQuery = query.trim() === '' || query.trim() === '*' ? '*' : query;
+
+        // For wildcard queries, use only text search (semantic search doesn't make sense)
+        const useSemanticSearch =
+          normalizedQuery !== '*' && (searchType === 'semantic' || searchType === 'hybrid');
+
+        if (useSemanticSearch) {
           const entityDef = await this.configLoader.getEntity(ctx, entity);
           if (entityDef) {
             const embeddableFields = getEmbeddableFields(entityDef);
@@ -256,7 +441,7 @@ export class MCPService {
               const globalConfig = getProviderConfig();
 
               // Debug logging
-              console.log('[MCP Service] Embeddings config:', {
+              this.logger.debug('Embeddings config', {
                 provider: globalConfig.name,
                 hasApiKey: !!globalConfig.apiKey,
                 apiKeyLength: globalConfig.apiKey?.length,
@@ -274,11 +459,11 @@ export class MCPService {
                 globalConfig,
                 tenantConfig?.embeddingsProvider
               );
-              const [queryVector] = await provider.embedTexts([query]);
+              const [queryVector] = await provider.embedTexts([normalizedQuery]);
 
               const semanticResults = await searchQdrant(tenantId, entity, {
                 vector: queryVector,
-                limit,
+                limit: countOnly ? 0 : limit, // If count only, don't fetch results
                 filter: {
                   must: [
                     { key: 'tenant_id', match: { value: tenantId } },
@@ -287,25 +472,64 @@ export class MCPService {
                 },
               });
 
-              console.log(`[MCP Service] Semantic search results for ${entity}:`, {
-                query,
+              // For count only, get count from text search (Qdrant doesn't provide total count easily)
+              if (countOnly) {
+                const textResults = await search(ctx, entity, {
+                  q: normalizedQuery,
+                  per_page: 0, // Just get count
+                  page: 1,
+                });
+
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(
+                        {
+                          count: textResults.found,
+                          entity,
+                          query: normalizedQuery,
+                        },
+                        null,
+                        2
+                      ),
+                    },
+                  ],
+                  isError: false,
+                };
+              }
+
+              this.logger.debug(`Semantic search results for ${entity}`, {
+                query: normalizedQuery,
                 resultsCount: semanticResults.length,
                 results: semanticResults.slice(0, 2), // Log first 2 results
               });
 
               // For semantic-only search: if no results, fallback to text search
               if (searchType === 'semantic' && semanticResults.length === 0) {
-                console.log(`[MCP Service] No semantic results, falling back to text search`);
+                this.logger.debug('No semantic results, falling back to text search');
                 const textResults = await search(ctx, entity, {
-                  q: query,
+                  q: normalizedQuery,
                   per_page: limit,
                   page: 1,
                 });
+                // Add view links to results
+                const textResultsWithLinks = this.addViewLinksToResults(textResults.hits, entity);
                 return {
                   content: [
                     {
                       type: 'text',
-                      text: JSON.stringify(textResults, null, 2),
+                      text: JSON.stringify(
+                        {
+                          results: textResultsWithLinks,
+                          count: textResults.found,
+                          page: textResults.page,
+                          entity,
+                          query: normalizedQuery,
+                        },
+                        null,
+                        2
+                      ),
                     },
                   ],
                   isError: false,
@@ -315,7 +539,7 @@ export class MCPService {
               // For hybrid search: combine semantic and text results
               if (searchType === 'hybrid') {
                 const textResults = await search(ctx, entity, {
-                  q: query,
+                  q: normalizedQuery,
                   per_page: limit,
                   page: 1,
                 });
@@ -347,30 +571,72 @@ export class MCPService {
                     })),
                 ].slice(0, limit);
 
-                console.log(`[MCP Service] Hybrid search results for ${entity}:`, {
-                  query,
+                this.logger.debug(`Hybrid search results for ${entity}`, {
+                  query: normalizedQuery,
                   semanticCount: semanticResults.length,
                   textCount: textResults.hits.length,
                   combinedCount: combinedResults.length,
+                });
+
+                // Add view links to combined results
+                const combinedResultsWithLinks = combinedResults.map((result: unknown) => {
+                  const resultObj = result as { id?: string; payload?: { document_id?: string } };
+                  const docId = resultObj.id || resultObj.payload?.document_id;
+                  if (docId && typeof docId === 'string') {
+                    return {
+                      ...resultObj,
+                      view_link: this.generateEntityViewLink(entity, docId),
+                    };
+                  }
+                  return resultObj;
                 });
 
                 return {
                   content: [
                     {
                       type: 'text',
-                      text: JSON.stringify(combinedResults, null, 2),
+                      text: JSON.stringify(
+                        {
+                          results: combinedResultsWithLinks,
+                          count: textResults.found,
+                          entity,
+                          query: normalizedQuery,
+                        },
+                        null,
+                        2
+                      ),
                     },
                   ],
                   isError: false,
                 };
               }
 
-              // Pure semantic search with results
+              // Pure semantic search with results - add view links
+              const semanticResultsWithLinks = semanticResults.map((result: unknown) => {
+                const resultObj = result as { id?: string; payload?: { document_id?: string } };
+                const docId = resultObj.id || resultObj.payload?.document_id;
+                if (docId && typeof docId === 'string') {
+                  return {
+                    ...resultObj,
+                    view_link: this.generateEntityViewLink(entity, docId),
+                  };
+                }
+                return resultObj;
+              });
+
               return {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify(semanticResults, null, 2),
+                    text: JSON.stringify(
+                      {
+                        results: semanticResultsWithLinks,
+                        entity,
+                        query: normalizedQuery,
+                      },
+                      null,
+                      2
+                    ),
                   },
                 ],
                 isError: false,
@@ -380,14 +646,35 @@ export class MCPService {
         }
 
         // Fallback to text search
+        const searchLimit = countOnly ? 0 : limit; // If count only, don't fetch results
         const results = await search(ctx, entity, {
-          q: query,
-          per_page: limit,
+          q: normalizedQuery,
+          per_page: searchLimit,
           page: 1,
         });
 
-        console.log(`[MCP Service] Text search results for ${entity}:`, {
-          query,
+        if (countOnly) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    count: results.found,
+                    entity,
+                    query: normalizedQuery,
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+            isError: false,
+          };
+        }
+
+        this.logger.debug(`Text search results for ${entity}`, {
+          query: normalizedQuery,
           found: results.found,
           hitsCount: results.hits.length,
           hits: results.hits.slice(0, 2).map((h: { id?: string; name?: string }) => ({
@@ -396,11 +683,31 @@ export class MCPService {
           })),
         });
 
+        // Add view links to results
+        const resultsWithLinks = this.addViewLinksToResults(results.hits, entity);
+
+        // Create response with prominent link information
+        const response = {
+          results: resultsWithLinks,
+          count: results.found,
+          page: results.page,
+          entity,
+          query: normalizedQuery,
+          // Add summary with links for better LLM visibility
+          links_summary: resultsWithLinks
+            .filter((r) => r.view_link)
+            .map((r) => ({
+              id: r._id || r.id,
+              name: (r as { name?: string }).name || 'Entity',
+              view_link: r.view_link,
+            })),
+        };
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(results, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
           isError: false,
@@ -423,15 +730,252 @@ export class MCPService {
           };
         }
 
+        // Add view link to entity with prominent display
+        const docWithLink = {
+          ...doc,
+          view_link: this.generateEntityViewLink(entity, id),
+          '🔗 VIEW_LINK': this.generateEntityViewLink(entity, id),
+          _IMPORTANT: `This ${entity} can be viewed at: ${this.generateEntityViewLink(entity, id)}`,
+        };
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(doc, null, 2),
+              text: JSON.stringify(docWithLink, null, 2),
             },
           ],
           isError: false,
         };
+      }
+
+      if (action === 'update') {
+        const id = args.id as string;
+        const confirmed = (args.confirmed as boolean) || false;
+
+        // Validate ID is provided
+        if (!id || id.trim() === '') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    error: 'ID is required',
+                    message: `Cannot execute UPDATE operation without an ID for ${entity}.`,
+                    action_required: 'SEARCH_FOR_ID',
+                    instructions: [
+                      `If you know this is a ${entity}, use search_${entity} with a descriptive query to find the entity ID.`,
+                      `If you're not sure about the entity type, use global_search to find both the entity type and ID.`,
+                      `Once you have the ID, call update_${entity} again with the ID and your changes.`,
+                    ],
+                    suggested_tools: [
+                      {
+                        tool: `search_${entity}`,
+                        description: `Search for ${entity} entities to find the ID`,
+                        example: { query: 'descriptive search query', limit: 10 },
+                      },
+                      {
+                        tool: 'global_search',
+                        description: 'Search across all entity types if entity type is unknown',
+                        example: { query: 'descriptive search query', limit: 10 },
+                      },
+                    ],
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Extract id and confirmed from args and pass the rest as update data
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _, confirmed: __, ...updateData } = args;
+
+        // If not confirmed, return preview and require confirmation
+        if (!confirmed) {
+          // Get current entity state
+          const currentEntity = await this.repository.findById(ctx, entity, id);
+          if (!currentEntity) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({ error: 'Entity not found' }, null, 2),
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    requires_confirmation: true,
+                    action: 'UPDATE',
+                    entity_type: entity,
+                    entity_id: id,
+                    current_state: currentEntity,
+                    proposed_changes: updateData,
+                    message: `⚠️ DESTRUCTIVE ACTION REQUIRES CONFIRMATION ⚠️\n\nYou are about to UPDATE ${entity} with ID: ${id}\n\nCurrent state:\n${JSON.stringify(currentEntity, null, 2)}\n\nProposed changes:\n${JSON.stringify(updateData, null, 2)}\n\n⚠️ This action will modify the entity. To proceed, call this tool again with confirmed=true`,
+                    confirmation_required: true,
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+            isError: false,
+          };
+        }
+
+        // Execute update with confirmation - Use EntitiesService to ensure proper indexing
+        const updated = await this.entitiesService.update(ctx, entity, id, updateData);
+
+        // Add view link to updated entity
+        const updatedWithLink = {
+          ...(updated as Record<string, unknown>),
+          view_link: this.generateEntityViewLink(entity, id),
+        };
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  action: 'UPDATE',
+                  entity_type: entity,
+                  entity_id: id,
+                  updated_entity: updatedWithLink,
+                  view_link: this.generateEntityViewLink(entity, id),
+                  message: `${entity} with ID ${id} has been successfully updated`,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: false,
+        };
+      }
+
+      if (action === 'delete') {
+        const id = args.id as string;
+        const confirmed = (args.confirmed as boolean) || false;
+
+        // Validate ID is provided
+        if (!id || id.trim() === '') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    error: 'ID is required',
+                    message: `Cannot execute DELETE operation without an ID for ${entity}.`,
+                    action_required: 'SEARCH_FOR_ID',
+                    instructions: [
+                      `If you know this is a ${entity}, use search_${entity} with a descriptive query to find the entity ID.`,
+                      `If you're not sure about the entity type, use global_search to find both the entity type and ID.`,
+                      `Once you have the ID, call delete_${entity} again with the ID.`,
+                    ],
+                    suggested_tools: [
+                      {
+                        tool: `search_${entity}`,
+                        description: `Search for ${entity} entities to find the ID`,
+                        example: { query: 'descriptive search query', limit: 10 },
+                      },
+                      {
+                        tool: 'global_search',
+                        description: 'Search across all entity types if entity type is unknown',
+                        example: { query: 'descriptive search query', limit: 10 },
+                      },
+                    ],
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // If not confirmed, return preview and require confirmation
+        if (!confirmed) {
+          // Get current entity state
+          const currentEntity = await this.repository.findById(ctx, entity, id);
+          if (!currentEntity) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({ error: 'Entity not found' }, null, 2),
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    requires_confirmation: true,
+                    action: 'DELETE',
+                    entity_type: entity,
+                    entity_id: id,
+                    entity_to_delete: currentEntity,
+                    message: `⚠️ DESTRUCTIVE ACTION REQUIRES CONFIRMATION ⚠️\n\nYou are about to DELETE ${entity} with ID: ${id}\n\nEntity to be deleted:\n${JSON.stringify(currentEntity, null, 2)}\n\n⚠️ This action is IRREVERSIBLE and will permanently delete the entity. To proceed, call this tool again with confirmed=true`,
+                    confirmation_required: true,
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+            isError: false,
+          };
+        }
+
+        // Execute delete with confirmation - Use EntitiesService to ensure proper cleanup
+        await this.entitiesService.delete(ctx, entity, id);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  action: 'DELETE',
+                  entity_type: entity,
+                  entity_id: id,
+                  message: `${entity} with ID ${id} has been successfully deleted`,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: false,
+        };
+      }
+
+      // Global search across all entities
+      if (name === 'global_search') {
+        const ctx: TenantContext = { tenant_id: tenantId, unit_id: unitId };
+        return this.globalSearch(ctx, args);
       }
 
       // Handle workflow tools
@@ -668,6 +1212,130 @@ export class MCPService {
           },
         ],
         isError: true,
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                error: error instanceof Error ? error.message : 'Unknown error',
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * Global search across all entities
+   */
+  private async globalSearch(
+    ctx: TenantContext,
+    args: Record<string, unknown>
+  ): Promise<{ content: Array<{ type: string; text: string }>; isError: boolean }> {
+    try {
+      const query = args.query as string;
+      const searchType = (args.type as string) || 'hybrid';
+      const limit = (args.limit as number) || 10;
+      const countOnly = (args.count_only as boolean) || false;
+
+      // Normalize wildcard query
+      const normalizedQuery = query.trim() === '' || query.trim() === '*' ? '*' : query;
+
+      // Get all entities for this tenant/unit
+      const entities = await this.configLoader.getEntities(ctx);
+      const results: Array<{ entity: string; items: unknown[]; count: number }> = [];
+
+      // Search each entity type
+      for (const entityDef of entities) {
+        try {
+          const entityName = entityDef.name;
+
+          // Use text search for global search (simpler and more reliable across all entities)
+          const searchLimit = countOnly ? 0 : limit;
+          const searchResults = await search(ctx, entityName, {
+            q: normalizedQuery,
+            per_page: searchLimit,
+            page: 1,
+          });
+
+          if (searchResults.hits && searchResults.hits.length > 0) {
+            // Map hits to ensure consistent structure and add view links
+            const mappedItems = searchResults.hits.map((hit: unknown) => {
+              const hitObj = hit as {
+                document?: { id?: string; _id?: string; [key: string]: unknown };
+                id?: string;
+                _id?: string;
+                [key: string]: unknown;
+              };
+              // Typesense returns documents directly or wrapped in document property
+              let mappedItem: Record<string, unknown>;
+              if (hitObj.document) {
+                const doc = hitObj.document as {
+                  id?: string;
+                  _id?: string;
+                  [key: string]: unknown;
+                };
+                mappedItem = { ...doc, _id: doc.id || doc._id };
+              } else {
+                mappedItem = { ...hitObj, _id: hitObj.id || hitObj._id };
+              }
+
+              // Add view link
+              const id = mappedItem._id || mappedItem.id;
+              if (id && typeof id === 'string') {
+                mappedItem.view_link = this.generateEntityViewLink(entityName, id);
+              }
+
+              return mappedItem;
+            });
+
+            results.push({
+              entity: entityName,
+              items: mappedItems,
+              count: searchResults.found,
+            });
+          } else if (searchResults.found > 0) {
+            // If count_only is true, we still want to include entities with matches
+            results.push({
+              entity: entityName,
+              items: [],
+              count: searchResults.found,
+            });
+          }
+        } catch (error) {
+          // Skip entities that fail to search (log but don't fail entire search)
+          this.logger.warn(
+            `Global search failed for entity ${entityDef.name}`,
+            error instanceof Error ? error.stack : String(error)
+          );
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                query: normalizedQuery,
+                searchType,
+                results,
+                totalEntities: results.length,
+                totalCount: results.reduce((sum, r) => sum + r.count, 0),
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: false,
       };
     } catch (error) {
       return {

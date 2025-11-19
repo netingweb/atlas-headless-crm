@@ -11,6 +11,7 @@ import { ToastAction } from '@/components/ui/toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { MemoryManager } from '@/lib/ai/memory';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -403,7 +404,79 @@ export default function ChatInterface() {
                 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-gray-100'}
               `}
             >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <div className="text-sm">
+                <ReactMarkdown
+                  components={{
+                    a: ({ href, children, ...props }) => {
+                      // Handle internal links (starting with /entities/)
+                      if (href && href.startsWith('/entities/')) {
+                        return (
+                          <a
+                            {...props}
+                            href={href}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              navigate(href);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                          >
+                            {children}
+                          </a>
+                        );
+                      }
+                      // External links open in new tab
+                      return (
+                        <a
+                          {...props}
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 underline"
+                        >
+                          {children}
+                        </a>
+                      );
+                    },
+                    p: ({ ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                    ul: ({ ...props }) => (
+                      <ul className="list-disc list-inside mb-2 space-y-1" {...props} />
+                    ),
+                    ol: ({ ...props }) => (
+                      <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />
+                    ),
+                    li: ({ ...props }) => <li className="ml-4" {...props} />,
+                    strong: ({ ...props }) => <strong className="font-semibold" {...props} />,
+                    em: ({ ...props }) => <em className="italic" {...props} />,
+                    code: ({
+                      inline,
+                      ...props
+                    }: {
+                      inline?: boolean;
+                      className?: string;
+                      children?: React.ReactNode;
+                    }) =>
+                      inline ? (
+                        <code
+                          className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-xs"
+                          {...props}
+                        />
+                      ) : (
+                        <code
+                          className="block bg-gray-200 dark:bg-gray-700 p-2 rounded text-xs overflow-x-auto"
+                          {...props}
+                        />
+                      ),
+                    pre: ({ ...props }) => (
+                      <pre
+                        className="bg-gray-200 dark:bg-gray-700 p-2 rounded mb-2 overflow-x-auto"
+                        {...props}
+                      />
+                    ),
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              </div>
             </div>
           </div>
         ))}

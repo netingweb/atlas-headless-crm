@@ -4,8 +4,8 @@ import { validate, ValidationError } from 'class-validator';
 import { CreateEntityDto, UpdateEntityDto } from '../dto/entity.dto';
 
 @Injectable()
-export class DynamicEntityValidationPipe implements PipeTransform<any> {
-  async transform(value: any, { metatype }: ArgumentMetadata) {
+export class DynamicEntityValidationPipe implements PipeTransform<unknown> {
+  async transform(value: unknown, { metatype }: ArgumentMetadata): Promise<unknown> {
     if (!metatype || !this.toValidate(metatype)) {
       return value;
     }

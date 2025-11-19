@@ -180,8 +180,106 @@ function createToolFromMCP(
 
             throw new Error(errorText);
           }
-          // Return the text content
-          return mcpResult.content.map((c) => c.text).join('\n');
+          // Parse and enhance JSON responses to highlight view links
+          const textContent = mcpResult.content.map((c) => c.text).join('\n');
+
+          // Try to parse JSON and enhance with link highlighting
+          try {
+            const parsed = JSON.parse(textContent);
+
+            // Recursively find and highlight view_link fields
+            const enhanceWithLinks = (obj: unknown, path = ''): unknown => {
+              if (Array.isArray(obj)) {
+                return obj.map((item, index) => enhanceWithLinks(item, `${path}[${index}]`));
+              } else if (obj && typeof obj === 'object') {
+                const enhanced: Record<string, unknown> = {};
+                let hasViewLink = false;
+                let viewLinkValue = '';
+
+                for (const [key, value] of Object.entries(obj)) {
+                  if (key === 'view_link' && typeof value === 'string') {
+                    hasViewLink = true;
+                    viewLinkValue = value;
+                    // Keep the view_link
+                    enhanced[key] = value;
+                  } else {
+                    enhanced[key] = enhanceWithLinks(value, path ? `${path}.${key}` : key);
+                  }
+                }
+
+                // Add prominent link information at the top level
+                if (hasViewLink) {
+                  enhanced['🔗 VIEW_LINK'] = viewLinkValue;
+                  enhanced['_IMPORTANT'] = `This entity can be viewed at: ${viewLinkValue}`;
+                }
+
+                return enhanced;
+              }
+              return obj;
+            };
+
+            const enhanced = enhanceWithLinks(parsed);
+
+            // Extract all view links and add them prominently at the top
+            const extractLinks = (
+              obj: unknown,
+              links: Array<{ path: string; link: string; name?: string }> = [],
+              path = ''
+            ): void => {
+              if (Array.isArray(obj)) {
+                obj.forEach((item, index) => extractLinks(item, links, `${path}[${index}]`));
+              } else if (obj && typeof obj === 'object') {
+                for (const [key, value] of Object.entries(obj)) {
+                  if (key === 'view_link' && typeof value === 'string') {
+                    const name =
+                      (obj as { name?: string }).name ||
+                      (obj as { _id?: string; id?: string })._id ||
+                      (obj as { _id?: string; id?: string }).id ||
+                      'Entity';
+                    links.push({ path: path || 'root', link: value, name: String(name) });
+                  } else if (key === 'links_summary' && Array.isArray(value)) {
+                    // Already extracted links
+                    (value as Array<{ view_link?: string; name?: string }>).forEach((item) => {
+                      if (item.view_link) {
+                        links.push({ path: 'summary', link: item.view_link, name: item.name });
+                      }
+                    });
+                  } else {
+                    extractLinks(value, links, path ? `${path}.${key}` : key);
+                  }
+                }
+              }
+            };
+
+            const allLinks: Array<{ path: string; link: string; name?: string }> = [];
+            extractLinks(enhanced, allLinks);
+
+            // Add links summary at the top if links found
+            if (allLinks.length > 0) {
+              const linksNote = {
+                _LINKS_FOUND: allLinks.map((l) => ({
+                  entity: l.name || 'Entity',
+                  view_link: l.link,
+                  note: `🔗 Click to view: ${l.link}`,
+                })),
+                _INSTRUCTION:
+                  'ALWAYS include these view links in your response using markdown format: [View EntityName](link)',
+              };
+
+              // Merge links note with enhanced object
+              const finalResult: Record<string, unknown> = {
+                ...linksNote,
+                ...(enhanced as Record<string, unknown>),
+              };
+
+              return JSON.stringify(finalResult, null, 2);
+            }
+
+            return JSON.stringify(enhanced, null, 2);
+          } catch {
+            // If not JSON, return as-is
+            return textContent;
+          }
         }
 
         return JSON.stringify(result);
@@ -288,6 +386,60 @@ Route: ${viewContext.route}`;
     }
   }
 
+  // Get current date and time
+  const now = new Date();
+  const currentDate = now.toLocaleDateString('it-IT', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const currentTime = now.toLocaleTimeString('it-IT', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+  });
+  const currentDateTimeISO = now.toISOString();
+  const currentTimestamp = now.getTime();
+
+  // Calculate common temporal references
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
+  const inTwoHours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+
+  // Calculate this week (Monday of current week)
+  const thisWeekStart = new Date(now);
+  const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Days to go back to Monday
+  thisWeekStart.setDate(now.getDate() - daysToMonday);
+  thisWeekStart.setHours(0, 0, 0, 0);
+
+  // Calculate next week (Monday of next week)
+  const nextWeekStart = new Date(thisWeekStart);
+  nextWeekStart.setDate(thisWeekStart.getDate() + 7);
+
+  const timeContext = `\n\nCURRENT DATE AND TIME:
+Current Date: ${currentDate}
+Current Time: ${currentTime}
+ISO Format: ${currentDateTimeISO}
+Unix Timestamp: ${currentTimestamp}
+
+IMPORTANT - TEMPORAL REFERENCES:
+When users mention time-related terms, use the current date/time above to interpret them:
+- "oggi" / "today" = ${currentDate} (${now.toISOString().split('T')[0]})
+- "domani" / "tomorrow" = ${tomorrow.toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} (${tomorrow.toISOString().split('T')[0]})
+- "ieri" / "yesterday" = ${yesterday.toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} (${yesterday.toISOString().split('T')[0]})
+- "tra un'ora" / "in an hour" = ${inOneHour.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} (${inOneHour.toISOString()})
+- "fra 2 ore" / "in 2 hours" = ${inTwoHours.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} (${inTwoHours.toISOString()})
+- "questa settimana" / "this week" = Week starting ${thisWeekStart.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} (${thisWeekStart.toISOString().split('T')[0]})
+- "prossima settimana" / "next week" = Week starting ${nextWeekStart.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} (${nextWeekStart.toISOString().split('T')[0]})
+
+When updating or creating entities with date/time fields, always convert relative time references (like "oggi", "domani", "tra un'ora") to the actual date/time values based on the current date/time above.
+Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss) for date/time fields when possible, or the format required by the entity schema.
+For dates only (without time), use format YYYY-MM-DD.`;
+
   const systemPrompt = `You are a helpful AI assistant for a CRM system. You can help users manage contacts, companies, tasks, notes, and opportunities.
 
 You have access to the following tools:
@@ -299,7 +451,24 @@ IMPORTANT RULES:
 - Be thorough and ensure all mandatory information is collected
 - When creating a company, you MUST include the 'email' field (it's required)
 - When creating a contact, you MUST include both 'name' and 'email' fields (they're required)
-${contextInfo}${memoryContext}
+${timeContext}${contextInfo}${memoryContext}
+
+CRITICAL - VIEW LINKS: When tool results contain "view_link" or "🔗 VIEW_LINK" fields, you MUST ALWAYS include them in your response. 
+
+FORMAT: Always add a clickable link using markdown format: [View Entity Name](view_link)
+
+EXAMPLES:
+- If search results show: { "_id": "123", "name": "John Doe", "view_link": "/entities/contact/123" }
+  You MUST respond with: "Found contact John Doe. [View details](/entities/contact/123)"
+
+- If multiple results: Always include a link for EACH entity found
+  Example: "Found 2 contacts:
+  - John Doe - [View](/entities/contact/123)
+  - Jane Smith - [View](/entities/contact/456)"
+
+- If results array contains items with view_link, add links for ALL items
+
+NEVER skip the view_link - it's essential for user navigation. Always format as: [View EntityType](/entities/entityType/id)
 
 Always be helpful, accurate, and concise. When using tools, provide clear explanations of what you're doing.`;
 

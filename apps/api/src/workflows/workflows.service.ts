@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { getDb, EntityRepository } from '@crm-atlas/db';
 import type { TenantContext } from '@crm-atlas/core';
@@ -10,6 +10,7 @@ import { WorkflowLogger } from '../../../workflow/src/workflow-logger';
 
 @Injectable()
 export class WorkflowsService {
+  private readonly logger = new Logger(WorkflowsService.name);
   private readonly db = getDb();
   private readonly workflowLogger = new WorkflowLogger();
   private readonly entityRepository = new EntityRepository();
@@ -28,28 +29,26 @@ export class WorkflowsService {
   async getWorkflows(ctx: TenantContext): Promise<WorkflowDefinition[]> {
     const config = await this.db.collection('workflows').findOne({ tenant_id: ctx.tenant_id });
     if (!config) {
-      console.log(`[WorkflowsService] No config found for tenant: ${ctx.tenant_id}`);
+      this.logger.debug(`No config found for tenant: ${ctx.tenant_id}`);
       return [];
     }
     const workflows = (config.workflows as WorkflowDefinition[]) || [];
-    console.log(
-      `[WorkflowsService] Found ${workflows.length} workflows for tenant: ${ctx.tenant_id}, unit: ${ctx.unit_id}`
+    this.logger.debug(
+      `Found ${workflows.length} workflows for tenant: ${ctx.tenant_id}, unit: ${ctx.unit_id}`
     );
 
     // Filter by unit_id if provided
     if (ctx.unit_id) {
       const filtered = workflows.filter((w) => !w.unit_id || w.unit_id === ctx.unit_id);
-      console.log(
-        `[WorkflowsService] Filtered to ${filtered.length} workflows for unit: ${ctx.unit_id}`
-      );
+      this.logger.debug(`Filtered to ${filtered.length} workflows for unit: ${ctx.unit_id}`);
       filtered.forEach((w) => {
-        console.log(
+        this.logger.debug(
           `  - ${w.name} (workflow_id: ${w.workflow_id}, unit_id: ${w.unit_id || 'none'})`
         );
       });
       return filtered;
     }
-    console.log(`[WorkflowsService] Returning all ${workflows.length} workflows (no unit filter)`);
+    this.logger.debug(`Returning all ${workflows.length} workflows (no unit filter)`);
     return workflows;
   }
 
@@ -456,22 +455,22 @@ export class WorkflowsService {
         const mismatches: string[] = [];
         if (!eventMatch) {
           mismatches.push(
-            `event (expected: ${workflow.trigger.event}, got: ${enhancedContext.event || 'undefined'})`
+            `event (expected: ${workflow.trigger.event}, got: ${String(enhancedContext.event || 'undefined')})`
           );
         }
         if (!entityMatch && workflow.trigger.entity) {
           mismatches.push(
-            `entity (expected: ${workflow.trigger.entity}, got: ${enhancedContext.entity || 'undefined'})`
+            `entity (expected: ${workflow.trigger.entity}, got: ${String(enhancedContext.entity || 'undefined')})`
           );
         }
         if (!tenantMatch) {
           mismatches.push(
-            `tenant_id (expected: ${workflowTenantId}, got: ${enhancedContext.tenant_id || 'undefined'})`
+            `tenant_id (expected: ${workflowTenantId}, got: ${String(enhancedContext.tenant_id || 'undefined')})`
           );
         }
         if (!unitMatch && workflowUnitId) {
           mismatches.push(
-            `unit_id (expected: ${workflowUnitId}, got: ${enhancedContext.unit_id || 'undefined'})`
+            `unit_id (expected: ${workflowUnitId}, got: ${String(enhancedContext.unit_id || 'undefined')})`
           );
         }
         testResult.trigger_evaluation.reason = `Mismatch: ${mismatches.join(', ')}`;

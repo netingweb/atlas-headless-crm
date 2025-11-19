@@ -87,6 +87,11 @@ export class ValidatorCache {
         // Use pattern to validate YYYY-MM-DD format (ISO date)
         schema.pattern = '^\\d{4}-\\d{2}-\\d{2}$';
         break;
+      case 'datetime':
+        schema.type = 'string';
+        // Use date-time format to validate ISO 8601 datetime format (YYYY-MM-DDTHH:mm:ss.sssZ or YYYY-MM-DDTHH:mm:ss)
+        schema.format = 'date-time';
+        break;
       case 'json':
         schema.type = 'object';
         break;

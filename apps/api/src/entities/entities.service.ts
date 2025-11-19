@@ -1,4 +1,4 @@
-import { Injectable, Inject, Optional } from '@nestjs/common';
+import { Injectable, Inject, Optional, Logger } from '@nestjs/common';
 import { NotFoundError, ValidationError } from '@crm-atlas/core';
 import type { TenantContext } from '@crm-atlas/core';
 import { ValidatorCache } from '@crm-atlas/core';
@@ -20,6 +20,7 @@ import { EntityEvents } from './entities.events';
 
 @Injectable()
 export class EntitiesService {
+  private readonly logger = new Logger(EntitiesService.name);
   private readonly repository = new EntityRepository();
   private readonly configLoader = new MongoConfigLoader(getDb());
   private readonly validatorCache: ValidatorCache;
@@ -109,17 +110,16 @@ export class EntitiesService {
     id: string,
     data: Record<string, unknown>
   ): Promise<unknown> {
-    console.log('[EntitiesService] Update called:', {
+    this.logger.debug('Update called', {
       tenant_id: ctx.tenant_id,
       unit_id: ctx.unit_id,
       entity,
       id,
       dataKeys: Object.keys(data),
-      data,
     });
 
     const entityDef = await this.ensureEntityExists(ctx, entity);
-    console.log('[EntitiesService] Entity definition loaded:', entityDef.name);
+    this.logger.debug(`Entity definition loaded: ${entityDef.name}`);
 
     // For updates, validate only provided fields (partial updates)
     // Create a schema without required fields for partial validation
@@ -132,7 +132,7 @@ export class EntitiesService {
     const valid = validator(data);
 
     if (!valid) {
-      console.log('[EntitiesService] Validation failed:', validator.errors);
+      this.logger.warn('Validation failed', { errors: validator.errors });
       const errors =
         validator.errors?.map((err) => {
           const path =
@@ -148,34 +148,35 @@ export class EntitiesService {
       throw new ValidationError(`Validation failed: ${errorMessages}`, errors);
     }
 
-    console.log('[EntitiesService] Validation passed');
+    this.logger.debug('Validation passed');
 
     // Validate referenced entities exist
     await this.relationsService.validateReferences(ctx, entityDef, data);
-    console.log('[EntitiesService] References validated');
+    this.logger.debug('References validated');
 
     const updated = await this.repository.update(ctx, entity, id, data);
-    console.log('[EntitiesService] Repository update result:', {
+    const updatedRecord = updated as Record<string, unknown> | null;
+    this.logger.debug('Repository update result', {
       success: !!updated,
-      updatedId: updated ? (updated as any)._id : null,
+      updatedId: updatedRecord?._id ?? null,
     });
 
     if (!updated) {
-      console.log('[EntitiesService] Update failed: throwing NotFoundError');
+      this.logger.warn(`Update failed: Resource not found ${entity}/${id}`);
       throw new NotFoundError(`Resource not found: ${entity}/${id}`);
     }
 
     // Re-index in Typesense and Qdrant
-    console.log('[EntitiesService] Re-indexing entity');
-    await this.indexEntity(ctx, entity, entityDef, updated as unknown as Record<string, unknown>);
+    this.logger.debug('Re-indexing entity');
+    await this.indexEntity(ctx, entity, entityDef, updatedRecord as Record<string, unknown>);
 
     // Emit event for workflow engine (if available)
     if (this.events) {
-      console.log('[EntitiesService] Emitting entity.updated event');
+      this.logger.debug('Emitting entity.updated event');
       this.events.emitEntityUpdated(ctx.tenant_id, ctx.unit_id, entity, id, data);
     }
 
-    console.log('[EntitiesService] Update completed successfully');
+    this.logger.debug('Update completed successfully');
     return updated;
   }
 
@@ -249,6 +250,10 @@ export class EntitiesService {
         schema.type = 'string';
         schema.format = 'date-time';
         break;
+      case 'datetime':
+        schema.type = 'string';
+        schema.format = 'date-time';
+        break;
       case 'json':
         // JSON fields can be any type
         break;
@@ -309,7 +314,7 @@ export class EntitiesService {
       await upsertDocument(ctx, entity, typesenseDoc);
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`✅ Indexed ${entity}/${doc._id} in Typesense`);
+        this.logger.debug(`Indexed ${entity}/${String(doc._id)} in Typesense`);
       }
 
       // Index in Qdrant for semantic search (if has embeddable fields)
@@ -337,11 +342,16 @@ export class EntitiesService {
       }
     } catch (error) {
       // Log error but don't fail the request
-      console.error(`Failed to index entity ${entity}/${doc._id}:`, error);
+      this.logger.error(
+        `Failed to index entity ${entity}/${String(doc._id)}`,
+        error instanceof Error ? error.stack : String(error)
+      );
       // Re-throw in development to help debug indexing issues
       if (process.env.NODE_ENV === 'development') {
-        console.warn('Indexing error details:', error instanceof Error ? error.message : error);
-        console.warn('Indexing error stack:', error instanceof Error ? error.stack : 'No stack');
+        this.logger.warn('Indexing error details', {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : 'No stack',
+        });
       }
     }
   }

@@ -2,6 +2,7 @@ import { loadRootEnv } from '@crm-atlas/utils';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { connectMongo } from '@crm-atlas/db';
 import { SmartValidationPipe } from './common/pipes/smart-validation.pipe';
@@ -15,10 +16,11 @@ import { SmartValidationPipe } from './common/pipes/smart-validation.pipe';
  */
 
 async function bootstrap(): Promise<void> {
+  const logger = new Logger('Bootstrap');
   // Ensure .env from monorepo root is loaded
   loadRootEnv();
   // Debug: Log environment variables status
-  console.log('[Bootstrap] Environment variables check:', {
+  logger.debug('Environment variables check', {
     hasOpenAIKey: !!process.env.OPENAI_API_KEY,
     openAIKeyLength: process.env.OPENAI_API_KEY?.length || 0,
     openAIKeyPrefix: process.env.OPENAI_API_KEY?.substring(0, 7) + '...' || 'not set',
@@ -42,9 +44,12 @@ async function bootstrap(): Promise<void> {
   try {
     const multipart = await import('@fastify/multipart');
     await fastifyInstance.register(multipart.default);
-    console.log('✅ Multipart plugin registered');
+    logger.log('Multipart plugin registered');
   } catch (error) {
-    console.error('⚠️ Failed to register multipart plugin:', error);
+    logger.error(
+      'Failed to register multipart plugin',
+      error instanceof Error ? error.stack : String(error)
+    );
     // Continue without multipart - uploads will fail but API can start
   }
 
@@ -132,23 +137,23 @@ async function bootstrap(): Promise<void> {
       },
       jsonDocumentUrl: '/docs/json',
     });
-    console.log('✅ Swagger configured at /docs');
-    console.log('✅ OpenAPI JSON available at /docs/json');
+    logger.log('Swagger configured at /docs');
+    logger.log('OpenAPI JSON available at /docs/json');
   } catch (error) {
-    console.error('❌ Swagger setup error:', error);
+    logger.error('Swagger setup error', error instanceof Error ? error.stack : String(error));
   }
 
   const port = parseInt(process.env.API_PORT || '3000', 10);
   const host = process.env.API_HOST || '0.0.0.0';
 
-  console.log(`[DEBUG] About to listen on ${host}:${port}`);
+  logger.debug(`About to listen on ${host}:${port}`);
   await app.listen(port, host);
-  console.log(`Application is running on: http://${host}:${port}`);
-  console.log(`Swagger docs available at: http://${host}:${port}/docs`);
+  logger.log(`Application is running on: http://${host}:${port}`);
+  logger.log(`Swagger docs available at: http://${host}:${port}/docs`);
 }
 
 bootstrap().catch((error) => {
-  console.error('Failed to start application:', error);
-  console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+  const logger = new Logger('Bootstrap');
+  logger.error('Failed to start application', error instanceof Error ? error.stack : String(error));
   process.exit(1);
 });
