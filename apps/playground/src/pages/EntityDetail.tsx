@@ -22,6 +22,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Save, Copy } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
+import DocumentUpload from '@/components/documents/DocumentUpload';
+import { documentsApi } from '@/lib/api/documents';
 
 // Readonly fields that should not be editable
 const READONLY_FIELDS = [
@@ -35,6 +37,169 @@ const READONLY_FIELDS = [
   'ownership',
   'visible_to',
 ];
+
+// Document-specific readonly fields (all except title)
+const DOCUMENT_READONLY_FIELDS = [
+  '_id',
+  'id',
+  'tenant_id',
+  'unit_id',
+  'created_at',
+  'updated_at',
+  'filename',
+  'mime_type',
+  'file_size',
+  'storage_path',
+  'document_type',
+  'related_entity_type',
+  'related_entity_id',
+  'processing_status',
+  'extracted_content',
+  'metadata',
+];
+
+// Component to display documents for an entity
+function EntityDocumentsList({ entityType, entityId }: { entityType: string; entityId: string }) {
+  const { tenantId, unitId } = useAuthStore();
+  const { toast } = useToast();
+
+  const {
+    data: documents,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['entity-documents', tenantId, unitId, entityType, entityId],
+    queryFn: () => documentsApi.getForEntity(tenantId || '', unitId || '', entityType, entityId),
+    enabled: !!tenantId && !!unitId && !!entityType && !!entityId,
+    retry: 1,
+  });
+
+  const handleDownload = async (documentId: string, filename: string) => {
+    try {
+      const blob = await documentsApi.download(tenantId || '', unitId || '', documentId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      toast({
+        title: 'Download failed',
+        description: 'Failed to download document',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDelete = async (documentId: string) => {
+    if (!confirm('Are you sure you want to delete this document?')) return;
+
+    try {
+      await documentsApi.delete(tenantId || '', unitId || '', documentId);
+      toast({
+        title: 'Document deleted',
+        description: 'Document has been deleted successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Delete failed',
+        description: 'Failed to delete document',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-gray-500">Loading documents...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-red-600">
+            Error loading documents: {(error as Error).message || 'Unknown error'}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!documents || documents.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-gray-500">No documents attached to this entity.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Attached Documents</CardTitle>
+        <CardDescription>{documents.length} document(s) attached</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {documents.map((doc) => (
+            <div
+              key={doc._id}
+              className="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50"
+            >
+              <div className="flex-1">
+                <p className="font-medium">{doc.title}</p>
+                <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+                  <span>{doc.filename}</span>
+                  <span>{(doc.file_size / 1024).toFixed(2)} KB</span>
+                  <span className="capitalize">{doc.document_type}</span>
+                  <span
+                    className={`capitalize ${
+                      doc.processing_status === 'completed'
+                        ? 'text-green-600'
+                        : doc.processing_status === 'failed'
+                          ? 'text-red-600'
+                          : 'text-yellow-600'
+                    }`}
+                  >
+                    {doc.processing_status}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownload(doc._id, doc.filename)}
+                >
+                  Download
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDelete(doc._id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function EntityDetail() {
   const { entityType, id } = useParams<{ entityType: string; id: string }>();
@@ -219,8 +384,9 @@ export default function EntityDetail() {
 
     // Filter out readonly fields and system fields
     const submitData: Record<string, unknown> = {};
+    const readonlyFields = entityType === 'document' ? DOCUMENT_READONLY_FIELDS : READONLY_FIELDS;
     Object.keys(formData).forEach((key) => {
-      if (!READONLY_FIELDS.includes(key)) {
+      if (!readonlyFields.includes(key)) {
         submitData[key] = formData[key];
       }
     });
@@ -240,7 +406,11 @@ export default function EntityDetail() {
   };
 
   const renderField = (field: EntityDefinition['fields'][0], referenceOptions?: Entity[]) => {
-    const isReadonly = READONLY_FIELDS.includes(field.name);
+    // For documents, only title is editable, all other fields are readonly
+    const isDocumentEntity = entityType === 'document';
+    const isReadonly = isDocumentEntity
+      ? DOCUMENT_READONLY_FIELDS.includes(field.name)
+      : READONLY_FIELDS.includes(field.name);
     const fieldValue = formData[field.name];
 
     if (isReadonly) {
@@ -291,7 +461,81 @@ export default function EntityDetail() {
       );
     }
 
+    // Special handling for related_entity_id in documents - show link if entity exists
+    // This must be checked BEFORE the generic reference field handler
+    if (field.name === 'related_entity_id' && entityType === 'document') {
+      const relatedEntityType = formData.related_entity_type as string;
+      // Handle both _id and id formats, and also check for ObjectId string
+      const relatedEntityId = fieldValue ? String(fieldValue).trim() : null;
+
+      // Debug log to see what values we have
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 related_entity_id field:', {
+          fieldName: field.name,
+          fieldValue,
+          relatedEntityType,
+          relatedEntityId,
+          formData: formData.related_entity_id,
+        });
+      }
+
+      return (
+        <div key={field.name} className="space-y-2">
+          <Label htmlFor={field.name} className="text-gray-500">
+            {field.name} (readonly)
+          </Label>
+          {relatedEntityType &&
+          relatedEntityId &&
+          relatedEntityId !== 'null' &&
+          relatedEntityId !== 'undefined' &&
+          relatedEntityId.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <Input
+                id={field.name}
+                value={relatedEntityId}
+                readOnly
+                className="bg-gray-50 flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/entities/${relatedEntityType}/${relatedEntityId}`)}
+              >
+                View {relatedEntityType}
+              </Button>
+            </div>
+          ) : (
+            <Input
+              id={field.name}
+              value={relatedEntityId || ''}
+              readOnly
+              className="bg-gray-50"
+              placeholder="No related entity"
+            />
+          )}
+        </div>
+      );
+    }
+
     if (field.type === 'reference' && field.reference_entity) {
+      // Special handling for related_entity_type in documents - show as readonly with display value
+      if (field.name === 'related_entity_type' && entityType === 'document') {
+        return (
+          <div key={field.name} className="space-y-2">
+            <Label htmlFor={field.name} className="text-gray-500">
+              {field.name} (readonly)
+            </Label>
+            <Input
+              id={field.name}
+              value={String(fieldValue ?? '')}
+              readOnly
+              className="bg-gray-50"
+            />
+          </div>
+        );
+      }
+
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
@@ -301,8 +545,9 @@ export default function EntityDetail() {
           <Select
             value={fieldValue ? String(fieldValue) : undefined}
             onValueChange={(value) => handleFieldChange(field.name, value || null)}
+            disabled={isReadonly}
           >
-            <SelectTrigger>
+            <SelectTrigger className={isReadonly ? 'bg-gray-50' : ''}>
               <SelectValue
                 placeholder={`Select ${field.reference_entity}${field.required ? '' : ' (optional)'}`}
               />
@@ -327,6 +572,25 @@ export default function EntityDetail() {
     }
 
     if (field.type === 'text') {
+      // Special handling for extracted_content - show full content, readonly, in a larger textarea
+      if (field.name === 'extracted_content') {
+        return (
+          <div key={field.name} className="space-y-2 col-span-full">
+            <Label htmlFor={field.name} className="text-gray-500 text-sm font-semibold">
+              {field.name} (readonly)
+            </Label>
+            <Textarea
+              id={field.name}
+              value={String(fieldValue ?? '')}
+              readOnly
+              className="bg-gray-50 font-mono text-xs border-gray-200"
+              rows={15}
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+        );
+      }
+
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
@@ -339,6 +603,8 @@ export default function EntityDetail() {
             onChange={(e) => handleFieldChange(field.name, e.target.value)}
             required={field.required}
             rows={4}
+            readOnly={isReadonly}
+            className={isReadonly ? 'bg-gray-50' : ''}
           />
         </div>
       );
@@ -400,19 +666,51 @@ export default function EntityDetail() {
       );
     }
 
+    // Special handling for metadata field - show formatted JSON in a larger textarea
+    if (
+      field.name === 'metadata' &&
+      (field.type === 'json' || typeof fieldValue === 'object' || fieldValue !== null)
+    ) {
+      const metadataValue =
+        typeof fieldValue === 'object' && fieldValue !== null
+          ? JSON.stringify(fieldValue, null, 2)
+          : fieldValue
+            ? String(fieldValue)
+            : '';
+
+      return (
+        <div key={field.name} className="space-y-2 col-span-full">
+          <Label htmlFor={field.name} className="text-gray-500 text-sm font-semibold">
+            {field.name} (readonly)
+          </Label>
+          <Textarea
+            id={field.name}
+            value={metadataValue}
+            readOnly
+            className="bg-gray-50 font-mono text-xs border-gray-200"
+            rows={12}
+            style={{ resize: 'vertical' }}
+          />
+        </div>
+      );
+    }
+
     // Default: string, email, url
     return (
       <div key={field.name} className="space-y-2">
-        <Label htmlFor={field.name}>
+        <Label htmlFor={field.name} className={isReadonly ? 'text-gray-500' : ''}>
           {field.name}
-          {field.required && <span className="text-red-500 ml-1">*</span>}
+          {field.required && !isReadonly && <span className="text-red-500 ml-1">*</span>}
+          {isReadonly && <span className="text-gray-400 ml-1">(readonly)</span>}
         </Label>
         <Input
           id={field.name}
           type={field.type === 'email' ? 'email' : field.type === 'url' ? 'url' : 'text'}
           value={String(fieldValue ?? '')}
           onChange={(e) => handleFieldChange(field.name, e.target.value)}
-          required={field.required}
+          required={field.required && !isReadonly}
+          readOnly={isReadonly}
+          className={isReadonly ? 'bg-gray-50' : ''}
         />
       </div>
     );
@@ -486,9 +784,29 @@ export default function EntityDetail() {
       <Tabs defaultValue="form" className="w-full">
         <TabsList>
           <TabsTrigger value="form">Form</TabsTrigger>
+          {!isNew && entityType !== 'document' && (
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+          )}
           {!isNew && <TabsTrigger value="raw">Raw MongoDB</TabsTrigger>}
           <TabsTrigger value="json">JSON Response</TabsTrigger>
         </TabsList>
+
+        {!isNew && entityType !== 'document' && (
+          <TabsContent value="documents">
+            <div className="space-y-6">
+              <DocumentUpload
+                relatedEntityType={entityType}
+                relatedEntityId={id}
+                onUploadComplete={() => {
+                  queryClient.invalidateQueries({
+                    queryKey: ['entity-documents', tenantId, unitId, entityType, id],
+                  });
+                }}
+              />
+              <EntityDocumentsList entityType={entityType || ''} entityId={id || ''} />
+            </div>
+          </TabsContent>
+        )}
 
         <TabsContent value="form">
           <Card>
@@ -553,8 +871,18 @@ export default function EntityDetail() {
                             if (READONLY_FIELDS.includes(field.name)) {
                               return null;
                             }
+                            // Special handling for related_entity_id in documents - use renderField which has special logic
+                            // This must be checked BEFORE the generic reference field handler
+                            if (field.name === 'related_entity_id' && entityType === 'document') {
+                              return renderField(field);
+                            }
                             // For reference fields, we need to load options
-                            if (field.type === 'reference' && field.reference_entity) {
+                            // Skip related_entity_id for documents as it's handled above
+                            if (
+                              field.type === 'reference' &&
+                              field.reference_entity &&
+                              !(field.name === 'related_entity_id' && entityType === 'document')
+                            ) {
                               return (
                                 <ReferenceField
                                   key={field.name}

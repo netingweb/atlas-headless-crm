@@ -5,6 +5,7 @@ import type {
   EntitiesConfig,
   PermissionsConfig,
   EntityDefinition,
+  DocumentsConfig,
 } from '@crm-atlas/types';
 
 export class ConfigCache {
@@ -12,6 +13,7 @@ export class ConfigCache {
   private unitsCache = new Map<string, Map<string, UnitConfig>>();
   private entitiesCache = new Map<string, EntitiesConfig>();
   private permissionsCache = new Map<string, PermissionsConfig>();
+  private documentsCache = new Map<string, DocumentsConfig>();
 
   getTenant(tenantId: string): TenantConfig | undefined {
     return this.tenantCache.get(tenantId);
@@ -55,17 +57,27 @@ export class ConfigCache {
     this.permissionsCache.set(tenantId, config);
   }
 
+  getDocumentsConfig(tenantId: string): DocumentsConfig | undefined {
+    return this.documentsCache.get(tenantId);
+  }
+
+  setDocumentsConfig(tenantId: string, config: DocumentsConfig): void {
+    this.documentsCache.set(tenantId, config);
+  }
+
   clear(tenantId?: string): void {
     if (tenantId) {
       this.tenantCache.delete(tenantId);
       this.unitsCache.delete(tenantId);
       this.entitiesCache.delete(tenantId);
       this.permissionsCache.delete(tenantId);
+      this.documentsCache.delete(tenantId);
     } else {
       this.tenantCache.clear();
       this.unitsCache.clear();
       this.entitiesCache.clear();
       this.permissionsCache.clear();
+      this.documentsCache.clear();
     }
   }
 }

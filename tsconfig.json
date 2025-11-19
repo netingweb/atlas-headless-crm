@@ -38,7 +38,9 @@
       "@crm-atlas/embeddings": ["packages/embeddings/src"],
       "@crm-atlas/workflows": ["packages/workflows/src"],
       "@crm-atlas/types": ["packages/types/src"],
-      "@crm-atlas/utils": ["packages/utils/src"]
+      "@crm-atlas/utils": ["packages/utils/src"],
+      "@crm-atlas/storage": ["packages/storage/src"],
+      "@crm-atlas/documents": ["packages/documents/src"]
     }
   },
   "include": ["apps/**/*", "packages/**/*", "scripts/**/*"],

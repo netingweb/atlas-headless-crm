@@ -136,6 +136,22 @@ async function syncConfig(tenantId: string): Promise<void> {
       console.log(`ℹ️  mcp.manifest.json not found, skipping`);
     }
 
+    // Sync documents config (if exists)
+    try {
+      const documentsConfig = JSON.parse(readFileSync(join(configDir, 'documents.json'), 'utf-8'));
+      await db
+        .collection('documents_config')
+        .replaceOne({ tenant_id: tenantId }, documentsConfig, { upsert: true });
+      console.log(`✅ Synced documents.json`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        console.log(`ℹ️  documents.json not found, skipping`);
+      } else {
+        console.error(`❌ Error syncing documents.json:`, error);
+        throw error;
+      }
+    }
+
     console.log(`\n✅ Configuration sync completed for tenant: ${tenantId}`);
   } catch (error) {
     console.error(`❌ Failed to sync configuration:`, error);

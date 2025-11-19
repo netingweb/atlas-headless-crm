@@ -5,6 +5,7 @@ import type {
   EntitiesConfig,
   PermissionsConfig,
   EntityDefinition,
+  DocumentsConfig,
 } from '@crm-atlas/types';
 import { ConfigCache } from './cache';
 
@@ -16,6 +17,7 @@ export interface ConfigLoader {
   getEntity(ctx: TenantContext, entityName: string): Promise<EntityDefinition | null>;
   getEntities(ctx: TenantContext): Promise<EntityDefinition[]>;
   getPermissions(tenantId: string): Promise<PermissionsConfig | null>;
+  getDocumentsConfig(tenantId: string): Promise<DocumentsConfig | null>;
 }
 
 export class MongoConfigLoader implements ConfigLoader {
@@ -115,6 +117,18 @@ export class MongoConfigLoader implements ConfigLoader {
 
     const config = doc as PermissionsConfig;
     this.cache.setPermissions(tenantId, config);
+    return config;
+  }
+
+  async getDocumentsConfig(tenantId: string): Promise<DocumentsConfig | null> {
+    const cached = this.cache.getDocumentsConfig(tenantId);
+    if (cached) return cached;
+
+    const doc = await this.db.collection('documents_config').findOne({ tenant_id: tenantId });
+    if (!doc) return null;
+
+    const config = doc as DocumentsConfig;
+    this.cache.setDocumentsConfig(tenantId, config);
     return config;
   }
 }

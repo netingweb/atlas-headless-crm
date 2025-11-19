@@ -14,12 +14,14 @@ export interface AIConfig {
 interface AIState {
   config: AIConfig | null;
   disabledTools: Set<string>; // Set of disabled tool names (empty = all enabled)
+  maxContextTokens: number; // Max tokens before summarization
   setConfig: (config: AIConfig) => void;
   clearConfig: () => void;
   toggleTool: (toolName: string) => void;
   setToolEnabled: (toolName: string, enabled: boolean) => void;
   enableAllTools: () => void;
   disableAllTools: (allToolNames: string[]) => void;
+  setMaxContextTokens: (tokens: number) => void;
 }
 
 export const useAIStore = create<AIState>()(
@@ -27,6 +29,7 @@ export const useAIStore = create<AIState>()(
     (set, get) => ({
       config: null,
       disabledTools: new Set<string>(), // Empty set = all tools enabled
+      maxContextTokens: 8000, // Default: 8000 tokens
       setConfig: (config: AIConfig) => {
         console.log('[AIStore] Saving config:', {
           provider: config.provider,
@@ -66,12 +69,16 @@ export const useAIStore = create<AIState>()(
       disableAllTools: (allToolNames: string[]) => {
         set({ disabledTools: new Set(allToolNames) }); // All tools disabled
       },
+      setMaxContextTokens: (tokens: number) => {
+        set({ maxContextTokens: tokens });
+      },
     }),
     {
       name: 'ai-config-storage',
       partialize: (state) => ({
         config: state.config,
         disabledTools: Array.from(state.disabledTools), // Convert Set to Array for persistence
+        maxContextTokens: state.maxContextTokens,
       }),
       onRehydrateStorage: () => (state) => {
         // Convert Array back to Set after rehydration

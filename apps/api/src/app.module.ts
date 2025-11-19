@@ -11,6 +11,7 @@ import { MCPModule } from './mcp/mcp.module';
 import { StatsModule } from './stats/stats.module';
 import { IndexingModule } from './indexing/indexing.module';
 import { WorkflowsModule } from './workflows/workflows.module';
+import { DocumentsModule } from './documents/documents.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CorsInterceptor } from './common/interceptors/cors.interceptor';
 
@@ -31,6 +32,7 @@ import { CorsInterceptor } from './common/interceptors/cors.interceptor';
     StatsModule,
     IndexingModule,
     WorkflowsModule,
+    DocumentsModule,
   ],
   providers: [
     {

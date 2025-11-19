@@ -4,9 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Send, Loader2, AlertCircle, Copy } from 'lucide-react';
 import { useAIStore } from '@/stores/ai-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { useCurrentContext } from '@/stores/context-store';
 import { createAgent, runAgentStream, type Agent } from '@/lib/ai/agent';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { MemoryManager } from '@/lib/ai/memory';
 
 interface Message {
   id: string;
@@ -23,15 +27,34 @@ interface Message {
 }
 
 export default function ChatInterface() {
-  const { config, disabledTools } = useAIStore();
+  const { config, disabledTools, maxContextTokens } = useAIStore();
   const { tenantId, unitId } = useAuthStore();
+  const viewContext = useCurrentContext();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const agentRef = useRef<Agent | null>(null);
   const [agentReady, setAgentReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const memoryManagerRef = useRef<MemoryManager | null>(null);
+
+  // Initialize memory manager
+  useEffect(() => {
+    if (!memoryManagerRef.current) {
+      memoryManagerRef.current = new MemoryManager('default', maxContextTokens);
+      if (config) {
+        memoryManagerRef.current.setConfig(config);
+      }
+    } else {
+      memoryManagerRef.current.setMaxContextTokens(maxContextTokens);
+      if (config) {
+        memoryManagerRef.current.setConfig(config);
+      }
+    }
+  }, [config, maxContextTokens]);
 
   // Initialize agent when config is available
   useEffect(() => {
@@ -74,7 +97,13 @@ export default function ChatInterface() {
             tenant_id: tenantId,
             unit_id: unitId,
           },
-          disabledTools
+          disabledTools,
+          {
+            entityType: viewContext.entityType,
+            entityId: viewContext.entityId,
+            route: viewContext.route,
+          },
+          memoryManagerRef.current || undefined
         );
         agentRef.current = agent;
         setAgentReady(true);
@@ -109,7 +138,16 @@ export default function ChatInterface() {
     };
 
     initAgent();
-  }, [config, tenantId, unitId, disabledTools, toast]);
+  }, [
+    config,
+    tenantId,
+    unitId,
+    disabledTools,
+    viewContext.entityType,
+    viewContext.entityId,
+    viewContext.route,
+    toast,
+  ]);
 
   const handleSend = async () => {
     if (!input.trim() || loading || !agentReady || !agentRef.current) {
@@ -166,13 +204,21 @@ export default function ChatInterface() {
     setMessages((prev) => [...prev, assistantMessage]);
 
     try {
-      // Prepare chat history (excluding the new assistant message)
-      const chatHistory = messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
+      // Add user message to memory
+      if (memoryManagerRef.current) {
+        await memoryManagerRef.current.addMessage('user', userInput);
+      }
+
+      // Prepare chat history from memory (or fallback to current messages)
+      const chatHistory = memoryManagerRef.current
+        ? memoryManagerRef.current.getChatHistory()
+        : messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          }));
 
       // Stream agent response
+      let assistantResponse = '';
       for await (const event of runAgentStream(agentRef.current, userInput, chatHistory)) {
         setMessages((prev) => {
           const updated = [...prev];
@@ -190,6 +236,7 @@ export default function ChatInterface() {
             case 'content':
               if (event.content) {
                 currentMsg.content += event.content;
+                assistantResponse += event.content;
               }
               break;
             case 'tool_call':
@@ -220,12 +267,69 @@ export default function ChatInterface() {
             case 'error':
               currentMsg.content = event.content || 'An error occurred';
               break;
+            case 'entity_updated':
+              // Invalidate React Query cache for the updated entity
+              if (event.entityType && event.entityId && tenantId && unitId) {
+                // Invalidate specific entity query
+                queryClient.invalidateQueries({
+                  queryKey: ['entity', tenantId, unitId, event.entityType, event.entityId],
+                });
+                // Invalidate entity list query
+                queryClient.invalidateQueries({
+                  queryKey: ['entity', tenantId, unitId, event.entityType],
+                });
+                // Invalidate entity documents if applicable
+                queryClient.invalidateQueries({
+                  queryKey: [
+                    'entity-documents',
+                    tenantId,
+                    unitId,
+                    event.entityType,
+                    event.entityId,
+                  ],
+                });
+
+                // Show notification if entity is different from current view
+                if (
+                  viewContext.entityType !== event.entityType ||
+                  viewContext.entityId !== event.entityId
+                ) {
+                  toast({
+                    title: 'Entity updated',
+                    description: `The ${event.entityType} has been updated by the AI agent`,
+                    action: (
+                      <ToastAction
+                        altText="View entity"
+                        onClick={() => {
+                          navigate(`/entities/${event.entityType}/${event.entityId}`);
+                        }}
+                      >
+                        View
+                      </ToastAction>
+                    ),
+                  });
+                } else {
+                  // If viewing the same entity, show a simple notification
+                  toast({
+                    title: 'Entity updated',
+                    description: 'The entity has been updated. Refreshing...',
+                  });
+                }
+              }
+              break;
           }
 
           updated[msgIndex] = currentMsg;
           return updated;
         });
       }
+
+      // Add assistant response to memory after streaming completes
+      if (memoryManagerRef.current && assistantResponse.trim()) {
+        await memoryManagerRef.current.addMessage('assistant', assistantResponse);
+      }
+
+      setLoading(false);
     } catch (err) {
       console.error('Failed to run agent:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to process message';

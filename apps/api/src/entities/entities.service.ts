@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { NotFoundError, ValidationError } from '@crm-atlas/core';
 import type { TenantContext } from '@crm-atlas/core';
 import { ValidatorCache } from '@crm-atlas/core';
 import { EntityRepository } from '@crm-atlas/db';
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { getDb } from '@crm-atlas/db';
-import type { EntityDefinition } from '@crm-atlas/types';
+import type { EntityDefinition, FieldDefinition } from '@crm-atlas/types';
 import { RelationsService } from './relations.service';
 import {
   upsertQdrantPoint,
@@ -22,10 +22,15 @@ import { EntityEvents } from './entities.events';
 export class EntitiesService {
   private readonly repository = new EntityRepository();
   private readonly configLoader = new MongoConfigLoader(getDb());
-  private readonly validatorCache = new ValidatorCache();
+  private readonly validatorCache: ValidatorCache;
   private readonly relationsService = new RelationsService();
 
-  constructor(private readonly events?: EntityEvents) {}
+  constructor(
+    @Optional() private readonly events?: EntityEvents,
+    @Optional() @Inject(ValidatorCache) validatorCache?: ValidatorCache
+  ) {
+    this.validatorCache = validatorCache || new ValidatorCache();
+  }
 
   async create(
     ctx: TenantContext,
@@ -116,9 +121,14 @@ export class EntitiesService {
     const entityDef = await this.ensureEntityExists(ctx, entity);
     console.log('[EntitiesService] Entity definition loaded:', entityDef.name);
 
-    // Clear cache to ensure latest schema is used
-    this.validatorCache.clear(ctx.tenant_id);
-    const validator = this.validatorCache.getOrCompile(ctx.tenant_id, entity, entityDef);
+    // For updates, validate only provided fields (partial updates)
+    // Create a schema without required fields for partial validation
+    const updateSchema = this.buildPartialUpdateSchema(entityDef);
+    const validator = this.validatorCache.getOrCompileForUpdate(
+      ctx.tenant_id,
+      entity,
+      updateSchema
+    );
     const valid = validator(data);
 
     if (!valid) {
@@ -196,6 +206,79 @@ export class EntitiesService {
       throw new NotFoundError(`Entity ${entity} not found`);
     }
     return entityDef;
+  }
+
+  /**
+   * Build a JSON schema for partial updates (no required fields)
+   */
+  private buildPartialUpdateSchema(entityDef: EntityDefinition): Record<string, unknown> {
+    const properties: Record<string, unknown> = {};
+
+    for (const field of entityDef.fields) {
+      properties[field.name] = this.fieldToJsonSchema(field);
+    }
+
+    return {
+      type: 'object',
+      properties,
+      // No required fields for partial updates
+      additionalProperties: true,
+    };
+  }
+
+  /**
+   * Convert field definition to JSON schema property
+   */
+  private fieldToJsonSchema(field: FieldDefinition): Record<string, unknown> {
+    const schema: Record<string, unknown> = {};
+
+    switch (field.type) {
+      case 'string':
+      case 'text':
+      case 'email':
+      case 'url':
+        schema.type = 'string';
+        break;
+      case 'number':
+        schema.type = 'number';
+        break;
+      case 'boolean':
+        schema.type = 'boolean';
+        break;
+      case 'date':
+        schema.type = 'string';
+        schema.format = 'date-time';
+        break;
+      case 'json':
+        // JSON fields can be any type
+        break;
+      case 'reference':
+        schema.type = 'string';
+        break;
+      default:
+        schema.type = 'string';
+    }
+
+    // Handle validation constraints
+    if (field.validation) {
+      if ('enum' in field.validation && Array.isArray(field.validation.enum)) {
+        schema.enum = field.validation.enum;
+      }
+      if ('min' in field.validation) {
+        schema.minimum = field.validation.min;
+      }
+      if ('max' in field.validation) {
+        schema.maximum = field.validation.max;
+      }
+      if ('minLength' in field.validation) {
+        schema.minLength = field.validation.minLength;
+      }
+      if ('maxLength' in field.validation) {
+        schema.maxLength = field.validation.maxLength;
+      }
+    }
+
+    return schema;
   }
 
   /**

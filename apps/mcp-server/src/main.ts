@@ -132,6 +132,94 @@ class MCPServer {
             required: ['id'],
           },
         });
+
+        // Special tools for document entity
+        if (entity.name === 'document') {
+          // Semantic search in document content
+          tools.push({
+            name: 'search_document_content',
+            description:
+              'Search semantically in document extracted content and metadata. Useful for finding specific information within documents.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                query: {
+                  type: 'string',
+                  description: 'Semantic search query to find relevant document content',
+                },
+                documentType: {
+                  type: 'string',
+                  description: 'Filter by document type (e.g., contract, technical_manual)',
+                },
+                relatedEntityType: {
+                  type: 'string',
+                  description: 'Filter by related entity type (e.g., contact, opportunity)',
+                },
+                relatedEntityId: {
+                  type: 'string',
+                  description: 'Filter by related entity ID',
+                },
+                limit: { type: 'number', description: 'Result limit', default: 10 },
+              },
+              required: ['query'],
+            },
+          });
+
+          // Contextual document retrieval
+          tools.push({
+            name: 'get_documents_for_entity',
+            description:
+              'Retrieve all documents related to a specific entity (e.g., all contracts for a contact, all quotes for an opportunity)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                entityType: {
+                  type: 'string',
+                  description: 'Type of related entity (e.g., contact, opportunity, company)',
+                },
+                entityId: {
+                  type: 'string',
+                  description: 'ID of the related entity',
+                },
+                documentType: {
+                  type: 'string',
+                  description: 'Filter by document type (optional)',
+                },
+              },
+              required: ['entityType', 'entityId'],
+            },
+          });
+
+          // Find document by content context
+          tools.push({
+            name: 'find_document_by_context',
+            description:
+              'Find a specific document based on context (e.g., "find the quote for client X", "find the contract for opportunity Y")',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                context: {
+                  type: 'string',
+                  description:
+                    'Contextual description of the document to find (e.g., "quote for Acme Corp", "contract signed in 2024")',
+                },
+                relatedEntityType: {
+                  type: 'string',
+                  description: 'Type of related entity (e.g., contact, opportunity)',
+                },
+                relatedEntityId: {
+                  type: 'string',
+                  description: 'ID of the related entity',
+                },
+                documentType: {
+                  type: 'string',
+                  description: 'Expected document type (e.g., contract, quote)',
+                },
+              },
+              required: ['context'],
+            },
+          });
+        }
       }
     }
 
@@ -329,6 +417,19 @@ class MCPServer {
         };
       }
 
+      // Document-specific tools
+      if (name === 'search_document_content') {
+        return this.searchDocumentContent(ctx, args);
+      }
+
+      if (name === 'get_documents_for_entity') {
+        return this.getDocumentsForEntity(ctx, args);
+      }
+
+      if (name === 'find_document_by_context') {
+        return this.findDocumentByContext(ctx, args);
+      }
+
       return {
         content: [
           {
@@ -337,6 +438,299 @@ class MCPServer {
           },
         ],
         isError: true,
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                error: error instanceof Error ? error.message : 'Unknown error',
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * Search semantically in document content
+   */
+  private async searchDocumentContent(
+    ctx: TenantContext,
+    args: Record<string, unknown>
+  ): Promise<{ content: Array<{ type: string; text: string }>; isError: boolean }> {
+    try {
+      const query = args.query as string;
+      const documentType = args.documentType as string | undefined;
+      const relatedEntityType = args.relatedEntityType as string | undefined;
+      const relatedEntityId = args.relatedEntityId as string | undefined;
+      const limit = (args.limit as number) || 10;
+
+      // Build filter for Qdrant search
+      const filter: { must: Array<Record<string, unknown>> } = {
+        must: [
+          { key: 'tenant_id', match: { value: ctx.tenant_id } },
+          { key: 'unit_id', match: { value: ctx.unit_id } },
+        ],
+      };
+
+      if (documentType) {
+        filter.must.push({ key: 'document_type', match: { value: documentType } });
+      }
+
+      if (relatedEntityType) {
+        filter.must.push({ key: 'related_entity_type', match: { value: relatedEntityType } });
+      }
+
+      if (relatedEntityId) {
+        filter.must.push({ key: 'related_entity_id', match: { value: relatedEntityId } });
+      }
+
+      // Generate embedding for query
+      const tenantConfig = await this.configLoader.getTenant(ctx.tenant_id);
+      const globalConfig = getProviderConfig();
+      const provider = createEmbeddingsProvider(globalConfig, tenantConfig?.embeddingsProvider);
+      const [queryVector] = await provider.embedTexts([query]);
+
+      // Search in Qdrant
+      const results = await searchQdrant(ctx.tenant_id, 'document', {
+        vector: queryVector,
+        limit,
+        filter,
+      });
+
+      // Fetch full document details for results
+      const documents = await Promise.all(
+        results.map(async (result) => {
+          const docId = result.payload.document_id as string;
+          const doc = await this.repository.findById(ctx, 'document', docId);
+          if (!doc) {
+            return null;
+          }
+
+          // Normalize document to ensure ID is accessible
+          const normalizedDoc: Record<string, unknown> = {
+            ...doc,
+            id: doc._id, // Add id field pointing to _id for easier access
+          };
+
+          return {
+            ...result,
+            document: normalizedDoc,
+            documentId: doc._id, // Explicit document ID for easy access
+          };
+        })
+      );
+
+      // Filter out null results
+      const validDocuments = documents.filter((d) => d !== null);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                query,
+                results: validDocuments,
+                count: validDocuments.length,
+                // Include document IDs in a separate array for easy access
+                documentIds: validDocuments.map((r) => (r as { documentId: string }).documentId),
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: false,
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                error: error instanceof Error ? error.message : 'Unknown error',
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * Get all documents for a specific entity
+   */
+  private async getDocumentsForEntity(
+    ctx: TenantContext,
+    args: Record<string, unknown>
+  ): Promise<{ content: Array<{ type: string; text: string }>; isError: boolean }> {
+    try {
+      const entityType = args.entityType as string;
+      const entityId = args.entityId as string;
+      const documentType = args.documentType as string | undefined;
+
+      // Search documents with filters
+      const filters: Record<string, unknown> = {
+        related_entity_type: entityType,
+        related_entity_id: entityId,
+      };
+
+      if (documentType) {
+        filters.document_type = documentType;
+      }
+
+      const documents = await this.repository.find(ctx, 'document', filters);
+
+      // Normalize documents to ensure IDs are accessible
+      const normalizedDocuments = documents.map((doc) => {
+        const normalized: Record<string, unknown> = {
+          ...doc,
+          id: doc._id, // Add id field pointing to _id for easier access
+        };
+        return normalized;
+      });
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                entityType,
+                entityId,
+                documents: normalizedDocuments,
+                count: normalizedDocuments.length,
+                // Include document IDs in a separate array for easy access
+                documentIds: normalizedDocuments.map((doc) => doc.id || doc._id),
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: false,
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                error: error instanceof Error ? error.message : 'Unknown error',
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * Find document by contextual description
+   */
+  private async findDocumentByContext(
+    ctx: TenantContext,
+    args: Record<string, unknown>
+  ): Promise<{ content: Array<{ type: string; text: string }>; isError: boolean }> {
+    try {
+      const context = args.context as string;
+      const relatedEntityType = args.relatedEntityType as string | undefined;
+      const relatedEntityId = args.relatedEntityId as string | undefined;
+      const documentType = args.documentType as string | undefined;
+
+      // Build filter
+      const filter: { must: Array<Record<string, unknown>> } = {
+        must: [
+          { key: 'tenant_id', match: { value: ctx.tenant_id } },
+          { key: 'unit_id', match: { value: ctx.unit_id } },
+        ],
+      };
+
+      if (relatedEntityType) {
+        filter.must.push({ key: 'related_entity_type', match: { value: relatedEntityType } });
+      }
+
+      if (relatedEntityId) {
+        filter.must.push({ key: 'related_entity_id', match: { value: relatedEntityId } });
+      }
+
+      if (documentType) {
+        filter.must.push({ key: 'document_type', match: { value: documentType } });
+      }
+
+      // Generate embedding for context query
+      const tenantConfig = await this.configLoader.getTenant(ctx.tenant_id);
+      const globalConfig = getProviderConfig();
+      const provider = createEmbeddingsProvider(globalConfig, tenantConfig?.embeddingsProvider);
+      const [queryVector] = await provider.embedTexts([context]);
+
+      // Search in Qdrant
+      const results = await searchQdrant(ctx.tenant_id, 'document', {
+        vector: queryVector,
+        limit: 5, // Return top 5 matches
+        filter,
+      });
+
+      // Fetch full document details
+      const documents = await Promise.all(
+        results.map(async (result) => {
+          const docId = result.payload.document_id as string;
+          const doc = await this.repository.findById(ctx, 'document', docId);
+          if (!doc) {
+            return null;
+          }
+
+          // Normalize document to ensure ID is accessible
+          const normalizedDoc: Record<string, unknown> = {
+            ...doc,
+            id: doc._id, // Add id field pointing to _id for easier access
+          };
+
+          return {
+            ...result,
+            document: normalizedDoc,
+            documentId: doc._id, // Explicit document ID for easy access
+          };
+        })
+      );
+
+      // Filter out null results
+      const validDocuments = documents.filter((d) => d !== null);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                context,
+                matches: validDocuments,
+                count: validDocuments.length,
+                // Include document IDs in a separate array for easy access
+                documentIds: validDocuments.map((r) => (r as { documentId: string }).documentId),
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: false,
       };
     } catch (error) {
       return {

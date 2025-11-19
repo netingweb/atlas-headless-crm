@@ -1,0 +1,31 @@
+{
+  "name": "@crm-atlas/documents",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@crm-atlas/core": "workspace:*",
+    "@crm-atlas/types": "workspace:*",
+    "@crm-atlas/config": "workspace:*",
+    "@crm-atlas/embeddings": "workspace:*",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.6.0",
+    "sharp": "^0.33.2",
+    "openai": "^4.28.0",
+    "tesseract.js": "^5.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/pdf-parse": "^1.1.4",
+    "typescript": "^5.3.3"
+  }
+}

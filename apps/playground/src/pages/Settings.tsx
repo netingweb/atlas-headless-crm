@@ -4,6 +4,7 @@ import AIEngineTab from '@/components/settings/AIEngineTab';
 import MCPToolsTab from '@/components/settings/MCPToolsTab';
 import APIMethodsTab from '@/components/settings/APIMethodsTab';
 import CacheTab from '@/components/settings/CacheTab';
+import QueueMonitorTab from '@/components/settings/QueueMonitorTab';
 
 export default function Settings() {
   return (
@@ -19,6 +20,7 @@ export default function Settings() {
           <TabsTrigger value="api">API Methods</TabsTrigger>
           <TabsTrigger value="ai">AI Engine</TabsTrigger>
           <TabsTrigger value="indexing">Indexing</TabsTrigger>
+          <TabsTrigger value="queue">Queue Monitor</TabsTrigger>
           <TabsTrigger value="cache">Cache</TabsTrigger>
         </TabsList>
 
@@ -36,6 +38,10 @@ export default function Settings() {
 
         <TabsContent value="indexing">
           <IndexingTab />
+        </TabsContent>
+
+        <TabsContent value="queue">
+          <QueueMonitorTab />
         </TabsContent>
 
         <TabsContent value="cache">

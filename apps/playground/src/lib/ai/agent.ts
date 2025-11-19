@@ -4,6 +4,7 @@ import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/
 import { z } from 'zod';
 import type { AIConfig } from '@/stores/ai-store';
 import { mcpApi } from '@/lib/api/mcp';
+import type { MemoryManager } from './memory';
 // TenantContext type definition (matching @crm-atlas/core)
 export interface TenantContext {
   tenant_id: string;
@@ -205,7 +206,9 @@ export interface Agent {
 export async function createAgent(
   config: AIConfig,
   ctx: TenantContext,
-  disabledToolNames?: Set<string>
+  disabledToolNames?: Set<string>,
+  viewContext?: { entityType: string | null; entityId: string | null; route: string | null },
+  memoryManager?: MemoryManager
 ): Promise<Agent> {
   // Validate API key before proceeding
   const apiKey = config.apiKey?.trim();
@@ -261,6 +264,30 @@ export async function createAgent(
     })
     .join('\n\n');
 
+  // Build context-aware system prompt
+  let contextInfo = '';
+  if (viewContext?.entityType && viewContext?.entityId) {
+    contextInfo = `\n\nCURRENT CONTEXT:
+You are currently viewing a ${viewContext.entityType} entity with ID: ${viewContext.entityId}
+Route: ${viewContext.route}
+
+When the user refers to "this ${viewContext.entityType}", "current ${viewContext.entityType}", or similar, they are referring to the ${viewContext.entityType} with ID ${viewContext.entityId}.
+You can use this context implicitly in your tool calls without asking the user for the entity ID.`;
+  } else if (viewContext?.entityType) {
+    contextInfo = `\n\nCURRENT CONTEXT:
+You are currently viewing the ${viewContext.entityType} entity list.
+Route: ${viewContext.route}`;
+  }
+
+  // Add memory context if available
+  let memoryContext = '';
+  if (memoryManager) {
+    const historyContext = memoryManager.getContextHistory();
+    if (historyContext) {
+      memoryContext = `\n\nCONVERSATION HISTORY:\n${historyContext}\n`;
+    }
+  }
+
   const systemPrompt = `You are a helpful AI assistant for a CRM system. You can help users manage contacts, companies, tasks, notes, and opportunities.
 
 You have access to the following tools:
@@ -272,6 +299,7 @@ IMPORTANT RULES:
 - Be thorough and ensure all mandatory information is collected
 - When creating a company, you MUST include the 'email' field (it's required)
 - When creating a contact, you MUST include both 'name' and 'email' fields (they're required)
+${contextInfo}${memoryContext}
 
 Always be helpful, accurate, and concise. When using tools, provide clear explanations of what you're doing.`;
 
@@ -349,12 +377,15 @@ export async function runAgent(
 }
 
 export interface StreamEvent {
-  type: 'thinking' | 'tool_call' | 'tool_result' | 'content' | 'done' | 'error';
+  type: 'thinking' | 'tool_call' | 'tool_result' | 'content' | 'done' | 'error' | 'entity_updated';
   content?: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;
   toolResult?: string;
   error?: string;
+  entityType?: string;
+  entityId?: string;
+  changes?: Record<string, unknown>;
 }
 
 /**
@@ -461,6 +492,38 @@ export async function* runAgentStream(
             const resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
 
             console.log(`[Agent] Tool ${toolCall.name} result:`, resultStr);
+
+            // Check if this tool modifies an entity and emit entity_updated event
+            const toolName = toolCall.name;
+            if (
+              toolName.startsWith('create_') ||
+              toolName.startsWith('update_') ||
+              toolName.startsWith('delete_')
+            ) {
+              // Extract entity type from tool name (e.g., "create_contact" -> "contact")
+              const entityType = toolName.replace(/^(create_|update_|delete_)/, '');
+
+              // Try to extract entity ID from result or args
+              let entityId: string | undefined;
+              try {
+                const resultObj = typeof result === 'string' ? JSON.parse(resultStr) : result;
+                // Check common ID fields
+                entityId =
+                  resultObj?._id || resultObj?.id || (toolCall.args?.id as string | undefined);
+              } catch {
+                // If parsing fails, try to get ID from args
+                entityId = toolCall.args?.id as string | undefined;
+              }
+
+              if (entityType && entityId) {
+                yield {
+                  type: 'entity_updated',
+                  entityType,
+                  entityId,
+                  changes: toolCall.args as Record<string, unknown>,
+                };
+              }
+            }
 
             yield {
               type: 'tool_result',

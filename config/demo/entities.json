@@ -95,6 +95,14 @@
           "embeddable": false
         },
         {
+          "name": "phone2",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
           "name": "website",
           "type": "url",
           "required": false,
@@ -338,6 +346,103 @@
               "support"
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "document",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "mime_type",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "file_size",
+          "type": "number",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "storage_path",
+          "type": "string",
+          "required": true,
+          "indexed": false,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "document_type",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "related_entity_type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "related_entity_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "*"
+        },
+        {
+          "name": "processing_status",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["pending", "processing", "completed", "failed"]
+          }
+        },
+        {
+          "name": "extracted_content",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "metadata",
+          "type": "json",
+          "required": false,
+          "indexed": false,
+          "searchable": false,
+          "embeddable": false
         }
       ]
     }

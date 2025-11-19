@@ -75,7 +75,14 @@ describe('EntitiesService', () => {
     );
     configLoader = mockConfigLoaderInstance as any;
 
-    validatorCache = new ValidatorCache();
+    // Create a mock ValidatorCache with all required methods
+    // Default: validation passes (returns true)
+    // Can be overridden in individual tests
+    validatorCache = {
+      getOrCompile: jest.fn().mockReturnValue(() => true),
+      getOrCompileForUpdate: jest.fn().mockReturnValue(() => true),
+      clear: jest.fn(),
+    } as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -153,6 +160,9 @@ describe('EntitiesService', () => {
       const invalidData = { name: 'Test' }; // Missing required email
 
       configLoader.getEntity.mockResolvedValue(entityDef);
+
+      // Mock validator to return false (validation fails)
+      (validatorCache.getOrCompile as jest.Mock).mockReturnValueOnce(() => false);
 
       await expect(service.create(ctx, 'contact', invalidData)).rejects.toThrow(ValidationError);
     });

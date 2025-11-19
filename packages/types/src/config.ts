@@ -1,6 +1,35 @@
 import { z } from 'zod';
 import { EntityDefinitionSchema } from './entities';
 
+export const StorageConfigSchema = z.object({
+  type: z.enum(['minio', 's3']),
+  config: z.record(z.unknown()),
+});
+
+export type StorageConfig = z.infer<typeof StorageConfigSchema>;
+
+export const VisionProviderSchema = z.object({
+  name: z.enum(['openai', 'claude']),
+  model: z.string().optional(),
+  apiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+});
+
+export type VisionProvider = z.infer<typeof VisionProviderSchema>;
+
+export const DocumentProcessingConfigSchema = z.object({
+  maxFileSize: z.number().optional(),
+  allowedMimeTypes: z.array(z.string()).optional(),
+  chunkingDefaults: z
+    .object({
+      chunkSize: z.number(),
+      chunkOverlap: z.number(),
+    })
+    .optional(),
+});
+
+export type DocumentProcessingConfig = z.infer<typeof DocumentProcessingConfigSchema>;
+
 export const TenantConfigSchema = z.object({
   tenant_id: z.string(),
   name: z.string(),
@@ -13,6 +42,9 @@ export const TenantConfigSchema = z.object({
       baseUrl: z.string().optional(),
     })
     .optional(),
+  storage: StorageConfigSchema.optional(),
+  visionProvider: VisionProviderSchema.optional(),
+  documentProcessing: DocumentProcessingConfigSchema.optional(),
 });
 
 export type TenantConfig = z.infer<typeof TenantConfigSchema>;

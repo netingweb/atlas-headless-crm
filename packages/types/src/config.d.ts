@@ -1,4 +1,91 @@
 import { z } from 'zod';
+export declare const StorageConfigSchema: z.ZodObject<
+  {
+    type: z.ZodEnum<['minio', 's3']>;
+    config: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+  },
+  'strip',
+  z.ZodTypeAny,
+  {
+    type: 'minio' | 's3';
+    config: Record<string, unknown>;
+  },
+  {
+    type: 'minio' | 's3';
+    config: Record<string, unknown>;
+  }
+>;
+export type StorageConfig = z.infer<typeof StorageConfigSchema>;
+export declare const VisionProviderSchema: z.ZodObject<
+  {
+    name: z.ZodEnum<['openai', 'claude']>;
+    model: z.ZodOptional<z.ZodString>;
+    apiKey: z.ZodOptional<z.ZodString>;
+    baseUrl: z.ZodOptional<z.ZodString>;
+  },
+  'strip',
+  z.ZodTypeAny,
+  {
+    name: 'openai' | 'claude';
+    model?: string | undefined;
+    apiKey?: string | undefined;
+    baseUrl?: string | undefined;
+  },
+  {
+    name: 'openai' | 'claude';
+    model?: string | undefined;
+    apiKey?: string | undefined;
+    baseUrl?: string | undefined;
+  }
+>;
+export type VisionProvider = z.infer<typeof VisionProviderSchema>;
+export declare const DocumentProcessingConfigSchema: z.ZodObject<
+  {
+    maxFileSize: z.ZodOptional<z.ZodNumber>;
+    allowedMimeTypes: z.ZodOptional<z.ZodArray<z.ZodString, 'many'>>;
+    chunkingDefaults: z.ZodOptional<
+      z.ZodObject<
+        {
+          chunkSize: z.ZodNumber;
+          chunkOverlap: z.ZodNumber;
+        },
+        'strip',
+        z.ZodTypeAny,
+        {
+          chunkSize: number;
+          chunkOverlap: number;
+        },
+        {
+          chunkSize: number;
+          chunkOverlap: number;
+        }
+      >
+    >;
+  },
+  'strip',
+  z.ZodTypeAny,
+  {
+    maxFileSize?: number | undefined;
+    allowedMimeTypes?: string[] | undefined;
+    chunkingDefaults?:
+      | {
+          chunkSize: number;
+          chunkOverlap: number;
+        }
+      | undefined;
+  },
+  {
+    maxFileSize?: number | undefined;
+    allowedMimeTypes?: string[] | undefined;
+    chunkingDefaults?:
+      | {
+          chunkSize: number;
+          chunkOverlap: number;
+        }
+      | undefined;
+  }
+>;
+export type DocumentProcessingConfig = z.infer<typeof DocumentProcessingConfigSchema>;
 export declare const TenantConfigSchema: z.ZodObject<
   {
     tenant_id: z.ZodString;
@@ -16,15 +103,105 @@ export declare const TenantConfigSchema: z.ZodObject<
         z.ZodTypeAny,
         {
           name: 'openai' | 'jina' | 'local';
-          apiKey?: string | undefined;
           model?: string | undefined;
+          apiKey?: string | undefined;
           baseUrl?: string | undefined;
         },
         {
           name: 'openai' | 'jina' | 'local';
-          apiKey?: string | undefined;
           model?: string | undefined;
+          apiKey?: string | undefined;
           baseUrl?: string | undefined;
+        }
+      >
+    >;
+    storage: z.ZodOptional<
+      z.ZodObject<
+        {
+          type: z.ZodEnum<['minio', 's3']>;
+          config: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+        },
+        'strip',
+        z.ZodTypeAny,
+        {
+          type: 'minio' | 's3';
+          config: Record<string, unknown>;
+        },
+        {
+          type: 'minio' | 's3';
+          config: Record<string, unknown>;
+        }
+      >
+    >;
+    visionProvider: z.ZodOptional<
+      z.ZodObject<
+        {
+          name: z.ZodEnum<['openai', 'claude']>;
+          model: z.ZodOptional<z.ZodString>;
+          apiKey: z.ZodOptional<z.ZodString>;
+          baseUrl: z.ZodOptional<z.ZodString>;
+        },
+        'strip',
+        z.ZodTypeAny,
+        {
+          name: 'openai' | 'claude';
+          model?: string | undefined;
+          apiKey?: string | undefined;
+          baseUrl?: string | undefined;
+        },
+        {
+          name: 'openai' | 'claude';
+          model?: string | undefined;
+          apiKey?: string | undefined;
+          baseUrl?: string | undefined;
+        }
+      >
+    >;
+    documentProcessing: z.ZodOptional<
+      z.ZodObject<
+        {
+          maxFileSize: z.ZodOptional<z.ZodNumber>;
+          allowedMimeTypes: z.ZodOptional<z.ZodArray<z.ZodString, 'many'>>;
+          chunkingDefaults: z.ZodOptional<
+            z.ZodObject<
+              {
+                chunkSize: z.ZodNumber;
+                chunkOverlap: z.ZodNumber;
+              },
+              'strip',
+              z.ZodTypeAny,
+              {
+                chunkSize: number;
+                chunkOverlap: number;
+              },
+              {
+                chunkSize: number;
+                chunkOverlap: number;
+              }
+            >
+          >;
+        },
+        'strip',
+        z.ZodTypeAny,
+        {
+          maxFileSize?: number | undefined;
+          allowedMimeTypes?: string[] | undefined;
+          chunkingDefaults?:
+            | {
+                chunkSize: number;
+                chunkOverlap: number;
+              }
+            | undefined;
+        },
+        {
+          maxFileSize?: number | undefined;
+          allowedMimeTypes?: string[] | undefined;
+          chunkingDefaults?:
+            | {
+                chunkSize: number;
+                chunkOverlap: number;
+              }
+            | undefined;
         }
       >
     >;
@@ -38,9 +215,35 @@ export declare const TenantConfigSchema: z.ZodObject<
     embeddingsProvider?:
       | {
           name: 'openai' | 'jina' | 'local';
-          apiKey?: string | undefined;
           model?: string | undefined;
+          apiKey?: string | undefined;
           baseUrl?: string | undefined;
+        }
+      | undefined;
+    storage?:
+      | {
+          type: 'minio' | 's3';
+          config: Record<string, unknown>;
+        }
+      | undefined;
+    visionProvider?:
+      | {
+          name: 'openai' | 'claude';
+          model?: string | undefined;
+          apiKey?: string | undefined;
+          baseUrl?: string | undefined;
+        }
+      | undefined;
+    documentProcessing?:
+      | {
+          maxFileSize?: number | undefined;
+          allowedMimeTypes?: string[] | undefined;
+          chunkingDefaults?:
+            | {
+                chunkSize: number;
+                chunkOverlap: number;
+              }
+            | undefined;
         }
       | undefined;
   },
@@ -51,9 +254,35 @@ export declare const TenantConfigSchema: z.ZodObject<
     embeddingsProvider?:
       | {
           name: 'openai' | 'jina' | 'local';
-          apiKey?: string | undefined;
           model?: string | undefined;
+          apiKey?: string | undefined;
           baseUrl?: string | undefined;
+        }
+      | undefined;
+    storage?:
+      | {
+          type: 'minio' | 's3';
+          config: Record<string, unknown>;
+        }
+      | undefined;
+    visionProvider?:
+      | {
+          name: 'openai' | 'claude';
+          model?: string | undefined;
+          apiKey?: string | undefined;
+          baseUrl?: string | undefined;
+        }
+      | undefined;
+    documentProcessing?:
+      | {
+          maxFileSize?: number | undefined;
+          allowedMimeTypes?: string[] | undefined;
+          chunkingDefaults?:
+            | {
+                chunkSize: number;
+                chunkOverlap: number;
+              }
+            | undefined;
         }
       | undefined;
   }
@@ -121,10 +350,10 @@ export declare const EntitiesConfigSchema: z.ZodObject<
                   | 'string'
                   | 'number'
                   | 'boolean'
-                  | 'text'
                   | 'date'
                   | 'email'
                   | 'url'
+                  | 'text'
                   | 'json'
                   | 'reference';
                 name: string;
@@ -141,10 +370,10 @@ export declare const EntitiesConfigSchema: z.ZodObject<
                   | 'string'
                   | 'number'
                   | 'boolean'
-                  | 'text'
                   | 'date'
                   | 'email'
                   | 'url'
+                  | 'text'
                   | 'json'
                   | 'reference';
                 name: string;
@@ -160,6 +389,39 @@ export declare const EntitiesConfigSchema: z.ZodObject<
             'many'
           >;
           indexes: z.ZodOptional<z.ZodArray<z.ZodRecord<z.ZodString, z.ZodUnknown>, 'many'>>;
+          document_config: z.ZodOptional<
+            z.ZodObject<
+              {
+                embedding_model: z.ZodOptional<z.ZodEnum<['openai', 'jina', 'local']>>;
+                embedding_model_name: z.ZodOptional<z.ZodString>;
+                chunk_size: z.ZodOptional<z.ZodNumber>;
+                chunk_overlap: z.ZodOptional<z.ZodNumber>;
+                vision_enabled: z.ZodOptional<z.ZodBoolean>;
+                vision_model: z.ZodOptional<z.ZodString>;
+                ocr_enabled: z.ZodOptional<z.ZodBoolean>;
+              },
+              'strip',
+              z.ZodTypeAny,
+              {
+                embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+                embedding_model_name?: string | undefined;
+                chunk_size?: number | undefined;
+                chunk_overlap?: number | undefined;
+                vision_enabled?: boolean | undefined;
+                vision_model?: string | undefined;
+                ocr_enabled?: boolean | undefined;
+              },
+              {
+                embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+                embedding_model_name?: string | undefined;
+                chunk_size?: number | undefined;
+                chunk_overlap?: number | undefined;
+                vision_enabled?: boolean | undefined;
+                vision_model?: string | undefined;
+                ocr_enabled?: boolean | undefined;
+              }
+            >
+          >;
         },
         'strip',
         z.ZodTypeAny,
@@ -170,10 +432,10 @@ export declare const EntitiesConfigSchema: z.ZodObject<
               | 'string'
               | 'number'
               | 'boolean'
-              | 'text'
               | 'date'
               | 'email'
               | 'url'
+              | 'text'
               | 'json'
               | 'reference';
             name: string;
@@ -186,6 +448,17 @@ export declare const EntitiesConfigSchema: z.ZodObject<
             default?: unknown;
           }[];
           indexes?: Record<string, unknown>[] | undefined;
+          document_config?:
+            | {
+                embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+                embedding_model_name?: string | undefined;
+                chunk_size?: number | undefined;
+                chunk_overlap?: number | undefined;
+                vision_enabled?: boolean | undefined;
+                vision_model?: string | undefined;
+                ocr_enabled?: boolean | undefined;
+              }
+            | undefined;
         },
         {
           name: string;
@@ -194,10 +467,10 @@ export declare const EntitiesConfigSchema: z.ZodObject<
               | 'string'
               | 'number'
               | 'boolean'
-              | 'text'
               | 'date'
               | 'email'
               | 'url'
+              | 'text'
               | 'json'
               | 'reference';
             name: string;
@@ -210,6 +483,17 @@ export declare const EntitiesConfigSchema: z.ZodObject<
             default?: unknown;
           }[];
           indexes?: Record<string, unknown>[] | undefined;
+          document_config?:
+            | {
+                embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+                embedding_model_name?: string | undefined;
+                chunk_size?: number | undefined;
+                chunk_overlap?: number | undefined;
+                vision_enabled?: boolean | undefined;
+                vision_model?: string | undefined;
+                ocr_enabled?: boolean | undefined;
+              }
+            | undefined;
         }
       >,
       'many'
@@ -226,10 +510,10 @@ export declare const EntitiesConfigSchema: z.ZodObject<
           | 'string'
           | 'number'
           | 'boolean'
-          | 'text'
           | 'date'
           | 'email'
           | 'url'
+          | 'text'
           | 'json'
           | 'reference';
         name: string;
@@ -242,6 +526,17 @@ export declare const EntitiesConfigSchema: z.ZodObject<
         default?: unknown;
       }[];
       indexes?: Record<string, unknown>[] | undefined;
+      document_config?:
+        | {
+            embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+            embedding_model_name?: string | undefined;
+            chunk_size?: number | undefined;
+            chunk_overlap?: number | undefined;
+            vision_enabled?: boolean | undefined;
+            vision_model?: string | undefined;
+            ocr_enabled?: boolean | undefined;
+          }
+        | undefined;
     }[];
   },
   {
@@ -253,10 +548,10 @@ export declare const EntitiesConfigSchema: z.ZodObject<
           | 'string'
           | 'number'
           | 'boolean'
-          | 'text'
           | 'date'
           | 'email'
           | 'url'
+          | 'text'
           | 'json'
           | 'reference';
         name: string;
@@ -269,6 +564,17 @@ export declare const EntitiesConfigSchema: z.ZodObject<
         default?: unknown;
       }[];
       indexes?: Record<string, unknown>[] | undefined;
+      document_config?:
+        | {
+            embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+            embedding_model_name?: string | undefined;
+            chunk_size?: number | undefined;
+            chunk_overlap?: number | undefined;
+            vision_enabled?: boolean | undefined;
+            vision_model?: string | undefined;
+            ocr_enabled?: boolean | undefined;
+          }
+        | undefined;
     }[];
   }
 >;

@@ -3,7 +3,12 @@ import { ApiTags, ApiOperation, ApiParam, ApiOkResponse, ApiBearerAuth } from '@
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { getDb } from '@crm-atlas/db';
 import { JwtAuthGuard } from '@crm-atlas/auth';
-import type { UnitConfig, EntityDefinition, PermissionsConfig } from '@crm-atlas/types';
+import type {
+  UnitConfig,
+  EntityDefinition,
+  PermissionsConfig,
+  DocumentsConfig,
+} from '@crm-atlas/types';
 
 @ApiTags('config')
 @Controller()
@@ -131,6 +136,20 @@ export class ConfigController {
   })
   async getPermissions(@Param('tenant') tenant: string): Promise<PermissionsConfig | null> {
     return this.configLoader.getPermissions(tenant);
+  }
+
+  @Get(':tenant/config/documents')
+  @ApiOperation({
+    summary: 'Get documents configuration',
+    description:
+      'Returns the documents configuration (document types and their settings) for a tenant.',
+  })
+  @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
+  @ApiOkResponse({
+    description: 'Documents configuration with document types',
+  })
+  async getDocumentsConfig(@Param('tenant') tenant: string): Promise<DocumentsConfig | null> {
+    return this.configLoader.getDocumentsConfig(tenant);
   }
 
   @Get(':tenant/config/clear-cache')

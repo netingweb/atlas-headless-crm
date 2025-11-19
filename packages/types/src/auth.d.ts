@@ -14,23 +14,23 @@ export declare const UserSchema: z.ZodObject<
   'strip',
   z.ZodTypeAny,
   {
+    email: string;
     tenant_id: string;
     unit_id: string;
-    email: string;
-    passwordHash: string;
-    roles: string[];
     scopes: string[];
+    roles: string[];
+    passwordHash: string;
     created_at: Date;
     updated_at: Date;
     _id?: string | undefined;
   },
   {
+    email: string;
     tenant_id: string;
     unit_id: string;
-    email: string;
-    passwordHash: string;
-    roles: string[];
     scopes: string[];
+    roles: string[];
+    passwordHash: string;
     created_at: Date;
     updated_at: Date;
     _id?: string | undefined;
@@ -59,8 +59,8 @@ export declare const ApiKeySchema: z.ZodObject<
     updated_at: Date;
     keyHash: string;
     keyPrefix: string;
-    _id?: string | undefined;
     unit_id?: string | undefined;
+    _id?: string | undefined;
     app_id?: string | undefined;
     expires_at?: Date | undefined;
   },
@@ -71,8 +71,8 @@ export declare const ApiKeySchema: z.ZodObject<
     updated_at: Date;
     keyHash: string;
     keyPrefix: string;
-    _id?: string | undefined;
     unit_id?: string | undefined;
+    _id?: string | undefined;
     app_id?: string | undefined;
     expires_at?: Date | undefined;
   }
@@ -93,8 +93,8 @@ export declare const JwtPayloadSchema: z.ZodObject<
   {
     tenant_id: string;
     unit_id: string;
-    roles: string[];
     scopes: string[];
+    roles: string[];
     sub: string;
     iat?: number | undefined;
     exp?: number | undefined;
@@ -102,8 +102,8 @@ export declare const JwtPayloadSchema: z.ZodObject<
   {
     tenant_id: string;
     unit_id: string;
-    roles: string[];
     scopes: string[];
+    roles: string[];
     sub: string;
     iat?: number | undefined;
     exp?: number | undefined;

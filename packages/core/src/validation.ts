@@ -7,6 +7,7 @@ addFormats(ajv);
 
 export class ValidatorCache {
   private cache = new Map<string, ValidateFunction>();
+  private updateCache = new Map<string, ValidateFunction>();
 
   getOrCompile(
     tenantId: string,
@@ -20,6 +21,22 @@ export class ValidatorCache {
       const schema = this.buildJsonSchema(entityDef);
       validator = ajv.compile(schema);
       this.cache.set(key, validator);
+    }
+
+    return validator;
+  }
+
+  getOrCompileForUpdate(
+    tenantId: string,
+    entityName: string,
+    schema: Record<string, unknown>
+  ): ValidateFunction {
+    const key = `${tenantId}:${entityName}:update`;
+    let validator = this.updateCache.get(key);
+
+    if (!validator) {
+      validator = ajv.compile(schema);
+      this.updateCache.set(key, validator);
     }
 
     return validator;
@@ -100,8 +117,19 @@ export class ValidatorCache {
       for (const key of keysToDelete) {
         this.cache.delete(key);
       }
+      // Also clear update cache for this tenant
+      const updateKeysToDelete: string[] = [];
+      for (const key of this.updateCache.keys()) {
+        if (key.startsWith(`${tenantId}:`)) {
+          updateKeysToDelete.push(key);
+        }
+      }
+      for (const key of updateKeysToDelete) {
+        this.updateCache.delete(key);
+      }
     } else {
       this.cache.clear();
+      this.updateCache.clear();
     }
   }
 }

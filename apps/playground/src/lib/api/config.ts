@@ -91,4 +91,26 @@ export const configApi = {
     const response = await apiClient.get<{ message: string }>(`/${tenant}/config/clear-cache`);
     return response.data;
   },
+
+  getDocumentsConfig: async (tenant: string): Promise<any> => {
+    try {
+      // Direct MongoDB query via API - we'll need to add this endpoint
+      // For now, return a default structure
+      const response = await apiClient.get(`/${tenant}/config/documents`);
+      return response.data;
+    } catch (error: any) {
+      // If endpoint doesn't exist, return default document types
+      if (error.response?.status === 404) {
+        return {
+          document_types: [
+            { name: 'contract', display_name: 'Contract' },
+            { name: 'technical_manual', display_name: 'Technical Manual' },
+            { name: 'text_document', display_name: 'Text Document' },
+          ],
+        };
+      }
+      console.error(`Failed to get documents config for tenant ${tenant}:`, error);
+      return null;
+    }
+  },
 };

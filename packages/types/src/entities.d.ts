@@ -24,10 +24,10 @@ export declare const FieldDefinitionSchema: z.ZodObject<
       | 'string'
       | 'number'
       | 'boolean'
-      | 'text'
       | 'date'
       | 'email'
       | 'url'
+      | 'text'
       | 'json'
       | 'reference';
     name: string;
@@ -44,10 +44,10 @@ export declare const FieldDefinitionSchema: z.ZodObject<
       | 'string'
       | 'number'
       | 'boolean'
-      | 'text'
       | 'date'
       | 'email'
       | 'url'
+      | 'text'
       | 'json'
       | 'reference';
     name: string;
@@ -61,6 +61,38 @@ export declare const FieldDefinitionSchema: z.ZodObject<
   }
 >;
 export type FieldDefinition = z.infer<typeof FieldDefinitionSchema>;
+export declare const DocumentConfigSchema: z.ZodObject<
+  {
+    embedding_model: z.ZodOptional<z.ZodEnum<['openai', 'jina', 'local']>>;
+    embedding_model_name: z.ZodOptional<z.ZodString>;
+    chunk_size: z.ZodOptional<z.ZodNumber>;
+    chunk_overlap: z.ZodOptional<z.ZodNumber>;
+    vision_enabled: z.ZodOptional<z.ZodBoolean>;
+    vision_model: z.ZodOptional<z.ZodString>;
+    ocr_enabled: z.ZodOptional<z.ZodBoolean>;
+  },
+  'strip',
+  z.ZodTypeAny,
+  {
+    embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+    embedding_model_name?: string | undefined;
+    chunk_size?: number | undefined;
+    chunk_overlap?: number | undefined;
+    vision_enabled?: boolean | undefined;
+    vision_model?: string | undefined;
+    ocr_enabled?: boolean | undefined;
+  },
+  {
+    embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+    embedding_model_name?: string | undefined;
+    chunk_size?: number | undefined;
+    chunk_overlap?: number | undefined;
+    vision_enabled?: boolean | undefined;
+    vision_model?: string | undefined;
+    ocr_enabled?: boolean | undefined;
+  }
+>;
+export type DocumentConfig = z.infer<typeof DocumentConfigSchema>;
 export declare const EntityDefinitionSchema: z.ZodObject<
   {
     name: z.ZodString;
@@ -86,10 +118,10 @@ export declare const EntityDefinitionSchema: z.ZodObject<
             | 'string'
             | 'number'
             | 'boolean'
-            | 'text'
             | 'date'
             | 'email'
             | 'url'
+            | 'text'
             | 'json'
             | 'reference';
           name: string;
@@ -106,10 +138,10 @@ export declare const EntityDefinitionSchema: z.ZodObject<
             | 'string'
             | 'number'
             | 'boolean'
-            | 'text'
             | 'date'
             | 'email'
             | 'url'
+            | 'text'
             | 'json'
             | 'reference';
           name: string;
@@ -125,6 +157,39 @@ export declare const EntityDefinitionSchema: z.ZodObject<
       'many'
     >;
     indexes: z.ZodOptional<z.ZodArray<z.ZodRecord<z.ZodString, z.ZodUnknown>, 'many'>>;
+    document_config: z.ZodOptional<
+      z.ZodObject<
+        {
+          embedding_model: z.ZodOptional<z.ZodEnum<['openai', 'jina', 'local']>>;
+          embedding_model_name: z.ZodOptional<z.ZodString>;
+          chunk_size: z.ZodOptional<z.ZodNumber>;
+          chunk_overlap: z.ZodOptional<z.ZodNumber>;
+          vision_enabled: z.ZodOptional<z.ZodBoolean>;
+          vision_model: z.ZodOptional<z.ZodString>;
+          ocr_enabled: z.ZodOptional<z.ZodBoolean>;
+        },
+        'strip',
+        z.ZodTypeAny,
+        {
+          embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+          embedding_model_name?: string | undefined;
+          chunk_size?: number | undefined;
+          chunk_overlap?: number | undefined;
+          vision_enabled?: boolean | undefined;
+          vision_model?: string | undefined;
+          ocr_enabled?: boolean | undefined;
+        },
+        {
+          embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+          embedding_model_name?: string | undefined;
+          chunk_size?: number | undefined;
+          chunk_overlap?: number | undefined;
+          vision_enabled?: boolean | undefined;
+          vision_model?: string | undefined;
+          ocr_enabled?: boolean | undefined;
+        }
+      >
+    >;
   },
   'strip',
   z.ZodTypeAny,
@@ -135,10 +200,10 @@ export declare const EntityDefinitionSchema: z.ZodObject<
         | 'string'
         | 'number'
         | 'boolean'
-        | 'text'
         | 'date'
         | 'email'
         | 'url'
+        | 'text'
         | 'json'
         | 'reference';
       name: string;
@@ -151,6 +216,17 @@ export declare const EntityDefinitionSchema: z.ZodObject<
       default?: unknown;
     }[];
     indexes?: Record<string, unknown>[] | undefined;
+    document_config?:
+      | {
+          embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+          embedding_model_name?: string | undefined;
+          chunk_size?: number | undefined;
+          chunk_overlap?: number | undefined;
+          vision_enabled?: boolean | undefined;
+          vision_model?: string | undefined;
+          ocr_enabled?: boolean | undefined;
+        }
+      | undefined;
   },
   {
     name: string;
@@ -159,10 +235,10 @@ export declare const EntityDefinitionSchema: z.ZodObject<
         | 'string'
         | 'number'
         | 'boolean'
-        | 'text'
         | 'date'
         | 'email'
         | 'url'
+        | 'text'
         | 'json'
         | 'reference';
       name: string;
@@ -175,6 +251,17 @@ export declare const EntityDefinitionSchema: z.ZodObject<
       default?: unknown;
     }[];
     indexes?: Record<string, unknown>[] | undefined;
+    document_config?:
+      | {
+          embedding_model?: 'openai' | 'jina' | 'local' | undefined;
+          embedding_model_name?: string | undefined;
+          chunk_size?: number | undefined;
+          chunk_overlap?: number | undefined;
+          vision_enabled?: boolean | undefined;
+          vision_model?: string | undefined;
+          ocr_enabled?: boolean | undefined;
+        }
+      | undefined;
   }
 >;
 export type EntityDefinition = z.infer<typeof EntityDefinitionSchema>;

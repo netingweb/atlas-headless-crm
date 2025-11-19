@@ -35,10 +35,22 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter({ logger: true })
   );
 
+  // Get Fastify instance
+  const fastifyInstance = app.getHttpAdapter().getInstance();
+
+  // Register multipart plugin for file uploads
+  try {
+    const multipart = await import('@fastify/multipart');
+    await fastifyInstance.register(multipart.default);
+    console.log('✅ Multipart plugin registered');
+  } catch (error) {
+    console.error('⚠️ Failed to register multipart plugin:', error);
+    // Continue without multipart - uploads will fail but API can start
+  }
+
   // CORS configuration - register on Fastify instance directly
   // For development, allow all origins. In production, restrict to specific origins
   const isDevelopment = process.env.NODE_ENV !== 'production';
-  const fastifyInstance = app.getHttpAdapter().getInstance();
 
   const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:5173',
