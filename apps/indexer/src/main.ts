@@ -137,7 +137,7 @@ class IndexerService {
 
     if (change.operationType === 'delete') {
       // Remove from indexes
-      await deleteDocument(ctx, entity, docId);
+      await deleteDocument(ctx, entity, docId, entityDef);
 
       const embeddableFields = getEmbeddableFields(entityDef);
       if (embeddableFields.length > 0) {
@@ -193,7 +193,7 @@ class IndexerService {
     // Remove _id to avoid duplication (we use id instead)
     delete typesenseDoc._id;
 
-    await upsertDocument(ctx, entity, typesenseDoc);
+    await upsertDocument(ctx, entity, typesenseDoc, entityDef);
 
     // Index in Qdrant if has embeddable fields
     const embeddableFields = getEmbeddableFields(entityDef);

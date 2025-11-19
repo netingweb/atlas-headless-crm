@@ -11,7 +11,17 @@ export function randomString(length: number): string {
   return result;
 }
 
-export function collectionName(tenantId: string, unitId: string, entity: string): string {
+export function collectionName(
+  tenantId: string,
+  unitId: string | null,
+  entity: string,
+  isGlobal = false
+): string {
+  if (isGlobal || unitId === null) {
+    // Global entity: tenant-wide collection
+    return `${tenantId}_${entity}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  }
+  // Local entity: unit-specific collection
   return `${tenantId}_${unitId}_${entity}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
 }
 

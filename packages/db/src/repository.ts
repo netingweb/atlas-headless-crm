@@ -2,6 +2,7 @@ import type { TenantContext, BaseDocument } from '@crm-atlas/core';
 import { ObjectId, type Document, type WithId } from 'mongodb';
 import { getDb } from './connection';
 import { collectionName } from '@crm-atlas/utils';
+import type { EntityDefinition } from '@crm-atlas/types';
 
 export class EntityRepository {
   private normalizeDocument<T extends BaseDocument>(doc: WithId<Document>): T {
@@ -27,24 +28,39 @@ export class EntityRepository {
   async create<T extends BaseDocument>(
     ctx: TenantContext,
     entity: string,
-    data: Omit<T, keyof BaseDocument>
+    data: Omit<T, keyof BaseDocument>,
+    entityDef?: EntityDefinition
   ): Promise<T> {
+    const isGlobal = entityDef?.scope === 'tenant';
     const now = new Date();
-    const doc = {
+    const doc: Record<string, unknown> = {
       ...data,
       tenant_id: ctx.tenant_id,
-      unit_id: ctx.unit_id,
       app_id: ctx.app_id,
-      ownership: {
-        owner_unit: ctx.unit_id,
-        visible_to: [],
-      },
-      visible_to: [],
       created_at: now,
       updated_at: now,
     };
 
-    const coll = getDb().collection(collectionName(ctx.tenant_id, ctx.unit_id, entity));
+    // Only add unit_id for local entities
+    if (!isGlobal) {
+      doc.unit_id = ctx.unit_id;
+      doc.ownership = {
+        owner_unit: ctx.unit_id,
+        visible_to: [],
+      };
+      doc.visible_to = [];
+    } else {
+      // For global entities, still track ownership but without unit_id
+      doc.ownership = {
+        owner_unit: ctx.unit_id || 'global',
+        visible_to: [],
+      };
+      doc.visible_to = [];
+    }
+
+    const coll = getDb().collection(
+      collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal)
+    );
     const result = await coll.insertOne(doc);
     const createdDoc: WithId<Document> = {
       ...doc,
@@ -56,15 +72,23 @@ export class EntityRepository {
   async findById<T extends BaseDocument>(
     ctx: TenantContext,
     entity: string,
-    id: string
+    id: string,
+    entityDef?: EntityDefinition
   ): Promise<T | null> {
     // Validate ObjectId format
     if (!ObjectId.isValid(id)) {
       return null;
     }
 
-    const coll = getDb().collection(collectionName(ctx.tenant_id, ctx.unit_id, entity));
-    const doc = await coll.findOne({ _id: new ObjectId(id) });
+    const isGlobal = entityDef?.scope === 'tenant';
+    const coll = getDb().collection(
+      collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal)
+    );
+    const filter: Record<string, unknown> = { _id: new ObjectId(id), tenant_id: ctx.tenant_id };
+    if (!isGlobal) {
+      filter.unit_id = ctx.unit_id;
+    }
+    const doc = await coll.findOne(filter);
     if (!doc) {
       return null;
     }
@@ -76,7 +100,8 @@ export class EntityRepository {
     ctx: TenantContext,
     entity: string,
     id: string,
-    data: Partial<Omit<T, keyof BaseDocument | '_id'>>
+    data: Partial<Omit<T, keyof BaseDocument | '_id'>>,
+    entityDef?: EntityDefinition
   ): Promise<T | null> {
     console.log('[DB Repository] Update called:', {
       tenant_id: ctx.tenant_id,
@@ -92,7 +117,8 @@ export class EntityRepository {
       return null;
     }
 
-    const collName = collectionName(ctx.tenant_id, ctx.unit_id, entity);
+    const isGlobal = entityDef?.scope === 'tenant';
+    const collName = collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal);
     console.log('[DB Repository] Collection name:', collName);
 
     const coll = getDb().collection(collName);
@@ -124,7 +150,11 @@ export class EntityRepository {
       options: { returnDocument: 'after' },
     });
 
-    const result = await coll.findOneAndUpdate({ _id: new ObjectId(id) }, updatePayload, {
+    const filter: Record<string, unknown> = { _id: new ObjectId(id), tenant_id: ctx.tenant_id };
+    if (!isGlobal) {
+      filter.unit_id = ctx.unit_id;
+    }
+    const result = await coll.findOneAndUpdate(filter, updatePayload, {
       returnDocument: 'after',
     });
 
@@ -150,24 +180,44 @@ export class EntityRepository {
     return normalized;
   }
 
-  async delete(ctx: TenantContext, entity: string, id: string): Promise<boolean> {
+  async delete(
+    ctx: TenantContext,
+    entity: string,
+    id: string,
+    entityDef?: EntityDefinition
+  ): Promise<boolean> {
     // Validate ObjectId format
     if (!ObjectId.isValid(id)) {
       return false;
     }
 
-    const coll = getDb().collection(collectionName(ctx.tenant_id, ctx.unit_id, entity));
-    const result = await coll.deleteOne({ _id: new ObjectId(id) });
+    const isGlobal = entityDef?.scope === 'tenant';
+    const coll = getDb().collection(
+      collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal)
+    );
+    const filter: Record<string, unknown> = { _id: new ObjectId(id), tenant_id: ctx.tenant_id };
+    if (!isGlobal) {
+      filter.unit_id = ctx.unit_id;
+    }
+    const result = await coll.deleteOne(filter);
     return result.deletedCount > 0;
   }
 
   async find<T extends BaseDocument>(
     ctx: TenantContext,
     entity: string,
-    filter: Record<string, unknown> = {}
+    filter: Record<string, unknown> = {},
+    entityDef?: EntityDefinition
   ): Promise<T[]> {
-    const coll = getDb().collection(collectionName(ctx.tenant_id, ctx.unit_id, entity));
-    const cursor = coll.find({ ...filter, tenant_id: ctx.tenant_id, unit_id: ctx.unit_id });
+    const isGlobal = entityDef?.scope === 'tenant';
+    const coll = getDb().collection(
+      collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal)
+    );
+    const queryFilter: Record<string, unknown> = { ...filter, tenant_id: ctx.tenant_id };
+    if (!isGlobal) {
+      queryFilter.unit_id = ctx.unit_id;
+    }
+    const cursor = coll.find(queryFilter);
     const docs = await cursor.toArray();
     return docs.map((doc) => this.normalizeDocument<T>(doc));
   }

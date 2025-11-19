@@ -1,0 +1,75 @@
+{
+  "tenant_id": "demo2",
+  "document_types": [
+    {
+      "name": "contratto_vendita",
+      "display_name": "Contratto di Vendita",
+      "allowed_mime_types": ["application/pdf"],
+      "max_upload_size": 10485760,
+      "embedding_config": {
+        "model": "openai",
+        "model_name": "text-embedding-3-large",
+        "chunk_size": 2000,
+        "chunk_overlap": 400
+      },
+      "vision_enabled": false,
+      "ocr_enabled": true
+    },
+    {
+      "name": "offerta",
+      "display_name": "Offerta",
+      "allowed_mime_types": ["application/pdf"],
+      "max_upload_size": 5242880,
+      "embedding_config": {
+        "model": "openai",
+        "model_name": "text-embedding-3-small",
+        "chunk_size": 1500,
+        "chunk_overlap": 300
+      },
+      "vision_enabled": false,
+      "ocr_enabled": false
+    },
+    {
+      "name": "preventivo",
+      "display_name": "Preventivo",
+      "allowed_mime_types": ["application/pdf"],
+      "max_upload_size": 5242880,
+      "embedding_config": {
+        "model": "openai",
+        "model_name": "text-embedding-3-small",
+        "chunk_size": 1500,
+        "chunk_overlap": 300
+      },
+      "vision_enabled": false,
+      "ocr_enabled": false
+    },
+    {
+      "name": "ordine",
+      "display_name": "Ordine",
+      "allowed_mime_types": ["application/pdf"],
+      "max_upload_size": 5242880,
+      "embedding_config": {
+        "model": "openai",
+        "model_name": "text-embedding-3-small",
+        "chunk_size": 1500,
+        "chunk_overlap": 300
+      },
+      "vision_enabled": false,
+      "ocr_enabled": false
+    },
+    {
+      "name": "fattura",
+      "display_name": "Fattura",
+      "allowed_mime_types": ["application/pdf"],
+      "max_upload_size": 5242880,
+      "embedding_config": {
+        "model": "openai",
+        "model_name": "text-embedding-3-small",
+        "chunk_size": 1500,
+        "chunk_overlap": 300
+      },
+      "vision_enabled": false,
+      "ocr_enabled": true
+    }
+  ]
+}

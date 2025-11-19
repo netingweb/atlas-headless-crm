@@ -1,0 +1,45 @@
+{
+  "tenant_id": "demo2",
+  "roles": [
+    {
+      "role": "admin",
+      "scopes": [
+        "crm:read",
+        "crm:write",
+        "crm:delete",
+        "documents:read",
+        "documents:write",
+        "documents:delete",
+        "workflows:manage",
+        "workflows:execute"
+      ]
+    },
+    {
+      "role": "organization_manager",
+      "scopes": [
+        "crm:read",
+        "crm:write",
+        "documents:read",
+        "documents:write",
+        "workflows:read",
+        "workflows:execute"
+      ]
+    },
+    {
+      "role": "unit_manager",
+      "scopes": ["crm:read", "crm:write", "documents:read", "documents:write"]
+    },
+    {
+      "role": "sales_rep",
+      "scopes": ["crm:read", "documents:read"]
+    },
+    {
+      "role": "service_rep",
+      "scopes": ["crm:read", "documents:read"]
+    },
+    {
+      "role": "accounting",
+      "scopes": ["crm:read", "documents:read", "documents:write"]
+    }
+  ]
+}

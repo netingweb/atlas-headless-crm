@@ -1,0 +1,38 @@
+[
+  {
+    "unit_id": "milano_sales",
+    "name": "Milano Sales Unit",
+    "tenant_id": "demo2",
+    "settings": {}
+  },
+  {
+    "unit_id": "milano_service",
+    "name": "Milano Service Unit",
+    "tenant_id": "demo2",
+    "settings": {}
+  },
+  {
+    "unit_id": "roma_sales",
+    "name": "Roma Sales Unit",
+    "tenant_id": "demo2",
+    "settings": {}
+  },
+  {
+    "unit_id": "roma_service",
+    "name": "Roma Service Unit",
+    "tenant_id": "demo2",
+    "settings": {}
+  },
+  {
+    "unit_id": "torino_sales",
+    "name": "Torino Sales Unit",
+    "tenant_id": "demo2",
+    "settings": {}
+  },
+  {
+    "unit_id": "torino_service",
+    "name": "Torino Service Unit",
+    "tenant_id": "demo2",
+    "settings": {}
+  }
+]

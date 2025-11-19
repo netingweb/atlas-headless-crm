@@ -9,6 +9,7 @@ interface AuthState {
   unitId: string | null;
   setToken: (token: string) => void;
   setUser: (user: User) => void;
+  setUnitId: (unitId: string) => void;
   logout: () => void;
   loadUser: () => Promise<void>;
 }
@@ -32,6 +33,10 @@ export const useAuthStore = create<AuthState>()(
           tenantId: user.tenant_id,
           unitId: user.unit_id,
         });
+      },
+
+      setUnitId: (unitId: string) => {
+        set({ unitId });
       },
 
       logout: () => {

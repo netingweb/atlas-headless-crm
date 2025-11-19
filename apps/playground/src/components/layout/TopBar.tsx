@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store';
 import { configApi } from '@/lib/api/config';
 import { searchApi } from '@/lib/api/search';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,8 +20,9 @@ import { ToastAction } from '@/components/ui/toast';
 
 export default function TopBar() {
   const navigate = useNavigate();
-  const { user, tenantId, unitId, logout } = useAuthStore();
+  const { user, tenantId, unitId, logout, setUnitId } = useAuthStore();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showResults, setShowResults] = useState(false);
@@ -131,6 +132,20 @@ export default function TopBar() {
     });
   };
 
+  const handleUnitChange = (newUnitId: string) => {
+    if (newUnitId !== unitId) {
+      setUnitId(newUnitId);
+      // Invalidate all queries to refresh data with new unit
+      queryClient.invalidateQueries();
+      toast({
+        title: 'Unit changed',
+        description: `Switched to ${units?.find((u) => u.unit_id === newUnitId)?.name || newUnitId}`,
+      });
+      // Navigate to dashboard to refresh data with new unit
+      navigate('/');
+    }
+  };
+
   return (
     <header className="border-b bg-white">
       <div className="flex h-16 items-center justify-between px-6">
@@ -214,9 +229,16 @@ export default function TopBar() {
                 <>
                   <DropdownMenuLabel>Units</DropdownMenuLabel>
                   {units.map((unit) => (
-                    <DropdownMenuItem key={unit.unit_id} disabled={unit.unit_id === unitId}>
+                    <DropdownMenuItem
+                      key={unit.unit_id}
+                      disabled={unit.unit_id === unitId}
+                      onClick={() => handleUnitChange(unit.unit_id)}
+                    >
                       <Building2 className="h-4 w-4 mr-2" />
                       {unit.name}
+                      {unit.unit_id === unitId && (
+                        <span className="ml-auto text-xs text-gray-500">(current)</span>
+                      )}
                     </DropdownMenuItem>
                   ))}
                   <DropdownMenuSeparator />

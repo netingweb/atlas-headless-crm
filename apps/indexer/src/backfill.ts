@@ -98,12 +98,17 @@ async function backfillEntity(
       const docId = String(doc._id);
 
       // Index in Typesense
-      await upsertDocument(ctx, entity, {
-        id: docId,
-        ...doc,
-        tenant_id: tenantId,
-        unit_id: unitId,
-      });
+      await upsertDocument(
+        ctx,
+        entity,
+        {
+          id: docId,
+          ...doc,
+          tenant_id: tenantId,
+          unit_id: unitId,
+        },
+        entityDef
+      );
 
       // Index in Qdrant if has embeddable fields and embeddings provider is configured
       if (embeddableFields.length > 0) {

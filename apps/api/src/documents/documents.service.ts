@@ -233,7 +233,8 @@ export class DocumentsService {
 
       // Delete from Typesense
       try {
-        await deleteDocument(ctx, 'document', id);
+        const entityDef = await this.configLoader.getEntity(ctx, 'document');
+        await deleteDocument(ctx, 'document', id, entityDef);
       } catch (error) {
         logger.warn(`Failed to delete document ${id} from Typesense:`, {
           error: error instanceof Error ? error.message : String(error),

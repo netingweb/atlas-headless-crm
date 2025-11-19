@@ -1,0 +1,83 @@
+{
+  "tenant_id": "demo2",
+  "policies": [
+    {
+      "entity": "deal",
+      "rules": [
+        {
+          "source_unit": "milano_sales",
+          "visible_to": ["roma_sales", "torino_sales"],
+          "conditions": {
+            "status": "chiusa_venduta"
+          }
+        },
+        {
+          "source_unit": "roma_sales",
+          "visible_to": ["milano_sales", "torino_sales"],
+          "conditions": {
+            "status": "chiusa_venduta"
+          }
+        },
+        {
+          "source_unit": "torino_sales",
+          "visible_to": ["milano_sales", "roma_sales"],
+          "conditions": {
+            "status": "chiusa_venduta"
+          }
+        }
+      ]
+    },
+    {
+      "entity": "document",
+      "rules": [
+        {
+          "source_unit": "milano_sales",
+          "visible_to": ["milano_service"],
+          "conditions": {
+            "document_type": "fattura"
+          }
+        },
+        {
+          "source_unit": "roma_sales",
+          "visible_to": ["roma_service"],
+          "conditions": {
+            "document_type": "fattura"
+          }
+        },
+        {
+          "source_unit": "torino_sales",
+          "visible_to": ["torino_service"],
+          "conditions": {
+            "document_type": "fattura"
+          }
+        }
+      ]
+    },
+    {
+      "entity": "service_order",
+      "rules": [
+        {
+          "source_unit": "milano_service",
+          "visible_to": ["milano_sales"],
+          "conditions": {
+            "status": "fatturato"
+          }
+        },
+        {
+          "source_unit": "roma_service",
+          "visible_to": ["roma_sales"],
+          "conditions": {
+            "status": "fatturato"
+          }
+        },
+        {
+          "source_unit": "torino_service",
+          "visible_to": ["torino_sales"],
+          "conditions": {
+            "status": "fatturato"
+          }
+        }
+      ]
+    }
+  ]
+}

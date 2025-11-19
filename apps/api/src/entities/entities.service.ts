@@ -67,7 +67,7 @@ export class EntitiesService {
     // Validate referenced entities exist
     await this.relationsService.validateReferences(ctx, entityDef, data);
 
-    const created = await this.repository.create(ctx, entity, data);
+    const created = await this.repository.create(ctx, entity, data, entityDef);
     const createdId = (created as { _id: string })._id;
 
     // Index in Typesense and Qdrant
@@ -88,7 +88,7 @@ export class EntitiesService {
     populate = false
   ): Promise<unknown> {
     const entityDef = await this.ensureEntityExists(ctx, entity);
-    const doc = await this.repository.findById(ctx, entity, id);
+    const doc = await this.repository.findById(ctx, entity, id, entityDef);
     if (!doc) {
       throw new NotFoundError(`Resource not found: ${entity}/${id}`);
     }
@@ -154,7 +154,7 @@ export class EntitiesService {
     await this.relationsService.validateReferences(ctx, entityDef, data);
     this.logger.debug('References validated');
 
-    const updated = await this.repository.update(ctx, entity, id, data);
+    const updated = await this.repository.update(ctx, entity, id, data, entityDef);
     const updatedRecord = updated as Record<string, unknown> | null;
     this.logger.debug('Repository update result', {
       success: !!updated,
@@ -182,7 +182,7 @@ export class EntitiesService {
 
   async delete(ctx: TenantContext, entity: string, id: string): Promise<void> {
     const entityDef = await this.ensureEntityExists(ctx, entity);
-    const deleted = await this.repository.delete(ctx, entity, id);
+    const deleted = await this.repository.delete(ctx, entity, id, entityDef);
     if (!deleted) {
       throw new NotFoundError(`Resource not found: ${entity}/${id}`);
     }
@@ -197,8 +197,8 @@ export class EntitiesService {
   }
 
   async findAll(ctx: TenantContext, entity: string): Promise<unknown[]> {
-    await this.ensureEntityExists(ctx, entity);
-    return this.repository.find(ctx, entity);
+    const entityDef = await this.ensureEntityExists(ctx, entity);
+    return this.repository.find(ctx, entity, {}, entityDef);
   }
 
   private async ensureEntityExists(ctx: TenantContext, entity: string): Promise<EntityDefinition> {
@@ -306,12 +306,15 @@ export class EntitiesService {
         ...doc,
         // Ensure tenant/unit are always present for Typesense faceting/filters
         tenant_id: ctx.tenant_id,
-        unit_id: ctx.unit_id,
       };
+      // Only add unit_id for local entities
+      if (entityDef.scope !== 'tenant') {
+        typesenseDoc.unit_id = ctx.unit_id;
+      }
       // Remove _id to avoid duplication (we use id instead)
       delete typesenseDoc._id;
 
-      await upsertDocument(ctx, entity, typesenseDoc);
+      await upsertDocument(ctx, entity, typesenseDoc, entityDef);
 
       if (process.env.NODE_ENV === 'development') {
         this.logger.debug(`Indexed ${entity}/${String(doc._id)} in Typesense`);
@@ -329,14 +332,18 @@ export class EntitiesService {
           const [vector] = await provider.embedTexts([textToEmbed]);
           await ensureQdrantCollection(ctx.tenant_id, entity, vector.length);
 
+          const qdrantPayload: Record<string, unknown> = {
+            tenant_id: ctx.tenant_id,
+            ...doc,
+          };
+          // Only add unit_id for local entities
+          if (entityDef.scope !== 'tenant') {
+            qdrantPayload.unit_id = ctx.unit_id;
+          }
           await upsertQdrantPoint(ctx.tenant_id, entity, {
             id: String(doc._id),
             vector,
-            payload: {
-              tenant_id: ctx.tenant_id,
-              unit_id: ctx.unit_id,
-              ...doc,
-            },
+            payload: qdrantPayload,
           });
         }
       }
@@ -367,7 +374,7 @@ export class EntitiesService {
   ): Promise<void> {
     try {
       // Remove from Typesense
-      await deleteDocument(ctx, entity, id);
+      await deleteDocument(ctx, entity, id, entityDef);
 
       // Remove from Qdrant
       const embeddableFields = getEmbeddableFields(entityDef);

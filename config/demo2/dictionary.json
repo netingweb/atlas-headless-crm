@@ -1,0 +1,109 @@
+{
+  "tenant_id": "demo2",
+  "dictionaries": {
+    "contact_type": [
+      { "value": "privato", "label": "Privato" },
+      { "value": "aziendale", "label": "Aziendale" }
+    ],
+    "contact_source": [
+      { "value": "sito_web", "label": "Sito Web" },
+      { "value": "passaggio", "label": "Passaggio" },
+      { "value": "social_media", "label": "Social Media" },
+      { "value": "fiera", "label": "Fiera" },
+      { "value": "referral", "label": "Referral" },
+      { "value": "walk_in", "label": "Walk-in" },
+      { "value": "telefono", "label": "Telefono" },
+      { "value": "other", "label": "Altro" }
+    ],
+    "contact_pipeline_stage": [
+      { "value": "lead", "label": "Lead" },
+      { "value": "qualificato", "label": "Qualificato" },
+      { "value": "preventivo", "label": "Preventivo" },
+      { "value": "negoziazione", "label": "Negoziazione" },
+      { "value": "chiuso_venduto", "label": "Chiuso Venduto" },
+      { "value": "perso", "label": "Perso" }
+    ],
+    "product_brand": [
+      { "value": "fiat", "label": "Fiat" },
+      { "value": "bmw", "label": "BMW" },
+      { "value": "mercedes", "label": "Mercedes-Benz" },
+      { "value": "audi", "label": "Audi" },
+      { "value": "volkswagen", "label": "Volkswagen" },
+      { "value": "ford", "label": "Ford" },
+      { "value": "peugeot", "label": "Peugeot" },
+      { "value": "renault", "label": "Renault" },
+      { "value": "toyota", "label": "Toyota" },
+      { "value": "opel", "label": "Opel" },
+      { "value": "citroen", "label": "Citroën" },
+      { "value": "nissan", "label": "Nissan" },
+      { "value": "hyundai", "label": "Hyundai" },
+      { "value": "kia", "label": "Kia" },
+      { "value": "mazda", "label": "Mazda" },
+      { "value": "suzuki", "label": "Suzuki" },
+      { "value": "seat", "label": "SEAT" },
+      { "value": "skoda", "label": "Škoda" },
+      { "value": "volvo", "label": "Volvo" },
+      { "value": "other", "label": "Altro" }
+    ],
+    "product_type": [
+      { "value": "nuova", "label": "Nuova" },
+      { "value": "usata", "label": "Usata" },
+      { "value": "km0", "label": "Km 0" }
+    ],
+    "product_fuel_type": [
+      { "value": "diesel", "label": "Diesel" },
+      { "value": "benzina", "label": "Benzina" },
+      { "value": "elettrica", "label": "Elettrica" },
+      { "value": "ibrida", "label": "Ibrida" }
+    ],
+    "task_type_sales": [
+      { "value": "follow_up", "label": "Follow-up" },
+      { "value": "qualifica", "label": "Qualifica" },
+      { "value": "preventivo", "label": "Preventivo" },
+      { "value": "test_drive", "label": "Test Drive" },
+      { "value": "chiusura", "label": "Chiusura" }
+    ],
+    "task_type_service": [
+      { "value": "tagliando", "label": "Tagliando" },
+      { "value": "riparazione", "label": "Riparazione" },
+      { "value": "controllo", "label": "Controllo" },
+      { "value": "ricambio", "label": "Ricambio" }
+    ],
+    "task_type_accounting": [
+      { "value": "fatturazione", "label": "Fatturazione" },
+      { "value": "pagamento", "label": "Pagamento" },
+      { "value": "riconciliazione", "label": "Riconciliazione" }
+    ],
+    "document_type": [
+      { "value": "contratto_vendita", "label": "Contratto di Vendita" },
+      { "value": "offerta", "label": "Offerta" },
+      { "value": "preventivo", "label": "Preventivo" },
+      { "value": "ordine", "label": "Ordine" },
+      { "value": "fattura", "label": "Fattura" },
+      { "value": "scontrino", "label": "Scontrino" }
+    ],
+    "deal_status": [
+      { "value": "in_negoziazione", "label": "In Negoziazione" },
+      { "value": "offerta_inviata", "label": "Offerta Inviata" },
+      { "value": "offerta_accettata", "label": "Offerta Accettata" },
+      { "value": "offerta_rifiutata", "label": "Offerta Rifiutata" },
+      { "value": "chiusa_venduta", "label": "Chiusa Venduta" },
+      { "value": "chiusa_persa", "label": "Chiusa Persa" },
+      { "value": "annullata", "label": "Annullata" }
+    ],
+    "deal_stage": [
+      { "value": "primo_contatto", "label": "Primo Contatto" },
+      { "value": "qualifica", "label": "Qualifica" },
+      { "value": "proposta", "label": "Proposta" },
+      { "value": "negoziazione", "label": "Negoziazione" },
+      { "value": "chiusura", "label": "Chiusura" },
+      { "value": "post_vendita", "label": "Post Vendita" }
+    ],
+    "service_order_status": [
+      { "value": "programmato", "label": "Programmato" },
+      { "value": "in_lavorazione", "label": "In Lavorazione" },
+      { "value": "completato", "label": "Completato" },
+      { "value": "fatturato", "label": "Fatturato" }
+    ]
+  }
+}

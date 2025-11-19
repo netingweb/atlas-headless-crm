@@ -43,9 +43,14 @@ export class RelationsService {
     }
 
     // Query related entities
-    const relatedDocs = await this.repository.find(ctx, relatedEntity, {
-      [referenceField]: id,
-    });
+    const relatedDocs = await this.repository.find(
+      ctx,
+      relatedEntity,
+      {
+        [referenceField]: id,
+      },
+      relatedEntityDef
+    );
 
     return relatedDocs;
   }

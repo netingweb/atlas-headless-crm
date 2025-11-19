@@ -21,15 +21,16 @@ export class SearchService {
     ctx: TenantContext,
     query: TextSearchQuery
   ): Promise<{ hits: unknown[]; found: number; page: number }> {
+    let entityDef: EntityDefinition | undefined;
     if (query.entity) {
-      const entityDef = await this.configLoader.getEntity(ctx, query.entity);
+      entityDef = await this.configLoader.getEntity(ctx, query.entity);
       if (entityDef) {
         await ensureCollection(ctx, query.entity, entityDef);
       }
     }
 
-    const searchOptions = buildTypesenseQuery(ctx, query);
-    return search(ctx, query.entity || '*', searchOptions);
+    const searchOptions = buildTypesenseQuery(ctx, query, entityDef);
+    return search(ctx, query.entity || '*', searchOptions, entityDef);
   }
 
   async semanticSearch(
@@ -56,14 +57,20 @@ export class SearchService {
 
     await ensureQdrantCollection(ctx.tenant_id, entity, queryVector.length);
 
+    const isGlobal = entityDef.scope === 'tenant';
+    const filterMust: Array<{ key: string; match: { value: string } }> = [
+      { key: 'tenant_id', match: { value: ctx.tenant_id } },
+    ];
+    // Only filter by unit_id for local entities
+    if (!isGlobal) {
+      filterMust.push({ key: 'unit_id', match: { value: ctx.unit_id } });
+    }
+
     const results = await searchQdrant(ctx.tenant_id, entity, {
       vector: queryVector,
       limit,
       filter: {
-        must: [
-          { key: 'tenant_id', match: { value: ctx.tenant_id } },
-          { key: 'unit_id', match: { value: ctx.unit_id } },
-        ],
+        must: filterMust,
       },
     });
 

@@ -43,6 +43,7 @@ export type DocumentConfig = z.infer<typeof DocumentConfigSchema>;
 
 export const EntityDefinitionSchema = z.object({
   name: z.string(),
+  scope: z.enum(['tenant', 'unit']).default('unit').optional(), // 'tenant' = global, 'unit' = local
   fields: z.array(FieldDefinitionSchema),
   indexes: z.array(z.record(z.unknown())).optional(),
   document_config: DocumentConfigSchema.optional(),

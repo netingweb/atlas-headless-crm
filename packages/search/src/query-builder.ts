@@ -1,5 +1,6 @@
 import type { TenantContext } from '@crm-atlas/core';
 import type { SearchOptions } from './typesense-client';
+import type { EntityDefinition } from '@crm-atlas/types';
 
 export interface TextSearchQuery {
   q: string;
@@ -10,8 +11,18 @@ export interface TextSearchQuery {
   page?: number;
 }
 
-export function buildTypesenseQuery(ctx: TenantContext, query: TextSearchQuery): SearchOptions {
-  const filterParts: string[] = [`tenant_id:=${ctx.tenant_id}`, `unit_id:=${ctx.unit_id}`];
+export function buildTypesenseQuery(
+  ctx: TenantContext,
+  query: TextSearchQuery,
+  entityDef?: EntityDefinition
+): SearchOptions {
+  const isGlobal = entityDef?.scope === 'tenant';
+  const filterParts: string[] = [`tenant_id:=${ctx.tenant_id}`];
+
+  // Only filter by unit_id for local entities
+  if (!isGlobal) {
+    filterParts.push(`unit_id:=${ctx.unit_id}`);
+  }
 
   if (query.filters) {
     for (const [key, value] of Object.entries(query.filters)) {

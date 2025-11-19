@@ -473,12 +473,17 @@ export class DocumentProcessingWorker {
       }
 
       const updatedDoc = await this.repository.findById(ctx, 'document', documentId);
-      await upsertDocument(ctx, 'document', {
-        id: documentId,
-        ...(updatedDoc as unknown as Record<string, unknown>),
-        tenant_id: tenantId,
-        unit_id: unitId,
-      });
+      await upsertDocument(
+        ctx,
+        'document',
+        {
+          id: documentId,
+          ...(updatedDoc as unknown as Record<string, unknown>),
+          tenant_id: tenantId,
+          unit_id: unitId,
+        },
+        documentEntityDef
+      );
 
       logger.info(`Document processed successfully: ${documentId}`);
     } catch (error) {

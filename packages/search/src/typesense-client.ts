@@ -84,7 +84,8 @@ export async function ensureCollection(
   entityDef: EntityDefinition
 ): Promise<void> {
   const client = getTypesenseClient();
-  const collName = collectionName(ctx.tenant_id, ctx.unit_id, entity);
+  const isGlobal = entityDef.scope === 'tenant';
+  const collName = collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal);
 
   try {
     await client.collections(collName).retrieve();
@@ -97,10 +98,12 @@ export async function ensureCollection(
 export async function upsertDocument(
   ctx: TenantContext,
   entity: string,
-  doc: TypesenseDocument
+  doc: TypesenseDocument,
+  entityDef?: EntityDefinition
 ): Promise<void> {
   const client = getTypesenseClient();
-  const collName = collectionName(ctx.tenant_id, ctx.unit_id, entity);
+  const isGlobal = entityDef?.scope === 'tenant';
+  const collName = collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal);
   // Be tolerant to missing/invalid fields: coerce or drop values that don't match schema
   await client.collections(collName).documents().upsert(doc, {
     dirty_values: 'coerce_or_drop',
@@ -110,20 +113,24 @@ export async function upsertDocument(
 export async function deleteDocument(
   ctx: TenantContext,
   entity: string,
-  id: string
+  id: string,
+  entityDef?: EntityDefinition
 ): Promise<void> {
   const client = getTypesenseClient();
-  const collName = collectionName(ctx.tenant_id, ctx.unit_id, entity);
+  const isGlobal = entityDef?.scope === 'tenant';
+  const collName = collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal);
   await client.collections(collName).documents(id).delete();
 }
 
 export async function search(
   ctx: TenantContext,
   entity: string,
-  options: SearchOptions
+  options: SearchOptions,
+  entityDef?: EntityDefinition
 ): Promise<{ hits: TypesenseDocument[]; found: number; page: number }> {
   const client = getTypesenseClient();
-  const collName = collectionName(ctx.tenant_id, ctx.unit_id, entity);
+  const isGlobal = entityDef?.scope === 'tenant';
+  const collName = collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal);
 
   const searchParams = {
     q: options.q,
@@ -229,6 +236,7 @@ export interface TypesenseHealth {
 export interface TypesenseMetrics {
   collections: number;
   documents: number;
+  collectionStats?: CollectionStats[];
   memoryUsage?: {
     used: number;
     total: number;
@@ -265,20 +273,32 @@ export async function checkTypesenseHealth(): Promise<TypesenseHealth> {
 }
 
 /**
- * Get Typesense server metrics
+ * Get Typesense server metrics filtered by tenant (and optionally unit)
  */
-export async function getTypesenseMetrics(_ctx: TenantContext): Promise<TypesenseMetrics> {
+export async function getTypesenseMetrics(ctx: TenantContext): Promise<TypesenseMetrics> {
   const client = getTypesenseClient();
 
   try {
     // Get all collections
-    const collections = await client.collections().retrieve();
+    const allCollections = await client.collections().retrieve();
 
-    // Count documents in all collections for this tenant/unit
+    // Filter collections by tenant
+    // Collections can be:
+    // - Global: {tenant_id}_{entity} (for scope: tenant)
+    // - Local: {tenant_id}_{unit_id}_{entity} (for scope: unit)
+    const tenantPrefix = `${ctx.tenant_id}_`;
+
+    const filteredCollections = allCollections.filter((collection) => {
+      // Include collections that start with tenant prefix
+      // This includes both global collections (tenant-wide) and local collections (unit-specific)
+      return collection.name.startsWith(tenantPrefix);
+    });
+
+    // Count documents in filtered collections
     let totalDocuments = 0;
     const collectionStats: CollectionStats[] = [];
 
-    for (const collection of collections) {
+    for (const collection of filteredCollections) {
       try {
         const stats = await client.collections(collection.name).retrieve();
         const statsResponse = stats as {
@@ -302,8 +322,9 @@ export async function getTypesenseMetrics(_ctx: TenantContext): Promise<Typesens
     }
 
     return {
-      collections: collections.length,
+      collections: filteredCollections.length,
       documents: totalDocuments,
+      collectionStats,
     };
   } catch (error) {
     throw new Error(
@@ -313,17 +334,23 @@ export async function getTypesenseMetrics(_ctx: TenantContext): Promise<Typesens
 }
 
 /**
- * Get collection statistics for a specific tenant/unit
+ * Get collection statistics for a specific tenant
+ * Includes both global collections (tenant-wide) and local collections (unit-specific)
  */
 export async function getCollectionStats(ctx: TenantContext): Promise<CollectionStats[]> {
   const client = getTypesenseClient();
   const collections = await client.collections().retrieve();
   const stats: CollectionStats[] = [];
 
-  const prefix = collectionName(ctx.tenant_id, ctx.unit_id, '');
+  // Filter collections by tenant
+  // Collections can be:
+  // - Global: {tenant_id}_{entity} (for scope: tenant)
+  // - Local: {tenant_id}_{unit_id}_{entity} (for scope: unit)
+  const tenantPrefix = `${ctx.tenant_id}_`;
 
   for (const collection of collections) {
-    if (collection.name.startsWith(prefix)) {
+    // Include all collections that belong to this tenant
+    if (collection.name.startsWith(tenantPrefix)) {
       try {
         const collectionInfo = await client.collections(collection.name).retrieve();
         const infoResponse = collectionInfo as {

@@ -1,0 +1,124 @@
+{
+  "name": "crm-atlas-automotive",
+  "version": "0.1.0",
+  "description": "Atlas CRM Headless MCP tools for automotive operations",
+  "tools": [
+    {
+      "name": "create_customer",
+      "description": "Create a new customer (contact) with automotive data",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "phone": { "type": "string" },
+          "gender": { "type": "string" },
+          "address": { "type": "string" },
+          "city": { "type": "string" },
+          "postal_code": { "type": "string" },
+          "customer_type": { "type": "string", "enum": ["privato", "aziendale"] },
+          "sales_source": { "type": "string" },
+          "pipeline_stage": { "type": "string" }
+        },
+        "required": ["name", "email"]
+      }
+    },
+    {
+      "name": "search_vehicles",
+      "description": "Search for vehicles (product) by brand, model, price, fuel type",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "brand": { "type": "string" },
+          "model": { "type": "string" },
+          "min_price": { "type": "number" },
+          "max_price": { "type": "number" },
+          "fuel_type": { "type": "string" },
+          "vehicle_type": { "type": "string", "enum": ["nuova", "usata", "km0"] },
+          "type": { "type": "string", "enum": ["text", "semantic", "hybrid"] }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "create_deal",
+      "description": "Create a new sales deal linking contact and product with initial data",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "contact_id": { "type": "string" },
+          "product_id": { "type": "string" },
+          "sale_price": { "type": "number" },
+          "sales_rep": { "type": "string" },
+          "unit_id": { "type": "string" },
+          "status": { "type": "string" },
+          "stage": { "type": "string" },
+          "probability": { "type": "number" }
+        },
+        "required": ["title", "contact_id", "product_id"]
+      }
+    },
+    {
+      "name": "update_deal_status",
+      "description": "Update the status of a deal with transition validation",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deal_id": { "type": "string" },
+          "status": { "type": "string" },
+          "stage": { "type": "string" },
+          "close_date": { "type": "string" }
+        },
+        "required": ["deal_id", "status"]
+      }
+    },
+    {
+      "name": "get_deal_documents",
+      "description": "Get all documents associated with a deal via related_entity_id",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deal_id": { "type": "string" },
+          "document_type": { "type": "string" }
+        },
+        "required": ["deal_id"]
+      }
+    },
+    {
+      "name": "get_sales_pipeline",
+      "description": "Get sales pipeline (deals) for a unit with filters for status, stage, probability",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "unit_id": { "type": "string" },
+          "status": { "type": "string" },
+          "stage": { "type": "string" },
+          "min_probability": { "type": "number" },
+          "max_probability": { "type": "number" }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "create_service_appointment",
+      "description": "Create a service appointment (service_order)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_number": { "type": "string" },
+          "service_type": { "type": "string" },
+          "vehicle_id": { "type": "string" },
+          "customer_id": { "type": "string" },
+          "appointment_date": { "type": "string" },
+          "technician": { "type": "string" },
+          "description": { "type": "string" },
+          "estimated_cost": { "type": "number" }
+        },
+        "required": ["order_number", "customer_id"]
+      }
+    }
+  ]
+}

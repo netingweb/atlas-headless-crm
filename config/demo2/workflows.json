@@ -1,0 +1,259 @@
+{
+  "tenant_id": "demo2",
+  "workflows": [
+    {
+      "tenant_id": "demo2",
+      "unit_id": "milano_sales",
+      "name": "Qualifica nuovo lead",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "event",
+        "event": "entity.created",
+        "entity": "contact",
+        "conditions": [
+          {
+            "field": "pipeline_stage",
+            "operator": "==",
+            "value": "lead"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "create",
+          "entity": "task",
+          "data": {
+            "title": "Qualifica lead: {{data.name}}",
+            "description": "Task di qualifica per il nuovo lead",
+            "type": "qualifica",
+            "contact_id": "{{entity_id}}",
+            "due_date": "{{today+1d}}",
+            "status": "not_started"
+          }
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Quando un contact viene creato con pipeline_stage 'lead', crea un task di qualifica",
+        "version": 1
+      }
+    },
+    {
+      "tenant_id": "demo2",
+      "unit_id": "milano_sales",
+      "name": "Creazione deal",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "event",
+        "event": "entity.created",
+        "entity": "deal"
+      },
+      "actions": [
+        {
+          "type": "create",
+          "entity": "task",
+          "data": {
+            "title": "Follow-up deal: {{data.title}}",
+            "description": "Task di follow-up per la nuova trattativa",
+            "type": "follow_up",
+            "due_date": "{{today+1d}}",
+            "status": "not_started"
+          }
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Quando un deal viene creato, crea un task di follow-up per il venditore",
+        "version": 1
+      }
+    },
+    {
+      "tenant_id": "demo2",
+      "unit_id": "milano_sales",
+      "name": "Deal in negoziazione",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "event",
+        "event": "entity.updated",
+        "entity": "deal",
+        "conditions": [
+          {
+            "field": "status",
+            "operator": "==",
+            "value": "in_negoziazione"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "create",
+          "entity": "task",
+          "data": {
+            "title": "Preparare offerta formale per deal: {{data.title}}",
+            "description": "Preparare offerta formale per la trattativa in negoziazione",
+            "type": "preventivo",
+            "due_date": "{{today+2d}}",
+            "status": "not_started"
+          }
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Quando un deal passa a 'in_negoziazione', crea task per preparare offerta formale",
+        "version": 1
+      }
+    },
+    {
+      "tenant_id": "demo2",
+      "unit_id": "milano_sales",
+      "name": "Deal chiusa venduta",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "event",
+        "event": "entity.updated",
+        "entity": "deal",
+        "conditions": [
+          {
+            "field": "status",
+            "operator": "==",
+            "value": "chiusa_venduta"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "create",
+          "entity": "task",
+          "data": {
+            "title": "Gestione pagamento per deal: {{data.title}}",
+            "description": "Task accounting per gestione pagamento della vendita",
+            "type": "fatturazione",
+            "due_date": "{{today+3d}}",
+            "status": "not_started"
+          }
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Quando un deal passa a 'chiusa_venduta', crea task accounting per gestione pagamento",
+        "version": 1
+      }
+    },
+    {
+      "tenant_id": "demo2",
+      "unit_id": "milano_sales",
+      "name": "Deal offerta rifiutata",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "event",
+        "event": "entity.updated",
+        "entity": "deal",
+        "conditions": [
+          {
+            "field": "status",
+            "operator": "==",
+            "value": "offerta_rifiutata"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "create",
+          "entity": "task",
+          "data": {
+            "title": "Follow-up offerta rifiutata: {{data.title}}",
+            "description": "Task di follow-up per capire le motivazioni del rifiuto",
+            "type": "follow_up",
+            "due_date": "{{today+1d}}",
+            "status": "not_started"
+          }
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Quando un deal passa a 'offerta_rifiutata', crea task di follow-up per capire motivazioni",
+        "version": 1
+      }
+    },
+    {
+      "tenant_id": "demo2",
+      "unit_id": "milano_service",
+      "name": "Creazione ordine servizio",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "event",
+        "event": "entity.created",
+        "entity": "service_order"
+      },
+      "actions": [
+        {
+          "type": "create",
+          "entity": "task",
+          "data": {
+            "title": "Ordine servizio: {{data.order_number}}",
+            "description": "Task per tecnico assegnato all'ordine servizio",
+            "type": "riparazione",
+            "due_date": "{{data.appointment_date}}",
+            "status": "not_started"
+          }
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Quando un service_order viene creato, crea task per tecnico assegnato",
+        "version": 1
+      }
+    },
+    {
+      "tenant_id": "demo2",
+      "unit_id": "milano_service",
+      "name": "Reminder tagliando",
+      "type": "schedule",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "schedule",
+        "cron": "0 9 1 * *",
+        "entity": "product",
+        "conditions": []
+      },
+      "actions": [
+        {
+          "type": "create",
+          "entity": "task",
+          "data": {
+            "title": "Reminder tagliando veicolo",
+            "description": "Verificare tagliandi in scadenza per i veicoli",
+            "type": "tagliando",
+            "due_date": "{{today+30d}}",
+            "status": "not_started"
+          }
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Schedule mensile per reminder tagliandi veicoli",
+        "version": 1
+      }
+    }
+  ]
+}

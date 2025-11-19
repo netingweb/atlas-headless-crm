@@ -1,0 +1,762 @@
+{
+  "_comment": "⚠️ IMPORTANT: After modifying this file, you MUST run 'pnpm config:sync demo2' to sync changes to MongoDB. Changes are NOT applied automatically!",
+  "tenant_id": "demo2",
+  "entities": [
+    {
+      "name": "contact",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "phone",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "gender",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "city",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "postal_code",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "customer_type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["privato", "aziendale"]
+          }
+        },
+        {
+          "name": "sales_source",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "pipeline_stage",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "company_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        }
+      ]
+    },
+    {
+      "name": "company",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "phone",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "phone2",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "website",
+          "type": "url",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "size",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "industry",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": false
+        }
+      ]
+    },
+    {
+      "name": "note",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "required": true,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "default": "to do",
+          "validation": {
+            "enum": ["to do", "pending", "on going", "done", "canceled", "archived"]
+          }
+        },
+        {
+          "name": "expiration_date_time",
+          "type": "datetime",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "company_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        },
+        {
+          "name": "contact_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        }
+      ]
+    },
+    {
+      "name": "task",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "due_date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "company_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        },
+        {
+          "name": "contact_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        }
+      ]
+    },
+    {
+      "name": "opportunity",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "value",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "stage",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "company_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        },
+        {
+          "name": "contact_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        }
+      ]
+    },
+    {
+      "name": "product",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "brand",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "model",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "year",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "vehicle_type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["nuova", "usata", "km0"]
+          }
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "km",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "color",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "fuel_type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["diesel", "benzina", "elettrica", "ibrida"]
+          }
+        },
+        {
+          "name": "vin",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "license_plate",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        }
+      ]
+    },
+    {
+      "name": "deal",
+      "fields": [
+        {
+          "name": "deal_number",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "contact_id",
+          "type": "reference",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        },
+        {
+          "name": "product_id",
+          "type": "reference",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "product"
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "stage",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "sale_price",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "close_date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "expected_close_date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "sales_rep",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "probability",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        }
+      ]
+    },
+    {
+      "name": "service_order",
+      "fields": [
+        {
+          "name": "order_number",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "service_type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "vehicle_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "product"
+        },
+        {
+          "name": "customer_id",
+          "type": "reference",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        },
+        {
+          "name": "appointment_date",
+          "type": "datetime",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "technician",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "estimated_cost",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "final_cost",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        }
+      ]
+    },
+    {
+      "name": "document",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "mime_type",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "file_size",
+          "type": "number",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "storage_path",
+          "type": "string",
+          "required": true,
+          "indexed": false,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "document_type",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "related_entity_type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "related_entity_id",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "*"
+        },
+        {
+          "name": "processing_status",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["pending", "processing", "completed", "failed"]
+          }
+        },
+        {
+          "name": "extracted_content",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "metadata",
+          "type": "json",
+          "required": false,
+          "indexed": false,
+          "searchable": false,
+          "embeddable": false
+        }
+      ]
+    }
+  ]
+}
