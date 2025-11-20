@@ -15,6 +15,7 @@ interface AIState {
   config: AIConfig | null;
   disabledTools: Set<string>; // Set of disabled tool names (empty = all enabled)
   maxContextTokens: number; // Max tokens before summarization
+  showChainOfThought: boolean; // Show/hide chain of thought visualization
   setConfig: (config: AIConfig) => void;
   clearConfig: () => void;
   toggleTool: (toolName: string) => void;
@@ -22,6 +23,7 @@ interface AIState {
   enableAllTools: () => void;
   disableAllTools: (allToolNames: string[]) => void;
   setMaxContextTokens: (tokens: number) => void;
+  setShowChainOfThought: (show: boolean) => void;
 }
 
 export const useAIStore = create<AIState>()(
@@ -30,6 +32,7 @@ export const useAIStore = create<AIState>()(
       config: null,
       disabledTools: new Set<string>(), // Empty set = all tools enabled
       maxContextTokens: 8000, // Default: 8000 tokens
+      showChainOfThought: true, // Default: show chain of thought
       setConfig: (config: AIConfig) => {
         console.log('[AIStore] Saving config:', {
           provider: config.provider,
@@ -72,6 +75,9 @@ export const useAIStore = create<AIState>()(
       setMaxContextTokens: (tokens: number) => {
         set({ maxContextTokens: tokens });
       },
+      setShowChainOfThought: (show: boolean) => {
+        set({ showChainOfThought: show });
+      },
     }),
     {
       name: 'ai-config-storage',
@@ -79,6 +85,7 @@ export const useAIStore = create<AIState>()(
         config: state.config,
         disabledTools: Array.from(state.disabledTools), // Convert Set to Array for persistence
         maxContextTokens: state.maxContextTokens,
+        showChainOfThought: state.showChainOfThought,
       }),
       onRehydrateStorage: () => (state) => {
         // Convert Array back to Set after rehydration

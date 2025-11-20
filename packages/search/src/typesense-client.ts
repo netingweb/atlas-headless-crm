@@ -129,19 +129,95 @@ export async function search(
   entityDef?: EntityDefinition
 ): Promise<{ hits: TypesenseDocument[]; found: number; page: number }> {
   const client = getTypesenseClient();
+  // Determine if entity is global: if entityDef is provided, use its scope
   const isGlobal = entityDef?.scope === 'tenant';
-  const collName = collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal);
+  let collName: string;
+
+  // If entityDef is provided, use it to determine collection name
+  if (entityDef) {
+    collName = collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal);
+    // Verify collection exists
+    try {
+      await client.collections(collName).retrieve();
+    } catch (error) {
+      // If collection doesn't exist, try fallback
+      const fallbackGlobal = collectionName(ctx.tenant_id, null, entity, true);
+      const fallbackLocal = collectionName(ctx.tenant_id, ctx.unit_id, entity, false);
+      try {
+        await client.collections(fallbackGlobal).retrieve();
+        collName = fallbackGlobal;
+      } catch {
+        try {
+          await client.collections(fallbackLocal).retrieve();
+          collName = fallbackLocal;
+        } catch {
+          throw new Error(
+            `Typesense collection not found. Tried: ${collName}, ${fallbackGlobal}, ${fallbackLocal}. ` +
+              `Please ensure the collection exists and data is indexed.`
+          );
+        }
+      }
+    }
+  } else {
+    // If entityDef is not provided, try global collection first (most common case)
+    // This handles cases where entityDef might not be loaded but entity is global
+    const globalCollName = collectionName(ctx.tenant_id, null, entity, true);
+    const localCollName = collectionName(ctx.tenant_id, ctx.unit_id, entity, false);
+
+    // Try global collection first
+    try {
+      await client.collections(globalCollName).retrieve();
+      collName = globalCollName;
+    } catch (globalError) {
+      // If global collection doesn't exist, try local collection
+      try {
+        await client.collections(localCollName).retrieve();
+        collName = localCollName;
+      } catch (localError) {
+        // If neither exists, throw error with helpful message
+        throw new Error(
+          `Typesense collection not found. Tried: ${globalCollName} and ${localCollName}. ` +
+            `Please ensure the collection exists and data is indexed.`
+        );
+      }
+    }
+  }
+
+  // Build filter_by with tenant_id (and unit_id for local entities)
+  const filterParts: string[] = [];
+  if (options.filter_by) {
+    filterParts.push(options.filter_by);
+  }
+
+  // Always filter by tenant_id
+  filterParts.push(`tenant_id:=${ctx.tenant_id}`);
+
+  // Only filter by unit_id for local entities
+  if (!isGlobal && ctx.unit_id) {
+    filterParts.push(`unit_id:=${ctx.unit_id}`);
+  }
 
   const searchParams = {
     q: options.q,
     query_by: options.query_by || '*',
-    filter_by: options.filter_by,
+    filter_by: filterParts.length > 0 ? filterParts.join(' && ') : undefined,
     facet_by: options.facet_by,
     per_page: options.per_page || 10,
     page: options.page || 1,
   };
 
-  const result = await client.collections(collName).documents().search(searchParams);
+  let result;
+  try {
+    result = await client.collections(collName).documents().search(searchParams);
+  } catch (error) {
+    // If search fails, provide more detailed error information
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Typesense search failed for collection "${collName}": ${errorMessage}. ` +
+        `Query: ${options.q}, Filters: ${searchParams.filter_by || 'none'}`
+    );
+  }
+
   return {
     hits: (result.hits?.map((h: unknown) => {
       const hit = h as { document?: TypesenseDocument; [key: string]: unknown };

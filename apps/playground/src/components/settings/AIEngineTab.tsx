@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -32,7 +33,7 @@ const aiConfigSchema = z.object({
 type AIConfigForm = z.infer<typeof aiConfigSchema>;
 
 export default function AIEngineTab() {
-  const { config, setConfig } = useAIStore();
+  const { config, setConfig, showChainOfThought, setShowChainOfThought } = useAIStore();
   const { tenantId } = useAuthStore();
   const { toast } = useToast();
   const [showApiKey, setShowApiKey] = useState(false);
@@ -269,6 +270,29 @@ export default function AIEngineTab() {
               <p className="text-xs text-gray-500">Maximum number of tokens in the response</p>
             </div>
 
+            {/* UI Preferences */}
+            <div className="border-t pt-6 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">UI Preferences</Label>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="showChainOfThought"
+                    checked={showChainOfThought}
+                    onCheckedChange={(checked) => setShowChainOfThought(checked === true)}
+                  />
+                  <Label
+                    htmlFor="showChainOfThought"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Show Chain of Thought visualization
+                  </Label>
+                </div>
+                <p className="text-xs text-gray-500 ml-6">
+                  Display the agent&apos;s thinking process and tool calls in the chat interface
+                </p>
+              </div>
+            </div>
+
             {/* Save Button */}
             <Button
               type="submit"
@@ -321,6 +345,10 @@ export default function AIEngineTab() {
                   <span className="font-medium">{config.maxTokens}</span>
                 </div>
               )}
+              <div className="flex justify-between border-t pt-2 mt-2">
+                <span className="text-gray-500">Chain of Thought:</span>
+                <span className="font-medium">{showChainOfThought ? 'Enabled' : 'Disabled'}</span>
+              </div>
             </div>
           </CardContent>
         </Card>

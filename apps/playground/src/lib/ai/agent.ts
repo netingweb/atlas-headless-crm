@@ -464,6 +464,14 @@ For datetime fields, use the full ISO 8601 format with time (e.g., "2025-11-20T1
 
   const systemPrompt = `You are a helpful AI assistant for a CRM system. You can help users manage contacts, companies, tasks, notes, opportunities, products, and other entities.
 
+CRITICAL - ANSWER ALL QUESTIONS:
+When a user message contains MULTIPLE questions or requests, you MUST answer ALL of them. Do NOT skip any question or respond only to the first one. 
+- If the user asks "quante aziende abbiamo? e quanti contatti?", you MUST answer BOTH questions
+- If the user asks multiple questions separated by "?", "e", "and", or new lines, you MUST address EACH question
+- Always provide a complete response that covers ALL questions in the user's message
+- Use numbered lists or clear sections if needed to organize multiple answers
+- NEVER leave any question unanswered - if you're unsure, use tools to find the answer
+
 IMPORTANT: You have access to tools that can search and retrieve data from the CRM system. When users ask questions about data (counts, searches, lists), you MUST use these tools. Never say you don't have access - use the tools!
 
 ${toolsListHeader}
@@ -521,6 +529,8 @@ EXAMPLES:
 - If results array contains items with view_link, add links for ALL items
 
 NEVER skip the view_link - it's essential for user navigation. Always format as: [View EntityType](/entities/entityType/id)
+
+REMEMBER: Always answer ALL questions in the user's message. If a user asks multiple questions, provide answers to ALL of them. Never skip or ignore any question - use tools if needed to find complete answers.
 
 Always be helpful, accurate, and concise. When using tools, provide clear explanations of what you're doing.`;
 
@@ -641,7 +651,8 @@ export async function* runAgentStream(
 
     const toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }> = [];
 
-    // Stream initial thinking/content
+    // Stream initial thinking/content and collect tool calls
+    let streamedContent = '';
     for await (const chunk of stream) {
       if (chunk.content) {
         const content = Array.isArray(chunk.content)
@@ -651,6 +662,7 @@ export async function* runAgentStream(
           : typeof chunk.content === 'string'
             ? chunk.content
             : String(chunk.content);
+        streamedContent += content;
         yield { type: 'content', content };
       }
 
@@ -674,10 +686,59 @@ export async function* runAgentStream(
       }
     }
 
-    // If we have tool calls, execute them
+    // If we have tool calls, execute them in a loop to support multiple rounds
+    const maxIterations = 10; // Prevent infinite loops
+    let iteration = 0;
+    let pendingResponse: AIMessage | null = null;
+
+    // If we have tool calls from the stream, construct the AIMessage properly
     if (toolCalls.length > 0) {
-      // Get the full response to access all tool calls
-      const response = await agent.llm.invoke(messages);
+      // Ensure all tool calls have valid IDs
+      const validToolCalls = toolCalls.map((tc) => ({
+        id: tc.id || `call_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        name: tc.name,
+        args: tc.args,
+      }));
+
+      // Construct AIMessage with the tool calls from the stream
+      // This ensures the tool_call_ids match what we'll use in ToolMessages
+      pendingResponse = new AIMessage({
+        content: streamedContent || '',
+        tool_calls: validToolCalls,
+      });
+    } else {
+      // No tool calls - if we have content, it's already been streamed
+      // If we don't have content, the stream was empty (shouldn't happen)
+      if (!streamedContent) {
+        // Stream was empty - this might indicate an error or the LLM didn't respond
+        // Try to get a response using invoke as fallback
+        try {
+          const fallbackResponse = await agent.llm.invoke(messages);
+          if (fallbackResponse.content) {
+            const content =
+              typeof fallbackResponse.content === 'string'
+                ? fallbackResponse.content
+                : String(fallbackResponse.content);
+            yield { type: 'content', content };
+          }
+        } catch (error) {
+          console.error('[Agent] Error getting fallback response:', error);
+          yield {
+            type: 'error',
+            content: 'The agent did not generate a response. Please try again.',
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }
+      yield { type: 'done' };
+      return;
+    }
+
+    while (pendingResponse && iteration < maxIterations) {
+      iteration++;
+
+      const response = pendingResponse;
+      pendingResponse = null; // Clear pending response
 
       if (response.tool_calls && response.tool_calls.length > 0) {
         // Add the AI message with tool_calls to the conversation
@@ -710,7 +771,7 @@ export async function* runAgentStream(
               content: `Calling tool: ${toolCall.name} with args: ${JSON.stringify(toolCall.args)}...`,
             };
 
-            console.log(`[Agent] Calling tool: ${toolCall.name}`, {
+            console.log(`[Agent] Calling tool: ${toolCall.name} (iteration ${iteration})`, {
               args: toolCall.args,
               toolCallId: toolCall.id,
             });
@@ -793,9 +854,40 @@ export async function* runAgentStream(
           }
         }
 
-        // Stream final response with tool results
+        // After executing all tool calls, check if LLM wants to call more tools
         yield { type: 'thinking', content: 'Processing tool results...' };
 
+        // Check if there are more tool calls needed by invoking again
+        const nextResponse = await agent.llm.invoke(messages);
+
+        if (nextResponse.tool_calls && nextResponse.tool_calls.length > 0) {
+          // There are more tool calls, process them in the next iteration
+          pendingResponse = nextResponse;
+          continue;
+        } else {
+          // No more tool calls, stream the final response
+          messages.push(nextResponse);
+          const finalStream = await agent.llm.stream(messages);
+
+          for await (const chunk of finalStream) {
+            if (chunk.content) {
+              const content = Array.isArray(chunk.content)
+                ? chunk.content
+                    .map((c: unknown) => (typeof c === 'string' ? c : JSON.stringify(c)))
+                    .join('')
+                : typeof chunk.content === 'string'
+                  ? chunk.content
+                  : String(chunk.content);
+              yield { type: 'content', content };
+            }
+          }
+
+          yield { type: 'done' };
+          return;
+        }
+      } else {
+        // No tool calls in response, stream the final response
+        messages.push(response);
         const finalStream = await agent.llm.stream(messages);
 
         for await (const chunk of finalStream) {
@@ -814,6 +906,15 @@ export async function* runAgentStream(
         yield { type: 'done' };
         return;
       }
+    }
+
+    // If we exit the loop without returning, check if we hit max iterations
+    if (iteration >= maxIterations && pendingResponse) {
+      yield {
+        type: 'error',
+        content: 'Maximum tool call iterations reached. The agent may be stuck in a loop.',
+        error: 'Max iterations exceeded',
+      };
     }
 
     yield { type: 'done' };

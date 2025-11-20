@@ -356,13 +356,14 @@ export class MCPService {
         case 'date':
           schema.type = 'string';
           schema.format = 'date';
-          schema.description = 'Date in format YYYY-MM-DD';
+          schema.description =
+            'Date in ISO 8601 date format (YYYY-MM-DD). Example: "2024-01-15". The backend will convert this to a datetime value at midnight UTC.';
           break;
         case 'datetime':
           schema.type = 'string';
           schema.format = 'date-time';
           schema.description =
-            'Date and time in ISO 8601 format (YYYY-MM-DDTHH:mm:ss) or use relative references like "oggi", "domani", "tra un\'ora"';
+            'Date and time in ISO 8601 format: YYYY-MM-DDTHH:mm:ss.sssZ or YYYY-MM-DDTHH:mm:ssZ. Examples: "2024-01-15T14:30:00.000Z" (UTC), "2024-01-15T14:30:00Z" (UTC), or "2024-01-15T14:30:00" (local time, will be interpreted as UTC). Always use UTC timezone (Z suffix) for consistency.';
           break;
         case 'reference':
           schema.type = 'string';
@@ -395,6 +396,174 @@ export class MCPService {
     return properties;
   }
 
+  /**
+   * Validate tool arguments against schema
+   */
+  private validateToolArgs(
+    _toolName: string,
+    args: Record<string, unknown>,
+    schema: { properties?: Record<string, unknown>; required?: string[] }
+  ): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // Check required fields
+    if (schema.required) {
+      for (const field of schema.required) {
+        if (!(field in args) || args[field] === undefined || args[field] === null) {
+          errors.push(`Required field '${field}' is missing`);
+        }
+      }
+    }
+
+    // Validate field types
+    if (schema.properties) {
+      for (const [field, value] of Object.entries(args)) {
+        const prop = schema.properties[field] as
+          | { type?: string; enum?: unknown[]; description?: string }
+          | undefined;
+
+        if (prop) {
+          // Check enum values
+          if (prop.enum && Array.isArray(prop.enum) && !prop.enum.includes(value)) {
+            errors.push(
+              `Field '${field}' has invalid value '${value}'. Must be one of: ${prop.enum.join(', ')}`
+            );
+          }
+
+          // Check type (basic validation)
+          if (prop.type) {
+            const expectedType = prop.type;
+            const actualType = typeof value;
+
+            if (expectedType === 'string' && actualType !== 'string') {
+              errors.push(`Field '${field}' must be a string, got ${actualType}`);
+            } else if (expectedType === 'number' && actualType !== 'number') {
+              errors.push(`Field '${field}' must be a number, got ${actualType}`);
+            } else if (expectedType === 'boolean' && actualType !== 'boolean') {
+              errors.push(`Field '${field}' must be a boolean, got ${actualType}`);
+            } else if (expectedType === 'array' && !Array.isArray(value)) {
+              errors.push(`Field '${field}' must be an array, got ${actualType}`);
+            } else if (
+              expectedType === 'object' &&
+              (actualType !== 'object' || Array.isArray(value))
+            ) {
+              errors.push(`Field '${field}' must be an object, got ${actualType}`);
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Get tool schema for validation
+   * This method builds the schema directly without calling listTools to avoid recursion
+   */
+  private async getToolSchema(
+    tenantId: string,
+    unitId: string,
+    toolName: string
+  ): Promise<{ properties?: Record<string, unknown>; required?: string[] } | null> {
+    try {
+      // Handle special tools
+      if (toolName === 'global_search') {
+        return {
+          properties: {
+            query: { type: 'string', default: '*' },
+            type: { type: 'string', enum: ['text', 'semantic', 'hybrid'], default: 'hybrid' },
+            limit: { type: 'number', default: 10 },
+            count_only: { type: 'boolean', default: false },
+          },
+          required: [],
+        };
+      }
+
+      if (toolName.startsWith('workflow_')) {
+        // Workflow tools have different schemas - skip validation for now
+        return null;
+      }
+
+      // For entity tools, build schema directly
+      const [action, entity] = toolName.split('_', 2);
+      if (!action || !entity) {
+        return null;
+      }
+
+      const units = await this.configLoader.getUnits(tenantId);
+      const entities = await this.configLoader.getEntities({
+        tenant_id: tenantId,
+        unit_id: unitId || units[0]?.unit_id || '',
+      });
+
+      const entityDef = entities.find((e) => e.name === entity);
+      if (!entityDef) {
+        return null;
+      }
+
+      // Build schema based on action
+      if (action === 'create') {
+        return {
+          properties: this.buildEntityProperties(entityDef),
+          required: entityDef.fields
+            .filter((f: { required: boolean }) => f.required)
+            .map((f: { name: string }) => f.name),
+        };
+      }
+
+      if (action === 'search') {
+        return {
+          properties: {
+            query: { type: 'string', default: '*' },
+            type: { type: 'string', enum: ['text', 'semantic', 'hybrid'], default: 'hybrid' },
+            limit: { type: 'number', default: 10 },
+            count_only: { type: 'boolean', default: false },
+          },
+          required: [],
+        };
+      }
+
+      if (action === 'get') {
+        return {
+          properties: {
+            id: { type: 'string' },
+          },
+          required: ['id'],
+        };
+      }
+
+      if (action === 'update') {
+        return {
+          properties: {
+            id: { type: 'string' },
+            confirmed: { type: 'boolean', default: false },
+            ...this.buildEntityProperties(entityDef),
+          },
+          required: ['id'],
+        };
+      }
+
+      if (action === 'delete') {
+        return {
+          properties: {
+            id: { type: 'string' },
+            confirmed: { type: 'boolean', default: false },
+          },
+          required: ['id'],
+        };
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.warn(`Failed to get tool schema for ${toolName}:`, error);
+      return null;
+    }
+  }
+
   async callTool(
     tenantId: string,
     unitId: string,
@@ -402,6 +571,47 @@ export class MCPService {
     args: Record<string, unknown>
   ): Promise<{ content: Array<{ type: string; text: string }>; isError: boolean }> {
     try {
+      // Validate tool name format
+      if (!name || name.trim() === '') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ error: 'Tool name is required' }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Get and validate tool schema (for non-workflow and non-global_search tools)
+      if (!name.startsWith('workflow_') && name !== 'global_search') {
+        const schema = await this.getToolSchema(tenantId, unitId, name);
+        if (schema) {
+          const validation = this.validateToolArgs(name, args, schema);
+          if (!validation.valid) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      error: 'Invalid tool arguments',
+                      validation_errors: validation.errors,
+                      tool: name,
+                      provided_args: args,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+      }
+
       const [action, entity] = name.split('_', 2);
       const ctx: TenantContext = { tenant_id: tenantId, unit_id: unitId };
 
@@ -474,11 +684,16 @@ export class MCPService {
 
               // For count only, get count from text search (Qdrant doesn't provide total count easily)
               if (countOnly) {
-                const textResults = await search(ctx, entity, {
-                  q: normalizedQuery,
-                  per_page: 0, // Just get count
-                  page: 1,
-                });
+                const textResults = await search(
+                  ctx,
+                  entity,
+                  {
+                    q: normalizedQuery,
+                    per_page: 0, // Just get count
+                    page: 1,
+                  },
+                  entityDef
+                );
 
                 return {
                   content: [
@@ -508,11 +723,16 @@ export class MCPService {
               // For semantic-only search: if no results, fallback to text search
               if (searchType === 'semantic' && semanticResults.length === 0) {
                 this.logger.debug('No semantic results, falling back to text search');
-                const textResults = await search(ctx, entity, {
-                  q: normalizedQuery,
-                  per_page: limit,
-                  page: 1,
-                });
+                const textResults = await search(
+                  ctx,
+                  entity,
+                  {
+                    q: normalizedQuery,
+                    per_page: limit,
+                    page: 1,
+                  },
+                  entityDef
+                );
                 // Add view links to results
                 const textResultsWithLinks = this.addViewLinksToResults(textResults.hits, entity);
                 return {
@@ -538,11 +758,16 @@ export class MCPService {
 
               // For hybrid search: combine semantic and text results
               if (searchType === 'hybrid') {
-                const textResults = await search(ctx, entity, {
-                  q: normalizedQuery,
-                  per_page: limit,
-                  page: 1,
-                });
+                const textResults = await search(
+                  ctx,
+                  entity,
+                  {
+                    q: normalizedQuery,
+                    per_page: limit,
+                    page: 1,
+                  },
+                  entityDef
+                );
 
                 // Combine results: prioritize semantic, add text results not in semantic
                 const semanticIds = new Set(semanticResults.map((r) => String(r.id)));
@@ -646,12 +871,38 @@ export class MCPService {
         }
 
         // Fallback to text search
+        // Load entity definition to determine scope (tenant vs unit)
+        const entityDef = await this.configLoader.getEntity(ctx, entity);
+        if (!entityDef) {
+          this.logger.warn(
+            `Entity definition not found for ${entity}, tenant: ${tenantId}, unit: ${unitId}. Will try global collection first.`
+          );
+        } else {
+          this.logger.debug(`Entity definition found for ${entity}, scope: ${entityDef.scope}`);
+        }
         const searchLimit = countOnly ? 0 : limit; // If count only, don't fetch results
-        const results = await search(ctx, entity, {
-          q: normalizedQuery,
-          per_page: searchLimit,
-          page: 1,
+
+        // Log search parameters for debugging
+        this.logger.debug(`[Search] Calling search function`, {
+          entity,
+          tenantId,
+          unitId,
+          query: normalizedQuery,
+          hasEntityDef: !!entityDef,
+          entityDefScope: entityDef?.scope,
+          searchLimit,
         });
+
+        const results = await search(
+          ctx,
+          entity,
+          {
+            q: normalizedQuery,
+            per_page: searchLimit,
+            page: 1,
+          },
+          entityDef || undefined
+        );
 
         if (countOnly) {
           return {

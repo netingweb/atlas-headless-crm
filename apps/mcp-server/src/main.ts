@@ -397,13 +397,14 @@ class MCPServer {
         case 'date':
           schema.type = 'string';
           schema.format = 'date';
-          schema.description = 'Date in format YYYY-MM-DD';
+          schema.description =
+            'Date in ISO 8601 date format (YYYY-MM-DD). Example: "2024-01-15". The backend will convert this to a datetime value at midnight UTC.';
           break;
         case 'datetime':
           schema.type = 'string';
           schema.format = 'date-time';
           schema.description =
-            'Date and time in ISO 8601 format (YYYY-MM-DDTHH:mm:ss) or use relative references like "oggi", "domani", "tra un\'ora"';
+            'Date and time in ISO 8601 format: YYYY-MM-DDTHH:mm:ss.sssZ or YYYY-MM-DDTHH:mm:ssZ. Examples: "2024-01-15T14:30:00.000Z" (UTC), "2024-01-15T14:30:00Z" (UTC), or "2024-01-15T14:30:00" (local time, will be interpreted as UTC). Always use UTC timezone (Z suffix) for consistency.';
           break;
         case 'reference':
           schema.type = 'string';

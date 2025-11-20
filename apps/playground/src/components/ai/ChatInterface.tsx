@@ -38,7 +38,7 @@ const createConversationId = () =>
   `session-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 
 const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
-  const { config, disabledTools, maxContextTokens } = useAIStore();
+  const { config, disabledTools, maxContextTokens, showChainOfThought } = useAIStore();
   const { tenantId, unitId } = useAuthStore();
   const viewContext = useCurrentContext();
   const { toast } = useToast();
@@ -615,7 +615,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                 </div>
               </div>
               {/* Chain of Thought visualization for assistant messages */}
-              {message.role === 'assistant' && (
+              {message.role === 'assistant' && showChainOfThought && (
                 <div className="w-full max-w-[80%]">
                   <ChainOfThought thinking={message.thinking} toolCalls={message.toolCalls} />
                 </div>

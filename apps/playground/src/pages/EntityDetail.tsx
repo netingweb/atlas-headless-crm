@@ -725,6 +725,21 @@ export default function EntityDetail() {
     }
 
     if (field.type === 'datetime') {
+      // Helper function to safely convert date to ISO string for datetime-local input
+      const getDateTimeLocalValue = (value: unknown): string => {
+        if (!value) return '';
+        try {
+          const dateStr = String(value);
+          if (!dateStr || dateStr.trim() === '') return '';
+          const date = new Date(dateStr);
+          // Check if date is valid
+          if (isNaN(date.getTime())) return '';
+          return date.toISOString().slice(0, 16);
+        } catch {
+          return '';
+        }
+      };
+
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
@@ -734,12 +749,26 @@ export default function EntityDetail() {
           <Input
             id={field.name}
             type="datetime-local"
-            value={fieldValue ? new Date(fieldValue as string).toISOString().slice(0, 16) : ''}
+            value={getDateTimeLocalValue(fieldValue)}
             onChange={(e) => {
               // Convert datetime-local format (YYYY-MM-DDTHH:mm) to ISO 8601
               const localDateTime = e.target.value;
-              const isoDateTime = localDateTime ? new Date(localDateTime).toISOString() : '';
-              handleFieldChange(field.name, isoDateTime);
+              if (!localDateTime) {
+                handleFieldChange(field.name, '');
+                return;
+              }
+              try {
+                const date = new Date(localDateTime);
+                // Validate date before converting to ISO string
+                if (isNaN(date.getTime())) {
+                  handleFieldChange(field.name, '');
+                  return;
+                }
+                const isoDateTime = date.toISOString();
+                handleFieldChange(field.name, isoDateTime);
+              } catch {
+                handleFieldChange(field.name, '');
+              }
             }}
             required={field.required}
           />
