@@ -80,16 +80,44 @@ export class MongoConfigLoader implements ConfigLoader {
 
   async getEntity(ctx: TenantContext, entityName: string): Promise<EntityDefinition | null> {
     const cached = this.cache.getEntity(ctx, entityName);
-    if (cached) return cached;
+    if (cached) {
+      console.log('[ConfigLoader] Returning cached entity:', {
+        entityName,
+        tenant_id: ctx.tenant_id,
+        scope: cached.scope,
+        hasScope: 'scope' in cached,
+      });
+      return cached;
+    }
 
     const configDoc = await this.db.collection('entities_config').findOne({
       tenant_id: ctx.tenant_id,
     });
-    if (!configDoc) return null;
+    if (!configDoc) {
+      console.warn('[ConfigLoader] No config found for tenant:', ctx.tenant_id);
+      return null;
+    }
 
     const config = configDoc as EntitiesConfig;
     this.cache.setEntities(ctx.tenant_id, config);
-    return config.entities.find((e) => e.name === entityName) || null;
+    const entity = config.entities.find((e) => e.name === entityName) || null;
+
+    if (entity) {
+      console.log('[ConfigLoader] Loaded entity from DB:', {
+        entityName,
+        tenant_id: ctx.tenant_id,
+        scope: entity.scope,
+        hasScope: 'scope' in entity,
+      });
+    } else {
+      console.warn('[ConfigLoader] Entity not found in config:', {
+        entityName,
+        tenant_id: ctx.tenant_id,
+        availableEntities: config.entities.map((e) => e.name),
+      });
+    }
+
+    return entity;
   }
 
   async getEntities(ctx: TenantContext): Promise<EntityDefinition[]> {

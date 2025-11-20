@@ -12,6 +12,7 @@ import { getDb } from '@crm-atlas/db';
 import { createEmbeddingsProvider, getProviderConfig } from '@crm-atlas/embeddings';
 import { getEmbeddableFields } from '@crm-atlas/utils';
 import type { TextSearchQuery } from '@crm-atlas/search';
+import type { EntityDefinition } from '@crm-atlas/types';
 
 @Injectable()
 export class SearchService {
@@ -23,8 +24,9 @@ export class SearchService {
   ): Promise<{ hits: unknown[]; found: number; page: number }> {
     let entityDef: EntityDefinition | undefined;
     if (query.entity) {
-      entityDef = await this.configLoader.getEntity(ctx, query.entity);
-      if (entityDef) {
+      const loadedEntityDef = await this.configLoader.getEntity(ctx, query.entity);
+      if (loadedEntityDef) {
+        entityDef = loadedEntityDef;
         await ensureCollection(ctx, query.entity, entityDef);
       }
     }

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { getDb, EntityRepository } from '@crm-atlas/db';
+import { MongoConfigLoader } from '@crm-atlas/config';
 import type { TenantContext } from '@crm-atlas/core';
 import type { WorkflowDefinition, WorkflowExecutionLog } from '@crm-atlas/types';
 // Note: WorkflowEngine and WorkflowLogger are imported from the workflow app
@@ -14,6 +15,7 @@ export class WorkflowsService {
   private readonly db = getDb();
   private readonly workflowLogger = new WorkflowLogger();
   private readonly entityRepository = new EntityRepository();
+  private readonly configLoader = new MongoConfigLoader(getDb());
   private workflowEngine: WorkflowEngine | null = null;
 
   /**
@@ -790,29 +792,35 @@ export class WorkflowsService {
 
     if (entityId && entity) {
       try {
-        const entityData = await this.entityRepository.findById(ctx, entity, entityId);
-        if (entityData) {
-          // Add entity data under 'data' key (as it would be in real events)
-          const entityObj = entityData as unknown as Record<string, unknown>;
-          const cleanData: Record<string, unknown> = {};
+        // Load entity definition to determine scope (tenant vs unit)
+        const entityDef = await this.configLoader.getEntity(ctx, entity);
+        if (!entityDef) {
+          this.logger.warn(`Entity definition not found: ${entity}`);
+        } else {
+          const entityData = await this.entityRepository.findById(ctx, entity, entityId, entityDef);
+          if (entityData) {
+            // Add entity data under 'data' key (as it would be in real events)
+            const entityObj = entityData as unknown as Record<string, unknown>;
+            const cleanData: Record<string, unknown> = {};
 
-          // Copy all fields except MongoDB internal fields and tenant/unit IDs
-          for (const [key, value] of Object.entries(entityObj)) {
-            if (!key.startsWith('_') && key !== 'tenant_id' && key !== 'unit_id') {
-              // Convert Date objects to ISO strings for consistency with event data
-              if (value instanceof Date) {
-                cleanData[key] = value.toISOString();
-              } else {
-                cleanData[key] = value;
+            // Copy all fields except MongoDB internal fields and tenant/unit IDs
+            for (const [key, value] of Object.entries(entityObj)) {
+              if (!key.startsWith('_') && key !== 'tenant_id' && key !== 'unit_id') {
+                // Convert Date objects to ISO strings for consistency with event data
+                if (value instanceof Date) {
+                  cleanData[key] = value.toISOString();
+                } else {
+                  cleanData[key] = value;
+                }
               }
             }
-          }
 
-          // Merge into context.data (preserving existing data if any)
-          enhanced.data = {
-            ...((enhanced.data as Record<string, unknown>) || {}),
-            ...cleanData,
-          };
+            // Merge into context.data (preserving existing data if any)
+            enhanced.data = {
+              ...((enhanced.data as Record<string, unknown>) || {}),
+              ...cleanData,
+            };
+          }
         }
       } catch (error) {
         // If entity not found, continue with original context

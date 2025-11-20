@@ -17,8 +17,12 @@ export function collectionName(
   entity: string,
   isGlobal = false
 ): string {
-  if (isGlobal || unitId === null) {
-    // Global entity: tenant-wide collection
+  if (isGlobal) {
+    // Global entity: tenant-wide collection (never include unit_id, even if provided)
+    return `${tenantId}_${entity}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  }
+  if (unitId === null) {
+    // Fallback: if unitId is null but not global, still create tenant-wide collection
     return `${tenantId}_${entity}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
   }
   // Local entity: unit-specific collection

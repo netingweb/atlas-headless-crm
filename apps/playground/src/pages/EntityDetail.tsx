@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
 import { entitiesApi, type Entity } from '@/lib/api/entities';
 import { configApi, type EntityDefinition } from '@/lib/api/config';
+import { playgroundSettingsApi } from '@/lib/api/playground-settings';
+import { useEntityVisibilityStore } from '@/stores/entity-visibility-store';
 import type { FieldDefinition } from '@crm-atlas/types';
 import { apiClient } from '@/lib/api/client';
 import { isApiAvailable } from '@/lib/api/permissions';
@@ -27,6 +29,7 @@ import DocumentUpload from '@/components/documents/DocumentUpload';
 import { documentsApi } from '@/lib/api/documents';
 
 // Readonly fields that should not be editable
+// Note: visible_to is kept in the codebase for future sharing policy implementation but hidden from UI
 const READONLY_FIELDS = [
   '_id',
   'id',
@@ -36,7 +39,7 @@ const READONLY_FIELDS = [
   'updated_at',
   'app_id',
   'ownership',
-  'visible_to',
+  // 'visible_to', // Hidden from UI - reserved for future sharing policy implementation
 ];
 
 // Document-specific readonly fields (all except title)
@@ -208,6 +211,7 @@ export default function EntityDetail() {
   const { tenantId, unitId, user } = useAuthStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isFieldVisibleInDetail, setEntityVisibility } = useEntityVisibilityStore();
   const isNew = id === 'new';
 
   // Get permissions
@@ -220,6 +224,20 @@ export default function EntityDetail() {
   // Check permissions
   const canCreate = isApiAvailable('entities.create', user || null, permissions || null);
   const canUpdate = isApiAvailable('entities.update', user || null, permissions || null);
+
+  // Load unit settings for visibility
+  const { data: unitSettings } = useQuery({
+    queryKey: ['unit-playground-settings', tenantId, unitId],
+    queryFn: () => playgroundSettingsApi.getUnitSettings(tenantId || '', unitId || ''),
+    enabled: !!tenantId && !!unitId,
+  });
+
+  // Update store when settings load
+  useEffect(() => {
+    if (unitSettings?.entityVisibility) {
+      setEntityVisibility(unitSettings.entityVisibility);
+    }
+  }, [unitSettings, setEntityVisibility]);
 
   // Get entity definition
   const {
@@ -383,13 +401,34 @@ export default function EntityDetail() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Filter out readonly fields and system fields
+    // Filter out readonly fields, system fields, and populated fields
     const submitData: Record<string, unknown> = {};
     const readonlyFields = entityType === 'document' ? DOCUMENT_READONLY_FIELDS : READONLY_FIELDS;
+
+    // Get list of valid field names from entity definition
+    const validFieldNames = new Set<string>();
+    if (entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)) {
+      entityDef.fields.forEach((field) => {
+        validFieldNames.add(field.name);
+      });
+    }
+
     Object.keys(formData).forEach((key) => {
-      if (!readonlyFields.includes(key)) {
-        submitData[key] = formData[key];
+      // Skip readonly fields
+      if (readonlyFields.includes(key)) {
+        return;
       }
+      // Skip populated fields (fields starting with _)
+      if (key.startsWith('_')) {
+        return;
+      }
+      // Skip fields that are not in entity definition (like contact_name, product_name, etc.)
+      // These are typically populated/computed fields
+      if (!validFieldNames.has(key) && key.endsWith('_name')) {
+        return;
+      }
+      // Include the field
+      submitData[key] = formData[key];
     });
 
     if (isNew) {
@@ -630,6 +669,32 @@ export default function EntityDetail() {
     }
 
     if (field.type === 'date') {
+      // Convert datetime value to date-only format for display
+      // Backend stores dates as date-time (ISO 8601), but we display only the date part
+      let displayValue = '';
+      if (fieldValue) {
+        try {
+          // Handle both date-time strings and date-only strings
+          const dateStr = String(fieldValue);
+          if (dateStr.includes('T')) {
+            // ISO 8601 date-time format: extract date part
+            displayValue = dateStr.split('T')[0];
+          } else if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            // Already in YYYY-MM-DD format
+            displayValue = dateStr;
+          } else {
+            // Try to parse as date
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+              displayValue = date.toISOString().split('T')[0];
+            }
+          }
+        } catch {
+          // If parsing fails, leave empty
+          displayValue = '';
+        }
+      }
+
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
@@ -639,8 +704,20 @@ export default function EntityDetail() {
           <Input
             id={field.name}
             type="date"
-            value={fieldValue ? new Date(fieldValue as string).toISOString().split('T')[0] : ''}
-            onChange={(e) => handleFieldChange(field.name, e.target.value)}
+            value={displayValue}
+            onChange={(e) => {
+              // Convert date-only format (YYYY-MM-DD) to ISO 8601 date-time format
+              // Backend expects date-time format even for date fields
+              const dateValue = e.target.value;
+              if (dateValue) {
+                // Create a date at midnight UTC and convert to ISO string
+                // This ensures consistent timezone handling
+                const isoDateTime = new Date(dateValue + 'T00:00:00.000Z').toISOString();
+                handleFieldChange(field.name, isoDateTime);
+              } else {
+                handleFieldChange(field.name, '');
+              }
+            }}
             required={field.required}
           />
         </div>
@@ -789,19 +866,50 @@ export default function EntityDetail() {
 
   // Reference fields are handled inline in the form rendering
 
+  const handleCopyId = async () => {
+    if (!id || id === 'new') return;
+    try {
+      await navigator.clipboard.writeText(id);
+      toast({
+        title: 'Copied',
+        description: 'Entity ID copied to clipboard',
+      });
+    } catch (error) {
+      toast({
+        title: 'Copy failed',
+        description: 'Unable to copy entity ID to clipboard',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold capitalize">
-            {isNew ? `Create ${entityType}` : `Edit ${entityType}`}
+            {isNew ? `Create ${entityType}` : `${entityType} Detail`}
           </h1>
-          <p className="text-gray-500">
-            {isNew ? `Create a new ${entityType}` : `Edit ${entityType} details`}
-          </p>
+          {!isNew && id && (
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-gray-500">
+                Edit {entityType} detail - id: <span className="font-mono">{id}</span>
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopyId}
+                className="h-6 px-2"
+                aria-label="Copy entity ID"
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+          {isNew && <p className="text-gray-500 mt-1">Create a new {entityType}</p>}
         </div>
       </div>
 
@@ -842,39 +950,28 @@ export default function EntityDetail() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Readonly system fields */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  {READONLY_FIELDS.map((fieldName) => {
-                    const value = formData[fieldName];
-                    if (value === undefined && value === null) return null;
-                    return (
-                      <div key={fieldName} className="space-y-2">
-                        <Label htmlFor={fieldName} className="text-gray-500">
-                          {fieldName} (readonly)
-                        </Label>
-                        <Input
-                          id={fieldName}
-                          value={
-                            typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')
-                          }
-                          readOnly
-                          className="bg-gray-50"
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-
                 {/* Editable fields from entity definition */}
-                <div className="border-t pt-6">
-                  <h3 className="text-lg font-semibold mb-4">Fields</h3>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)
-                      ? entityDef.fields.map((field: FieldDefinition) => {
-                          // Skip readonly fields (already shown above)
-                          if (READONLY_FIELDS.includes(field.name)) {
-                            return null;
+                {entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields) && (
+                  <div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {entityDef.fields
+                        .filter((field: FieldDefinition) => {
+                          // Skip readonly/system fields (will be shown below)
+                          const isDocumentEntity = entityType === 'document';
+                          const isReadonly = isDocumentEntity
+                            ? DOCUMENT_READONLY_FIELDS.includes(field.name)
+                            : READONLY_FIELDS.includes(field.name);
+
+                          if (isReadonly) {
+                            return false;
                           }
+                          // Filter by visibility settings
+                          if (entityType) {
+                            return isFieldVisibleInDetail(entityType, field.name);
+                          }
+                          return true;
+                        })
+                        .map((field: FieldDefinition) => {
                           // Special handling for related_entity_id in documents - use renderField which has special logic
                           // This must be checked BEFORE the generic reference field handler
                           if (field.name === 'related_entity_id' && entityType === 'document') {
@@ -900,10 +997,89 @@ export default function EntityDetail() {
                             );
                           }
                           return renderField(field);
-                        })
-                      : null}
+                        })}
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* Readonly and system fields */}
+                {(() => {
+                  // Collect all readonly fields
+                  const readonlyFieldsFromDef: FieldDefinition[] = [];
+                  const readonlySystemFields: string[] = [];
+
+                  if (entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)) {
+                    entityDef.fields.forEach((field: FieldDefinition) => {
+                      const isDocumentEntity = entityType === 'document';
+                      const isReadonly = isDocumentEntity
+                        ? DOCUMENT_READONLY_FIELDS.includes(field.name)
+                        : READONLY_FIELDS.includes(field.name);
+
+                      if (isReadonly) {
+                        // Check visibility
+                        if (!entityType || isFieldVisibleInDetail(entityType, field.name)) {
+                          readonlyFieldsFromDef.push(field);
+                        }
+                      }
+                    });
+                  }
+
+                  // System fields that are not in entity definition
+                  READONLY_FIELDS.forEach((fieldName) => {
+                    const value = formData[fieldName];
+                    if (value !== undefined && value !== null) {
+                      // Check if this field is already in entity definition
+                      const isInEntityDef =
+                        entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)
+                          ? entityDef.fields.some((f) => f.name === fieldName)
+                          : false;
+
+                      if (!isInEntityDef) {
+                        readonlySystemFields.push(fieldName);
+                      }
+                    }
+                  });
+
+                  const hasReadonlyFields =
+                    readonlyFieldsFromDef.length > 0 || readonlySystemFields.length > 0;
+
+                  if (!hasReadonlyFields) {
+                    return null;
+                  }
+
+                  return (
+                    <div className="border-t pt-6">
+                      <h3 className="text-lg font-semibold mb-4">System Fields (Read Only)</h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {/* Readonly fields from entity definition */}
+                        {readonlyFieldsFromDef.map((field: FieldDefinition) => {
+                          return renderField(field);
+                        })}
+                        {/* System readonly fields not in entity definition */}
+                        {readonlySystemFields.map((fieldName) => {
+                          const value = formData[fieldName];
+                          return (
+                            <div key={fieldName} className="space-y-2">
+                              <Label htmlFor={fieldName} className="text-gray-500">
+                                {fieldName} (readonly)
+                              </Label>
+                              <Input
+                                id={fieldName}
+                                value={
+                                  typeof value === 'object'
+                                    ? JSON.stringify(value)
+                                    : String(value ?? '')
+                                }
+                                readOnly
+                                className="bg-gray-50"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="flex gap-4">
                   {(isNew ? canCreate : canUpdate) ? (

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAIStore, providerModels, type AIProvider } from '@/stores/ai-store';
+import { playgroundSettingsApi } from '@/lib/api/playground-settings';
+import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { Save, Eye, EyeOff, Copy } from 'lucide-react';
@@ -30,30 +33,60 @@ type AIConfigForm = z.infer<typeof aiConfigSchema>;
 
 export default function AIEngineTab() {
   const { config, setConfig } = useAIStore();
+  const { tenantId } = useAuthStore();
   const { toast } = useToast();
   const [showApiKey, setShowApiKey] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>(
     (config?.provider as AIProvider) || 'openai'
   );
 
+  const defaultFormValues: AIConfigForm = config || {
+    provider: 'openai',
+    apiKey: '',
+    model: 'gpt-4o-mini',
+    temperature: 0.7,
+    maxTokens: 2000,
+  };
+
   const {
     register,
     handleSubmit,
     setValue,
+    reset,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<AIConfigForm>({
     resolver: zodResolver(aiConfigSchema),
-    defaultValues: config || {
-      provider: 'openai',
-      apiKey: '',
-      model: 'gpt-4o-mini',
-      temperature: 0.7,
-      maxTokens: 2000,
-    },
+    defaultValues: defaultFormValues,
   });
 
   const currentModel = watch('model');
+
+  const tenantSettingsQuery = useQuery({
+    queryKey: ['tenant-playground-settings', tenantId],
+    queryFn: async () => {
+      if (!tenantId) {
+        throw new Error('Tenant context not available');
+      }
+      return playgroundSettingsApi.getTenantSettings(tenantId);
+    },
+    enabled: !!tenantId,
+  });
+
+  useEffect(() => {
+    if (tenantSettingsQuery.data?.ai) {
+      const apiValues: AIConfigForm = {
+        provider: tenantSettingsQuery.data.ai.provider,
+        apiKey: tenantSettingsQuery.data.ai.apiKey || '',
+        model: tenantSettingsQuery.data.ai.model || 'gpt-4o-mini',
+        temperature: tenantSettingsQuery.data.ai.temperature ?? 0.7,
+        maxTokens: tenantSettingsQuery.data.ai.maxTokens ?? 2000,
+      };
+      reset(apiValues);
+      setSelectedProvider(apiValues.provider);
+      setConfig(apiValues);
+    }
+  }, [tenantSettingsQuery.data, reset, setConfig]);
 
   const handleProviderChange = (provider: AIProvider) => {
     setSelectedProvider(provider);
@@ -63,44 +96,37 @@ export default function AIEngineTab() {
     setValue('model', defaultModel);
   };
 
-  const onSubmit = async (data: AIConfigForm) => {
-    try {
-      console.log('Saving AI config:', {
-        provider: data.provider,
-        model: data.model,
-        hasApiKey: !!data.apiKey,
-        apiKeyLength: data.apiKey?.length,
-      });
-      setConfig(data);
-      // Verify it was saved (use setTimeout to allow state update)
-      setTimeout(() => {
-        const savedConfig = useAIStore.getState().config;
-        console.log('Config saved, verification:', {
-          provider: savedConfig?.provider,
-          model: savedConfig?.model,
-          hasApiKey: !!savedConfig?.apiKey,
-          apiKeyLength: savedConfig?.apiKey?.length,
-        });
-      }, 100);
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (data: AIConfigForm) => {
+      if (!tenantId) {
+        throw new Error('Tenant context not available');
+      }
+      const response = await playgroundSettingsApi.updateTenantSettings(tenantId, { ai: data });
+      return response;
+    },
+    onSuccess: (_, variables) => {
+      setConfig(variables);
       toast({
-        title: 'AI Engine configured',
-        description: `Configuration saved for ${data.provider} (${data.model})`,
+        title: 'AI Engine configurato',
+        description: `Configurazione salvata per ${variables.provider} (${variables.model})`,
       });
-    } catch (error) {
+      tenantSettingsQuery.refetch();
+    },
+    onError: (error) => {
       console.error('Error saving config:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to save configuration';
       toast({
-        title: 'Configuration error',
+        title: 'Errore di configurazione',
         description: errorMessage,
         variant: 'destructive',
         action: (
           <ToastAction
-            altText="Copy error message"
+            altText="Copia messaggio di errore"
             onClick={() => {
               navigator.clipboard.writeText(errorMessage).then(() => {
                 toast({
-                  title: 'Copied',
-                  description: 'Error message copied to clipboard',
+                  title: 'Copiato',
+                  description: "Messaggio d'errore copiato negli appunti",
                 });
               });
             }}
@@ -109,7 +135,19 @@ export default function AIEngineTab() {
           </ToastAction>
         ),
       });
+    },
+  });
+
+  const onSubmit = async (data: AIConfigForm) => {
+    if (!tenantId) {
+      toast({
+        title: 'Tenant non disponibile',
+        description: 'Effettua il login oppure seleziona un tenant valido.',
+        variant: 'destructive',
+      });
+      return;
     }
+    updateSettingsMutation.mutate(data);
   };
 
   return (
@@ -123,6 +161,11 @@ export default function AIEngineTab() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {!tenantId && (
+            <p className="text-sm text-yellow-600">
+              Effettua il login e seleziona un tenant per configurare l&apos;AI Engine.
+            </p>
+          )}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Provider Selection */}
             <div className="space-y-2">
@@ -227,10 +270,19 @@ export default function AIEngineTab() {
             </div>
 
             {/* Save Button */}
-            <Button type="submit" disabled={isSubmitting} className="w-full">
+            <Button
+              type="submit"
+              disabled={isSubmitting || updateSettingsMutation.isPending || !tenantId}
+              className="w-full"
+            >
               <Save className="mr-2 h-4 w-4" />
-              {isSubmitting ? 'Saving...' : 'Save Configuration'}
+              {isSubmitting || updateSettingsMutation.isPending
+                ? 'Saving...'
+                : 'Save Configuration'}
             </Button>
+            {tenantSettingsQuery.isLoading && (
+              <p className="text-xs text-gray-500">Caricamento configurazione in corso...</p>
+            )}
           </form>
         </CardContent>
       </Card>

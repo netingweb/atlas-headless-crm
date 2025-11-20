@@ -17,14 +17,74 @@ config/
     mcp.manifest.json    # Strumenti MCP per agenti AI
 ```
 
-## Tenant Demo
+## Tenant Disponibili
 
-Il tenant `demo` è preconfigurato con:
+### Tenant Demo
 
-- **Unit**: sales, support
-- **Entities**: lead, opportunity
+Il tenant `demo` è preconfigurato con un caso d'uso B2B generico:
+
+- **Units**: sales, support
+- **Entities**: contact, company, note, task, opportunity, product, document
 - **Roles**: admin, sales_manager, sales_rep
 - **Workflows**: followup_hot_lead
+- **Use Case**: CRM generico per vendita B2B
+
+### Tenant Demo2 (Automotive)
+
+Il tenant `demo2` è un esempio completo per il settore automotive:
+
+- **Units**: milano_sales, milano_service, roma_sales, roma_service, torino_sales, torino_service
+- **Entities Global** (visibili da tutte le units): product (veicoli), contact, company
+- **Entities Local** (specifiche per unit): task, note, deal, opportunity, document, service_order
+- **Roles**: admin, organization_manager, unit_manager, sales_rep, service_rep, accounting
+- **Workflows**: 7 workflows per processo vendita/service
+- **Use Case**: Concessionaria auto multi-sede con vendita e service
+
+**Documentazione Demo2**:
+
+- [Setup Guide](../docs/demo2-setup-guide.md)
+- [Verification Report](../docs/demo2-verification-report.md)
+- [Final Summary](../docs/demo2-final-summary.md)
+
+## Entità Global vs Local
+
+A partire dalla versione 0.1.0, il sistema supporta due tipi di scope per le entità:
+
+### Scope: Tenant (Global)
+
+Entità **condivise** tra tutte le units del tenant:
+
+- Collection MongoDB: `{tenant}_{entity}` (senza unit_id)
+- Esempio: `demo2_product`, `demo2_contact`
+- Visibilità: Tutti i record visibili da tutte le units
+- Uso tipico: Cataloghi prodotti, anagrafica clienti condivisa
+
+```json
+{
+  "name": "product",
+  "scope": "tenant",
+  "fields": [...]
+}
+```
+
+### Scope: Unit (Local) - Default
+
+Entità **specifiche** di ogni unit:
+
+- Collection MongoDB: `{tenant}_{unit}_{entity}`
+- Esempio: `demo2_milano_sales_task`, `demo2_roma_sales_task`
+- Visibilità: Ogni unit vede solo i propri record
+- Uso tipico: Tasks, deals, documenti specifici della unit
+
+```json
+{
+  "name": "task",
+  "scope": "unit",
+  "fields": [...]
+}
+```
+
+**Nota**: Se `scope` non è specificato, il default è `"unit"` per retrocompatibilità.
 
 ## Come modificare le configurazioni
 
@@ -32,6 +92,8 @@ Il tenant `demo` è preconfigurato con:
 2. **IMPORTANTE**: Esegui sempre lo script di sync per applicare le modifiche:
    ```bash
    pnpm config:sync demo
+   # oppure
+   pnpm config:sync demo2
    ```
 
 ## ⚠️ Sincronizzazione Obbligatoria
@@ -58,6 +120,9 @@ Esegui `pnpm config:sync` dopo aver modificato:
 ```bash
 # Sincronizza il tenant demo
 pnpm config:sync demo
+
+# Sincronizza il tenant demo2 (automotive)
+pnpm config:sync demo2
 
 # Oppure specifica un tenant diverso
 pnpm config:sync <tenant_id>

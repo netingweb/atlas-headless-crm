@@ -153,11 +153,21 @@ export class DocumentsService {
   }
 
   async findAll(ctx: TenantContext, filters?: Record<string, unknown>): Promise<unknown[]> {
-    return this.repository.find(ctx, 'document', filters || {});
+    // Load entity definition to determine scope (tenant vs unit)
+    const entityDef = await this.configLoader.getEntity(ctx, 'document');
+    if (!entityDef) {
+      throw new NotFoundError('Document entity definition not found');
+    }
+    return this.repository.find(ctx, 'document', filters || {}, entityDef);
   }
 
   async findById(ctx: TenantContext, id: string): Promise<unknown> {
-    const doc = await this.repository.findById(ctx, 'document', id);
+    // Load entity definition to determine scope (tenant vs unit)
+    const entityDef = await this.configLoader.getEntity(ctx, 'document');
+    if (!entityDef) {
+      throw new NotFoundError(`Document entity definition not found`);
+    }
+    const doc = await this.repository.findById(ctx, 'document', id, entityDef);
     if (!doc) {
       throw new NotFoundError(`Document not found: ${id}`);
     }
@@ -180,7 +190,12 @@ export class DocumentsService {
   }
 
   async update(ctx: TenantContext, id: string, data: Record<string, unknown>): Promise<unknown> {
-    return this.repository.update(ctx, 'document', id, data);
+    // Load entity definition to determine scope (tenant vs unit)
+    const entityDef = await this.configLoader.getEntity(ctx, 'document');
+    if (!entityDef) {
+      throw new NotFoundError('Document entity definition not found');
+    }
+    return this.repository.update(ctx, 'document', id, data, entityDef);
   }
 
   async delete(ctx: TenantContext, id: string): Promise<void> {
@@ -234,7 +249,9 @@ export class DocumentsService {
       // Delete from Typesense
       try {
         const entityDef = await this.configLoader.getEntity(ctx, 'document');
-        await deleteDocument(ctx, 'document', id, entityDef);
+        if (entityDef) {
+          await deleteDocument(ctx, 'document', id, entityDef);
+        }
       } catch (error) {
         logger.warn(`Failed to delete document ${id} from Typesense:`, {
           error: error instanceof Error ? error.message : String(error),
@@ -256,7 +273,12 @@ export class DocumentsService {
     await storageProvider.delete(ctx.tenant_id, ctx.unit_id, documentId, filename);
 
     // 4. Delete entity from MongoDB
-    await this.repository.delete(ctx, 'document', id);
+    // Load entity definition to determine scope (tenant vs unit)
+    const entityDefForDelete = await this.configLoader.getEntity(ctx, 'document');
+    if (!entityDefForDelete) {
+      throw new NotFoundError('Document entity definition not found');
+    }
+    await this.repository.delete(ctx, 'document', id, entityDefForDelete);
   }
 
   async getEntityDocuments(
@@ -264,9 +286,19 @@ export class DocumentsService {
     entityType: string,
     entityId: string
   ): Promise<unknown[]> {
-    return this.repository.find(ctx, 'document', {
-      related_entity_type: entityType,
-      related_entity_id: entityId,
-    });
+    // Load entity definition to determine scope (tenant vs unit)
+    const entityDef = await this.configLoader.getEntity(ctx, 'document');
+    if (!entityDef) {
+      throw new NotFoundError('Document entity definition not found');
+    }
+    return this.repository.find(
+      ctx,
+      'document',
+      {
+        related_entity_type: entityType,
+        related_entity_id: entityId,
+      },
+      entityDef
+    );
   }
 }

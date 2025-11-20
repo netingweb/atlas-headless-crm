@@ -12,17 +12,53 @@ export interface TypesenseHealth {
   error?: string;
 }
 
-export interface CollectionStats {
+export interface IndexedCollectionDetail {
   name: string;
+  entity: string | null;
+  scope: 'global' | 'local' | 'unknown';
+  unit_id?: string | null;
+  indexed: boolean;
   numDocuments: number;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: number | null;
+  updatedAt: number | null;
 }
 
-export interface TypesenseMetrics {
+export interface IndexingMetricsSummary {
+  totalCollections: number;
+  totalDocuments: number;
+  global: {
+    expected: number;
+    indexed: number;
+    documents: number;
+  };
+  local: {
+    expected: number;
+    indexed: number;
+    documents: number;
+  };
+  unknown: {
+    indexed: number;
+    documents: number;
+  };
+}
+
+export interface TypesenseMetricsRaw {
   collections: number;
   documents: number;
-  collectionStats: CollectionStats[];
+  collectionStats?: Array<{
+    name: string;
+    numDocuments: number;
+    createdAt: number;
+    updatedAt: number;
+  }>;
+}
+
+export interface IndexingMetricsResponse {
+  summary: IndexingMetricsSummary;
+  globalCollections: IndexedCollectionDetail[];
+  localCollections: IndexedCollectionDetail[];
+  unknownCollections: IndexedCollectionDetail[];
+  raw: TypesenseMetricsRaw;
 }
 
 export interface BackfillResponse {
@@ -44,8 +80,8 @@ export const indexingApi = {
   /**
    * Get Typesense metrics
    */
-  async getMetrics(ctx: TenantContext): Promise<TypesenseMetrics> {
-    const response = await apiClient.get<TypesenseMetrics>(
+  async getMetrics(ctx: TenantContext): Promise<IndexingMetricsResponse> {
+    const response = await apiClient.get<IndexingMetricsResponse>(
       `/${ctx.tenant_id}/${ctx.unit_id}/indexing/metrics`
     );
     return response.data;

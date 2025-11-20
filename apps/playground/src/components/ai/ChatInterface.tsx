@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Send, Loader2, AlertCircle, Copy } from 'lucide-react';
 import { useAIStore } from '@/stores/ai-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -12,6 +12,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { MemoryManager } from '@/lib/ai/memory';
 import ReactMarkdown from 'react-markdown';
+
+export interface ChatInterfaceHandle {
+  copyChat: () => Promise<void>;
+  resetChat: () => Promise<void>;
+}
 
 interface Message {
   id: string;
@@ -27,7 +32,10 @@ interface Message {
   thinking?: string[];
 }
 
-export default function ChatInterface() {
+const createConversationId = () =>
+  `session-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+
+const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
   const { config, disabledTools, maxContextTokens } = useAIStore();
   const { tenantId, unitId } = useAuthStore();
   const viewContext = useCurrentContext();
@@ -41,21 +49,30 @@ export default function ChatInterface() {
   const [agentReady, setAgentReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const memoryManagerRef = useRef<MemoryManager | null>(null);
+  const conversationIdRef = useRef<string>(createConversationId());
+
+  const createMemoryManager = useCallback(
+    (conversationId: string) => {
+      const manager = new MemoryManager(conversationId, maxContextTokens);
+      if (config) {
+        manager.setConfig(config);
+      }
+      return manager;
+    },
+    [config, maxContextTokens]
+  );
 
   // Initialize memory manager
   useEffect(() => {
     if (!memoryManagerRef.current) {
-      memoryManagerRef.current = new MemoryManager('default', maxContextTokens);
-      if (config) {
-        memoryManagerRef.current.setConfig(config);
-      }
+      memoryManagerRef.current = createMemoryManager(conversationIdRef.current);
     } else {
       memoryManagerRef.current.setMaxContextTokens(maxContextTokens);
       if (config) {
         memoryManagerRef.current.setConfig(config);
       }
     }
-  }, [config, maxContextTokens]);
+  }, [config, createMemoryManager, maxContextTokens]);
 
   // Initialize agent when config is available
   useEffect(() => {
@@ -360,6 +377,61 @@ export default function ChatInterface() {
     }
   };
 
+  const handleCopyChat = useCallback(async () => {
+    if (!messages.length) {
+      toast({
+        title: 'Nothing to copy',
+        description: 'Start chatting to enable transcript copy',
+      });
+      return;
+    }
+
+    const transcript = messages
+      .map((message) => {
+        const timestamp = message.timestamp.toLocaleString();
+        const role = message.role.toUpperCase();
+        const content = message.content.trim() || '[no content]';
+        return `[${role}] ${timestamp}\n${content}`;
+      })
+      .join('\n\n');
+
+    try {
+      await navigator.clipboard.writeText(transcript);
+      toast({
+        title: 'Chat copied',
+        description: 'Full conversation copied to clipboard',
+      });
+    } catch (err) {
+      console.error('Failed to copy chat:', err);
+      toast({
+        title: 'Copy failed',
+        description: 'Unable to copy chat. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [messages, toast]);
+
+  const handleResetChat = useCallback(async () => {
+    if (memoryManagerRef.current) {
+      memoryManagerRef.current.clearMemory();
+    }
+    const newConversationId = createConversationId();
+    conversationIdRef.current = newConversationId;
+    memoryManagerRef.current = createMemoryManager(newConversationId);
+    setMessages([]);
+    setInput('');
+    setError(null);
+    toast({
+      title: 'Session reset',
+      description: 'Started a new chat session.',
+    });
+  }, [createMemoryManager, toast]);
+
+  useImperativeHandle(ref, () => ({
+    copyChat: handleCopyChat,
+    resetChat: handleResetChat,
+  }));
+
   return (
     <div className="flex flex-col h-full">
       {/* Status Banner */}
@@ -381,136 +453,153 @@ export default function ChatInterface() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="text-center text-gray-500 mt-8">
-            <p>Start a conversation with the AI assistant</p>
-            <p className="text-sm mt-2">Ask questions about your CRM data</p>
-            {config && agentReady && (
-              <p className="text-xs mt-1 text-gray-400">
-                Using {config.provider} ({config.model})
-              </p>
-            )}
-          </div>
-        )}
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
-          >
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-4">
+          {messages.length === 0 && (
+            <div className="text-center text-gray-500 mt-8">
+              <p>Start a conversation with the AI assistant</p>
+              <p className="text-sm mt-2">Ask questions about your CRM data</p>
+              {config && agentReady && (
+                <p className="text-xs mt-1 text-gray-400">
+                  Using {config.provider} ({config.model})
+                </p>
+              )}
+            </div>
+          )}
+          {messages.map((message) => (
             <div
-              className={`
+              key={message.id}
+              className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
+            >
+              <div
+                className={`
                 max-w-[80%] rounded-lg px-4 py-2
                 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-gray-100'}
               `}
-            >
-              <div className="text-sm">
-                <ReactMarkdown
-                  components={{
-                    a: ({ href, children, ...props }) => {
-                      // Handle internal links (starting with /entities/)
-                      if (href && href.startsWith('/entities/')) {
+              >
+                <div className="text-sm">
+                  <ReactMarkdown
+                    components={{
+                      a: ({ href, children, ...props }) => {
+                        // Handle internal links (starting with /entities/)
+                        if (href && href.startsWith('/entities/')) {
+                          return (
+                            <a
+                              {...props}
+                              href={href}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                navigate(href);
+                              }}
+                              className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                            >
+                              {children}
+                            </a>
+                          );
+                        }
+                        // External links open in new tab
                         return (
                           <a
                             {...props}
                             href={href}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              navigate(href);
-                            }}
-                            className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline"
                           >
                             {children}
                           </a>
                         );
-                      }
-                      // External links open in new tab
-                      return (
-                        <a
-                          {...props}
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 underline"
-                        >
-                          {children}
-                        </a>
-                      );
-                    },
-                    p: ({ ...props }) => <p className="mb-2 last:mb-0" {...props} />,
-                    ul: ({ ...props }) => (
-                      <ul className="list-disc list-inside mb-2 space-y-1" {...props} />
-                    ),
-                    ol: ({ ...props }) => (
-                      <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />
-                    ),
-                    li: ({ ...props }) => <li className="ml-4" {...props} />,
-                    strong: ({ ...props }) => <strong className="font-semibold" {...props} />,
-                    em: ({ ...props }) => <em className="italic" {...props} />,
-                    code: ({
-                      inline,
-                      ...props
-                    }: {
-                      inline?: boolean;
-                      className?: string;
-                      children?: React.ReactNode;
-                    }) =>
-                      inline ? (
-                        <code
-                          className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-xs"
-                          {...props}
-                        />
-                      ) : (
-                        <code
-                          className="block bg-gray-200 dark:bg-gray-700 p-2 rounded text-xs overflow-x-auto"
+                      },
+                      p: ({ ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                      ul: ({ ...props }) => (
+                        <ul className="list-disc list-inside mb-2 space-y-1" {...props} />
+                      ),
+                      ol: ({ ...props }) => (
+                        <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />
+                      ),
+                      li: ({ ...props }) => <li className="ml-4" {...props} />,
+                      strong: ({ ...props }) => <strong className="font-semibold" {...props} />,
+                      em: ({ ...props }) => <em className="italic" {...props} />,
+                      code: ({
+                        inline,
+                        ...props
+                      }: {
+                        inline?: boolean;
+                        className?: string;
+                        children?: React.ReactNode;
+                      }) =>
+                        inline ? (
+                          <code
+                            className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-xs"
+                            {...props}
+                          />
+                        ) : (
+                          <code
+                            className="block bg-gray-200 dark:bg-gray-700 p-2 rounded text-xs overflow-x-auto"
+                            {...props}
+                          />
+                        ),
+                      pre: ({ ...props }) => (
+                        <pre
+                          className="bg-gray-200 dark:bg-gray-700 p-2 rounded mb-2 overflow-x-auto"
                           {...props}
                         />
                       ),
-                    pre: ({ ...props }) => (
-                      <pre
-                        className="bg-gray-200 dark:bg-gray-700 p-2 rounded mb-2 overflow-x-auto"
-                        {...props}
-                      />
-                    ),
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-lg px-4 py-2">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <p className="text-sm">Thinking...</p>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-gray-100 rounded-lg px-4 py-2">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <p className="text-sm">Thinking...</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Input */}
       <div className="border-t p-4">
         <div className="flex gap-2">
-          <Input
+          <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             placeholder={
               agentReady
                 ? 'Type your message...'
                 : 'Configure AI engine in Settings to start chatting'
             }
             disabled={loading || !agentReady}
+            rows={3}
+            className="resize-y min-h-[3rem] max-h-48"
           />
-          <Button onClick={handleSend} disabled={loading || !input.trim() || !agentReady}>
+          <Button
+            onClick={handleSend}
+            disabled={loading || !input.trim() || !agentReady}
+            className="self-end"
+          >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
       </div>
     </div>
   );
-}
+});
+
+ChatInterface.displayName = 'ChatInterface';
+
+export default ChatInterface;

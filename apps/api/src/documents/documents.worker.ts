@@ -310,18 +310,33 @@ export class DocumentProcessingWorker {
       if (documentId) {
         try {
           const ctx: TenantContext = { tenant_id: tenantId, unit_id: unitId };
-          const existingDoc = await this.repository.findById(ctx, 'document', documentId);
-          const existingMetadata =
-            (existingDoc as { metadata?: Record<string, unknown> })?.metadata || {};
-          await this.repository.update(ctx, 'document', documentId, {
-            processing_status: 'failed',
-            metadata: {
-              ...existingMetadata,
-              error: err.message,
-              error_stack: err.stack,
-              failed_at: new Date().toISOString(),
-            },
-          });
+          // Load entity definition to determine scope (tenant vs unit)
+          const entityDef = await this.configLoader.getEntity(ctx, 'document');
+          if (entityDef) {
+            const existingDoc = await this.repository.findById(
+              ctx,
+              'document',
+              documentId,
+              entityDef
+            );
+            const existingMetadata =
+              (existingDoc as { metadata?: Record<string, unknown> })?.metadata || {};
+            await this.repository.update(
+              ctx,
+              'document',
+              documentId,
+              {
+                processing_status: 'failed',
+                metadata: {
+                  ...existingMetadata,
+                  error: err.message,
+                  error_stack: err.stack,
+                  failed_at: new Date().toISOString(),
+                },
+              },
+              entityDef
+            );
+          }
         } catch (updateError) {
           logger.error(
             `Failed to update document status to failed`,
@@ -365,12 +380,28 @@ export class DocumentProcessingWorker {
 
     try {
       // Update status to processing
-      await this.repository.update(ctx, 'document', documentId, {
-        processing_status: 'processing',
-      });
+      // Load entity definition to determine scope (tenant vs unit)
+      const entityDefForProcessing = await this.configLoader.getEntity(ctx, 'document');
+      if (!entityDefForProcessing) {
+        throw new Error('Document entity definition not found');
+      }
+      await this.repository.update(
+        ctx,
+        'document',
+        documentId,
+        {
+          processing_status: 'processing',
+        },
+        entityDefForProcessing
+      );
 
       // Get document
-      const docRaw = await this.repository.findById(ctx, 'document', documentId);
+      // Load entity definition to determine scope (tenant vs unit)
+      const entityDef = await this.configLoader.getEntity(ctx, 'document');
+      if (!entityDef) {
+        throw new Error('Document entity definition not found');
+      }
+      const docRaw = await this.repository.findById(ctx, 'document', documentId, entityDef);
       if (!docRaw) {
         throw new Error(`Document not found: ${documentId}`);
       }
@@ -422,11 +453,18 @@ export class DocumentProcessingWorker {
       });
 
       // Update document with extracted content
-      await this.repository.update(ctx, 'document', documentId, {
-        extracted_content: processingResult.text,
-        metadata: processingResult.metadata,
-        processing_status: 'completed',
-      });
+      // Use the same entityDef loaded earlier (at line 382)
+      await this.repository.update(
+        ctx,
+        'document',
+        documentId,
+        {
+          extracted_content: processingResult.text,
+          metadata: processingResult.metadata,
+          processing_status: 'completed',
+        },
+        entityDef
+      );
 
       // Generate embeddings and index
       if (processingResult.text && documentTypeConfig?.embedding_config) {
@@ -472,7 +510,17 @@ export class DocumentProcessingWorker {
         await ensureCollection(ctx, 'document', documentEntityDef);
       }
 
-      const updatedDoc = await this.repository.findById(ctx, 'document', documentId);
+      // Load entity definition to determine scope (tenant vs unit)
+      const entityDefForUpdate = await this.configLoader.getEntity(ctx, 'document');
+      if (!entityDefForUpdate) {
+        throw new Error('Document entity definition not found');
+      }
+      const updatedDoc = await this.repository.findById(
+        ctx,
+        'document',
+        documentId,
+        entityDefForUpdate
+      );
       await upsertDocument(
         ctx,
         'document',
@@ -495,18 +543,33 @@ export class DocumentProcessingWorker {
 
       // Update document status with detailed error info
       try {
-        const existingDoc = await this.repository.findById(ctx, 'document', documentId);
-        const existingMetadata =
-          (existingDoc as { metadata?: Record<string, unknown> })?.metadata || {};
-        await this.repository.update(ctx, 'document', documentId, {
-          processing_status: 'failed',
-          metadata: {
-            ...existingMetadata,
-            error: errorObj.message,
-            error_stack: errorObj.stack,
-            failed_at: new Date().toISOString(),
-          },
-        });
+        // Load entity definition to determine scope (tenant vs unit)
+        const entityDefForError = await this.configLoader.getEntity(ctx, 'document');
+        if (entityDefForError) {
+          const existingDoc = await this.repository.findById(
+            ctx,
+            'document',
+            documentId,
+            entityDefForError
+          );
+          const existingMetadata =
+            (existingDoc as { metadata?: Record<string, unknown> })?.metadata || {};
+          await this.repository.update(
+            ctx,
+            'document',
+            documentId,
+            {
+              processing_status: 'failed',
+              metadata: {
+                ...existingMetadata,
+                error: errorObj.message,
+                error_stack: errorObj.stack,
+                failed_at: new Date().toISOString(),
+              },
+            },
+            entityDefForError
+          );
+        }
       } catch (updateError) {
         logger.error(
           `Failed to update document status to failed`,

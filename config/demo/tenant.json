@@ -1,10 +1,20 @@
 {
   "tenant_id": "demo",
   "name": "Demo Tenant",
-  "settings": {},
+  "settings": {
+    "playground": {
+      "ai": {
+        "provider": "openai",
+        "apiKey": "REMOVED_COMPROMISED_KEY",
+        "model": "text-embedding-3-small",
+        "temperature": 0.7,
+        "maxTokens": 2000
+      }
+    }
+  },
   "embeddingsProvider": {
     "name": "openai",
-    "apiKey": "",
+    "apiKey": "REMOVED_COMPROMISED_KEY",
     "model": "text-embedding-3-small"
   },
   "storage": {
@@ -20,7 +30,7 @@
   "visionProvider": {
     "name": "openai",
     "model": "gpt-4-vision-preview",
-    "apiKey": ""
+    "apiKey": "REMOVED_COMPROMISED_KEY"
   },
   "documentProcessing": {
     "maxFileSize": 104857600,

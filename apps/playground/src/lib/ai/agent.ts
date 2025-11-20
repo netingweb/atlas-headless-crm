@@ -327,36 +327,50 @@ export async function createAgent(
   // Load MCP tools
   const mcpTools = await mcpApi.listTools(ctx.tenant_id, ctx.unit_id);
 
+  console.log(`[Agent] Loaded ${mcpTools.length} MCP tools from server`);
+
   // Filter tools: exclude disabled tools
   const filteredTools = disabledToolNames
     ? mcpTools.filter((tool) => !disabledToolNames.has(tool.name))
     : mcpTools; // If no filter provided, use all tools
 
+  console.log(`[Agent] After filtering: ${filteredTools.length} tools available`);
+
   // Convert MCP tools to LangChain tools
   const tools = filteredTools.map((tool) => createToolFromMCP(tool, ctx));
+
+  console.log(`[Agent] Created ${tools.length} LangChain tools`);
 
   // Create LLM with tools bound
   const llm = createLLM(config).bindTools(tools);
 
   // Create system prompt with detailed tool information
   const toolsDescription = tools
-    .map((tool) => {
+    .map((tool, index) => {
       // Get the tool's schema to show required fields
       const toolSchema = mcpTools.find((t) => t.name === tool.name);
       const requiredFields = (toolSchema?.inputSchema?.required || []) as string[];
       const properties = (toolSchema?.inputSchema?.properties || {}) as Record<string, unknown>;
 
-      let toolInfo = `- ${tool.name}: ${tool.description}`;
+      let toolInfo = `${index + 1}. ${tool.name}: ${tool.description}`;
+
+      // Add usage examples for common search tools
+      if (tool.name.startsWith('search_')) {
+        toolInfo += `\n    Usage examples:\n    - To get count only: { "query": "*", "count_only": true }\n    - To search all: { "query": "*", "limit": 50 }\n    - To search specific: { "query": "search term", "limit": 10 }`;
+      } else if (tool.name === 'global_search') {
+        toolInfo += `\n    Usage examples:\n    - To search all entities: { "query": "search term", "limit": 10 }\n    - To get counts: { "query": "*", "count_only": true }`;
+      }
+
       if (requiredFields.length > 0) {
         const requiredDetails = requiredFields
           .map((field: string) => {
             const prop = properties[field] as { type?: string; description?: string } | undefined;
             const type = prop?.type || 'unknown';
             const desc = prop?.description || '';
-            return `  * ${field} (${type})${desc ? `: ${desc}` : ''} [REQUIRED]`;
+            return `    - ${field} (${type})${desc ? `: ${desc}` : ''} [REQUIRED]`;
           })
           .join('\n');
-        toolInfo += `\n  Required fields:\n${requiredDetails}`;
+        toolInfo += `\n    Required fields:\n${requiredDetails}`;
       }
       return toolInfo;
     })
@@ -437,13 +451,50 @@ When users mention time-related terms, use the current date/time above to interp
 - "prossima settimana" / "next week" = Week starting ${nextWeekStart.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} (${nextWeekStart.toISOString().split('T')[0]})
 
 When updating or creating entities with date/time fields, always convert relative time references (like "oggi", "domani", "tra un'ora") to the actual date/time values based on the current date/time above.
-Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss) for date/time fields when possible, or the format required by the entity schema.
-For dates only (without time), use format YYYY-MM-DD.`;
+IMPORTANT: Always use ISO 8601 date-time format (YYYY-MM-DDTHH:mm:ss.sssZ) for ALL date and datetime fields.
+Even if a field is defined as type "date" (without time), the backend expects date-time format with time set to midnight UTC (e.g., "2025-11-20T00:00:00.000Z").
+For datetime fields, use the full ISO 8601 format with time (e.g., "2025-11-20T14:30:00.000Z").`;
 
-  const systemPrompt = `You are a helpful AI assistant for a CRM system. You can help users manage contacts, companies, tasks, notes, and opportunities.
+  const totalToolsCount = tools.length;
+  const toolsListHeader = `You have access to ${totalToolsCount} tools in total. When asked about available tools, you MUST list ALL ${totalToolsCount} tools, not just a summary. Here is the complete list:`;
 
-You have access to the following tools:
+  // Log tools count for debugging
+  console.log(`[Agent] System prompt will include ${totalToolsCount} tools`);
+  console.log(`[Agent] Tools list length: ${toolsDescription.length} characters`);
+
+  const systemPrompt = `You are a helpful AI assistant for a CRM system. You can help users manage contacts, companies, tasks, notes, opportunities, products, and other entities.
+
+IMPORTANT: You have access to tools that can search and retrieve data from the CRM system. When users ask questions about data (counts, searches, lists), you MUST use these tools. Never say you don't have access - use the tools!
+
+${toolsListHeader}
 ${toolsDescription}
+
+CRITICAL INSTRUCTION FOR TOOL LISTING:
+When a user asks "quali tools abbiamo disponibili?", "what tools are available?", "list all tools", "quali tools puoi usare?", or any similar question about available tools, you MUST:
+1. Respond with a complete numbered list of ALL ${totalToolsCount} tools
+2. Use the exact numbering from the list above (1, 2, 3, ... ${totalToolsCount})
+3. Include the tool name and description for each tool
+4. Do NOT provide a summary, grouped list, or category-based list
+5. Do NOT skip any tools - you must list all ${totalToolsCount} tools
+
+Example format when listing tools:
+"Ho a disposizione ${totalToolsCount} tools:
+1. tool_name_1: description
+2. tool_name_2: description
+...
+${totalToolsCount}. tool_name_last: description"
+
+CRITICAL - YOU MUST USE TOOLS:
+When users ask questions about data in the CRM system (like "quanti prodotti abbiamo?", "how many contacts?", "cerca BMW", "find products", etc.), you MUST use the available tools to get the information. DO NOT guess or say you don't have access - USE THE TOOLS!
+
+Examples of when to use tools:
+- "quanti prodotti abbiamo?" → Use search_product with query: "*" and count_only: true
+- "quanti contatti ci sono?" → Use search_contact with query: "*" and count_only: true  
+- "cerca prodotti BMW" → Use search_product with query: "BMW" or global_search with query: "BMW"
+- "mostrami tutti i prodotti" → Use search_product with query: "*" and limit: 50
+- "trova contatti interessati" → Use search_contact with query: "interessati" or global_search
+
+NEVER say "I don't have access" or "I can't retrieve" - ALWAYS try using the tools first!
 
 IMPORTANT RULES:
 - Always provide ALL required fields when creating entities
@@ -451,6 +502,7 @@ IMPORTANT RULES:
 - Be thorough and ensure all mandatory information is collected
 - When creating a company, you MUST include the 'email' field (it's required)
 - When creating a contact, you MUST include both 'name' and 'email' fields (they're required)
+- When asked about counts or lists, ALWAYS use search tools with appropriate parameters
 ${timeContext}${contextInfo}${memoryContext}
 
 CRITICAL - VIEW LINKS: When tool results contain "view_link" or "🔗 VIEW_LINK" fields, you MUST ALWAYS include them in your response. 
@@ -471,6 +523,12 @@ EXAMPLES:
 NEVER skip the view_link - it's essential for user navigation. Always format as: [View EntityType](/entities/entityType/id)
 
 Always be helpful, accurate, and concise. When using tools, provide clear explanations of what you're doing.`;
+
+  // Log final system prompt length for debugging
+  console.log(`[Agent] System prompt total length: ${systemPrompt.length} characters`);
+  console.log(
+    `[Agent] System prompt estimated tokens: ~${Math.ceil(systemPrompt.length / 4)} tokens`
+  );
 
   return {
     llm,

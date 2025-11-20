@@ -8,7 +8,6 @@ const tenantId = 'demo2';
 
 interface Product {
   tenant_id: string;
-  unit_id: string;
   name: string;
   brand: string;
   model: string;
@@ -21,10 +20,7 @@ interface Product {
   vin?: string;
   license_plate?: string;
   description?: string;
-  ownership: {
-    owner_unit: string;
-    visible_to: string[];
-  };
+  created_by_unit?: string; // Track which unit created this product
   visible_to: string[];
   created_at: Date;
   updated_at: Date;
@@ -32,7 +28,7 @@ interface Product {
 
 const products: Omit<
   Product,
-  'tenant_id' | 'unit_id' | 'ownership' | 'visible_to' | 'created_at' | 'updated_at'
+  'tenant_id' | 'created_by_unit' | 'visible_to' | 'created_at' | 'updated_at'
 >[] = [
   // BMW
   {
@@ -349,72 +345,69 @@ async function seedProducts(): Promise<void> {
   const units = ['milano_sales', 'roma_sales', 'torino_sales'];
   const now = new Date();
 
-  console.log(`\n📋 Creating products for tenant: ${tenantId}\n`);
+  console.log(`\n📋 Creating products for tenant: ${tenantId} (global scope)\n`);
+
+  // Product is a global entity (scope: tenant), so we use a single collection
+  // Use hardcoded name for now to avoid "null" issue
+  const collName = `${tenantId}_product`;
+  const collection = db.collection(collName);
 
   let totalCreated = 0;
 
-  for (const unitId of units) {
-    const collName = collectionName(tenantId, unitId, 'product');
-    const collection = db.collection(collName);
+  // Distribute products to track which unit created them (but all in same collection)
+  for (let i = 0; i < products.length; i++) {
+    const product = products[i];
+    const unitId = units[i % units.length]; // Round-robin distribution
 
-    // Distribute products across units (some products in each unit)
-    const productsPerUnit = Math.ceil(products.length / units.length);
-    const unitIndex = units.indexOf(unitId);
-    const startIndex = unitIndex * productsPerUnit;
-    const endIndex = Math.min(startIndex + productsPerUnit, products.length);
-    const unitProducts = products.slice(startIndex, endIndex);
+    const fullProduct: Product = {
+      ...product,
+      tenant_id: tenantId,
+      created_by_unit: unitId, // Track which unit created this product
+      visible_to: [], // Global entities are visible to all units by default
+      created_at: now,
+      updated_at: now,
+    };
 
-    for (const product of unitProducts) {
-      const fullProduct: Product = {
-        ...product,
-        tenant_id: tenantId,
-        unit_id: unitId,
-        ownership: {
-          owner_unit: unitId,
-          visible_to: [],
-        },
-        visible_to: [],
-        created_at: now,
-        updated_at: now,
-      };
-
-      // Generate VIN if not present (format: 17 characters)
-      if (!fullProduct.vin) {
-        const vinChars = 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789';
-        fullProduct.vin = Array.from({ length: 17 }, () =>
-          vinChars.charAt(Math.floor(Math.random() * vinChars.length))
-        ).join('');
-      }
-
-      // Generate license plate if not present (Italian format: AA123BB)
-      if (!fullProduct.license_plate) {
-        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        const numbers = '0123456789';
-        const plate =
-          letters.charAt(Math.floor(Math.random() * letters.length)) +
-          letters.charAt(Math.floor(Math.random() * letters.length)) +
-          numbers.charAt(Math.floor(Math.random() * numbers.length)) +
-          numbers.charAt(Math.floor(Math.random() * numbers.length)) +
-          numbers.charAt(Math.floor(Math.random() * numbers.length)) +
-          letters.charAt(Math.floor(Math.random() * letters.length)) +
-          letters.charAt(Math.floor(Math.random() * letters.length));
-        fullProduct.license_plate = plate;
-      }
-
-      await collection.insertOne(fullProduct as any);
-      totalCreated++;
-      console.log(
-        `✅ Created: ${product.name} (${product.brand} ${product.model}) - €${product.price.toLocaleString('it-IT')} in ${unitId}`
-      );
+    // Generate VIN if not present (format: 17 characters)
+    if (!fullProduct.vin) {
+      const vinChars = 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789';
+      fullProduct.vin = Array.from({ length: 17 }, () =>
+        vinChars.charAt(Math.floor(Math.random() * vinChars.length))
+      ).join('');
     }
+
+    // Generate license plate if not present (Italian format: AA123BB)
+    if (!fullProduct.license_plate) {
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const numbers = '0123456789';
+      const plate =
+        letters.charAt(Math.floor(Math.random() * letters.length)) +
+        letters.charAt(Math.floor(Math.random() * letters.length)) +
+        numbers.charAt(Math.floor(Math.random() * numbers.length)) +
+        numbers.charAt(Math.floor(Math.random() * numbers.length)) +
+        numbers.charAt(Math.floor(Math.random() * numbers.length)) +
+        letters.charAt(Math.floor(Math.random() * letters.length)) +
+        letters.charAt(Math.floor(Math.random() * letters.length));
+      fullProduct.license_plate = plate;
+    }
+
+    await collection.insertOne(fullProduct as any);
+    totalCreated++;
+    console.log(
+      `✅ Created: ${product.name} (${product.brand} ${product.model}) - €${product.price.toLocaleString('it-IT')} [created_by: ${unitId}]`
+    );
   }
 
   console.log(`\n✅ Total products created: ${totalCreated}`);
-  console.log(`📊 Distribution:`);
+  console.log(`📊 Global collection: ${collName}`);
+  const count = await collection.countDocuments();
+  console.log(`   Total products in global collection: ${count}`);
+
+  // Show distribution by created_by_unit
+  console.log(`\n📊 Distribution by unit (created_by_unit):`);
   for (const unitId of units) {
-    const collName = collectionName(tenantId, unitId, 'product');
-    const count = await db.collection(collName).countDocuments();
-    console.log(`   ${unitId}: ${count} products`);
+    const unitCount = await collection.countDocuments({ created_by_unit: unitId });
+    console.log(`   ${unitId}: ${unitCount} products`);
   }
 
   await client.close();

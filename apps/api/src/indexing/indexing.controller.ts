@@ -9,7 +9,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard, ScopesGuard, AuthScopes } from '@crm-atlas/auth';
 import { TenantContext } from '@crm-atlas/core';
-import { IndexingService } from './indexing.service';
+import { IndexingService, type IndexingMetricsResponse } from './indexing.service';
 
 @ApiTags('indexing')
 @Controller(':tenant/:unit/indexing')
@@ -51,16 +51,7 @@ export class IndexingController {
   async getMetrics(
     @Param('tenant') tenant: string,
     @Param('unit') unit: string
-  ): Promise<{
-    collections: number;
-    documents: number;
-    collectionStats: Array<{
-      name: string;
-      numDocuments: number;
-      createdAt: number;
-      updatedAt: number;
-    }>;
-  }> {
+  ): Promise<IndexingMetricsResponse> {
     const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
     return this.indexingService.getMetrics(ctx);
   }

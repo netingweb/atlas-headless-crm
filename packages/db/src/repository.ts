@@ -77,19 +77,79 @@ export class EntityRepository {
   ): Promise<T | null> {
     // Validate ObjectId format
     if (!ObjectId.isValid(id)) {
+      console.log('[Repository] Invalid ObjectId:', { entity, id });
       return null;
     }
 
+    // Determine if entity is global (tenant scope) or local (unit scope)
+    // CRITICAL: If entityDef is not provided, we cannot determine scope correctly
+    // This will cause issues for global entities
     const isGlobal = entityDef?.scope === 'tenant';
-    const coll = getDb().collection(
-      collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal)
-    );
-    const filter: Record<string, unknown> = { _id: new ObjectId(id), tenant_id: ctx.tenant_id };
-    if (!isGlobal) {
-      filter.unit_id = ctx.unit_id;
+
+    if (!entityDef) {
+      console.error('[Repository] WARNING: findById called without entityDef!', {
+        entity,
+        id,
+        tenant_id: ctx.tenant_id,
+        unit_id: ctx.unit_id,
+      });
+      // Default to local scope if entityDef is not provided (for backward compatibility)
+      // But this will fail for global entities!
     }
+
+    const collName = collectionName(ctx.tenant_id, isGlobal ? null : ctx.unit_id, entity, isGlobal);
+    const coll = getDb().collection(collName);
+
+    // Build filter based on entity scope
+    let filter: Record<string, unknown>;
+    if (isGlobal) {
+      // For global entities, only filter by _id and tenant_id
+      // Don't filter by unit_id at all (even if the document has one)
+      filter = { _id: new ObjectId(id), tenant_id: ctx.tenant_id };
+    } else {
+      // For local entities, filter by _id, tenant_id, and unit_id
+      filter = { _id: new ObjectId(id), tenant_id: ctx.tenant_id, unit_id: ctx.unit_id };
+    }
+
+    console.log('[Repository] findById query:', {
+      entity,
+      id,
+      collection: collName,
+      isGlobal,
+      scope: entityDef?.scope,
+      filter: JSON.stringify(filter),
+      tenant_id: ctx.tenant_id,
+      unit_id: ctx.unit_id,
+      hasEntityDef: !!entityDef,
+    });
+
     const doc = await coll.findOne(filter);
     if (!doc) {
+      // Try a more permissive query for global entities if the first one fails
+      if (isGlobal) {
+        console.log(
+          '[Repository] Global entity not found with strict filter, trying permissive query'
+        );
+        const permissiveFilter = { _id: new ObjectId(id), tenant_id: ctx.tenant_id };
+        const permissiveDoc = await coll.findOne(permissiveFilter);
+        if (permissiveDoc) {
+          console.log('[Repository] Found with permissive query:', {
+            entity,
+            id,
+            collection: collName,
+            hasUnitId: !!permissiveDoc.unit_id,
+          });
+          return this.normalizeDocument<T>(permissiveDoc);
+        }
+      }
+
+      console.log('[Repository] Document not found:', {
+        entity,
+        id,
+        collection: collName,
+        filter: JSON.stringify(filter),
+        isGlobal,
+      });
       return null;
     }
 

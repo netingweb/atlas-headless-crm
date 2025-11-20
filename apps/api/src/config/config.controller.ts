@@ -1,5 +1,12 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiParam, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Put, Param, Body, UseGuards } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiParam,
+  ApiOkResponse,
+  ApiBearerAuth,
+  ApiBody,
+} from '@nestjs/swagger';
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { getDb } from '@crm-atlas/db';
 import { JwtAuthGuard } from '@crm-atlas/auth';
@@ -9,6 +16,11 @@ import type {
   PermissionsConfig,
   DocumentsConfig,
 } from '@crm-atlas/types';
+import { ConfigService } from './config.service';
+import {
+  TenantPlaygroundSettingsDto,
+  UnitPlaygroundSettingsDto,
+} from './dto/playground-settings.dto';
 
 @ApiTags('config')
 @Controller()
@@ -16,6 +28,8 @@ import type {
 @ApiBearerAuth()
 export class ConfigController {
   private readonly configLoader = new MongoConfigLoader(getDb());
+
+  constructor(private readonly configService: ConfigService) {}
 
   @Get(':tenant/units')
   @ApiOperation({
@@ -170,5 +184,85 @@ export class ConfigController {
       return { message: `Cache cleared for tenant: ${tenant}` };
     }
     return { message: 'Cache clear requested. Please restart API to fully clear cache.' };
+  }
+
+  @Get(':tenant/config/playground-settings/tenant')
+  @ApiOperation({
+    summary: 'Get tenant-level playground settings',
+    description:
+      'Returns tenant-level playground settings (AI Engine configuration and MCP Tools). ' +
+      'These settings are shared across all units of the tenant.',
+  })
+  @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
+  @ApiOkResponse({
+    description: 'Tenant playground settings',
+    type: TenantPlaygroundSettingsDto,
+  })
+  async getTenantPlaygroundSettings(
+    @Param('tenant') tenant: string
+  ): Promise<TenantPlaygroundSettingsDto> {
+    return this.configService.getTenantPlaygroundSettings(tenant);
+  }
+
+  @Put(':tenant/config/playground-settings/tenant')
+  @ApiOperation({
+    summary: 'Update tenant-level playground settings',
+    description:
+      'Updates tenant-level playground settings (AI Engine configuration and MCP Tools). ' +
+      'These settings are shared across all units of the tenant.',
+  })
+  @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
+  @ApiBody({ type: TenantPlaygroundSettingsDto })
+  @ApiOkResponse({
+    description: 'Settings updated successfully',
+    type: TenantPlaygroundSettingsDto,
+  })
+  async updateTenantPlaygroundSettings(
+    @Param('tenant') tenant: string,
+    @Body() settings: TenantPlaygroundSettingsDto
+  ): Promise<TenantPlaygroundSettingsDto> {
+    return this.configService.updateTenantPlaygroundSettings(tenant, settings);
+  }
+
+  @Get(':tenant/:unit/config/playground-settings/unit')
+  @ApiOperation({
+    summary: 'Get unit-level playground settings',
+    description:
+      'Returns unit-level playground settings (Entity Visibility configuration). ' +
+      'These settings are specific to each unit.',
+  })
+  @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
+  @ApiParam({ name: 'unit', description: 'Unit ID', example: 'sales' })
+  @ApiOkResponse({
+    description: 'Unit playground settings',
+    type: UnitPlaygroundSettingsDto,
+  })
+  async getUnitPlaygroundSettings(
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string
+  ): Promise<UnitPlaygroundSettingsDto> {
+    return this.configService.getUnitPlaygroundSettings(tenant, unit);
+  }
+
+  @Put(':tenant/:unit/config/playground-settings/unit')
+  @ApiOperation({
+    summary: 'Update unit-level playground settings',
+    description:
+      'Updates unit-level playground settings (Entity Visibility configuration). ' +
+      'These settings are specific to each unit.',
+  })
+  @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
+  @ApiParam({ name: 'unit', description: 'Unit ID', example: 'sales' })
+  @ApiBody({ type: UnitPlaygroundSettingsDto })
+  @ApiOkResponse({
+    description: 'Settings updated successfully',
+    type: UnitPlaygroundSettingsDto,
+  })
+  async updateUnitPlaygroundSettings(
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string,
+    @Body() settings: UnitPlaygroundSettingsDto
+  ): Promise<UnitPlaygroundSettingsDto> {
+    return this.configService.updateUnitPlaygroundSettings(tenant, unit, settings);
   }
 }

@@ -1,9 +1,12 @@
+import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUIStore } from '@/stores/ui-store';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/auth-store';
 import { useQuery } from '@tanstack/react-query';
 import { configApi } from '@/lib/api/config';
+import { playgroundSettingsApi } from '@/lib/api/playground-settings';
+import { useEntityVisibilityStore } from '@/stores/entity-visibility-store';
 import {
   LayoutDashboard,
   Users,
@@ -34,7 +37,8 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
-  const { tenantId } = useAuthStore();
+  const { tenantId, unitId } = useAuthStore();
+  const { isEntityVisibleInMenu, setEntityVisibility } = useEntityVisibilityStore();
 
   const { data: entityDefs, error: entitiesError } = useQuery({
     queryKey: ['config-entities', tenantId],
@@ -43,6 +47,21 @@ export default function Sidebar() {
     staleTime: 60_000,
     retry: 2,
   });
+
+  // Load unit settings for visibility
+  const { data: unitSettings } = useQuery({
+    queryKey: ['unit-playground-settings', tenantId, unitId],
+    queryFn: () => playgroundSettingsApi.getUnitSettings(tenantId || '', unitId || ''),
+    enabled: !!tenantId && !!unitId,
+    staleTime: 60_000,
+  });
+
+  // Update store when settings load
+  React.useEffect(() => {
+    if (unitSettings?.entityVisibility) {
+      setEntityVisibility(unitSettings.entityVisibility);
+    }
+  }, [unitSettings, setEntityVisibility]);
 
   // Log error for debugging
   if (entitiesError) {
@@ -53,6 +72,7 @@ export default function Sidebar() {
     (entityDefs || [])
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name))
+      .filter((def) => isEntityVisibleInMenu(def.name)) // Filter by visibility
       .map((def) => {
         const Icon = entityIconMap[def.name] || FileText;
         return {

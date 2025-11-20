@@ -1,8 +1,11 @@
+import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
 import { entitiesApi } from '@/lib/api/entities';
 import { configApi } from '@/lib/api/config';
+import { playgroundSettingsApi } from '@/lib/api/playground-settings';
+import { useEntityVisibilityStore } from '@/stores/entity-visibility-store';
 import { isApiAvailable } from '@/lib/api/permissions';
 import { Button } from '@/components/ui/button';
 import { Plus, Copy, Edit, Trash2 } from 'lucide-react';
@@ -14,6 +17,7 @@ export default function EntityList() {
   const { tenantId, unitId, user } = useAuthStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isFieldVisibleInList, setEntityVisibility } = useEntityVisibilityStore();
 
   const { data: entities, isLoading } = useQuery({
     queryKey: ['entities', tenantId, unitId, entityType],
@@ -26,11 +30,38 @@ export default function EntityList() {
     enabled: !!tenantId && !!unitId && !!entityType,
   });
 
+  // Load entity definition to know available fields
+  const { data: entityDef } = useQuery({
+    queryKey: ['entity-definition', tenantId, entityType],
+    queryFn: () => configApi.getEntity(tenantId || '', entityType || ''),
+    enabled: !!tenantId && !!entityType,
+  });
+
+  // Load unit settings for visibility
+  const { data: unitSettings } = useQuery({
+    queryKey: ['unit-playground-settings', tenantId, unitId],
+    queryFn: () => playgroundSettingsApi.getUnitSettings(tenantId || '', unitId || ''),
+    enabled: !!tenantId && !!unitId,
+  });
+
+  // Update store when settings load
+  React.useEffect(() => {
+    if (unitSettings?.entityVisibility) {
+      setEntityVisibility(unitSettings.entityVisibility);
+    }
+  }, [unitSettings, setEntityVisibility]);
+
   const { data: permissions } = useQuery({
     queryKey: ['permissions', tenantId],
     queryFn: () => configApi.getPermissions(tenantId || ''),
     enabled: !!tenantId,
   });
+
+  // Get visible fields for the table columns
+  const visibleFields = React.useMemo(() => {
+    if (!entityDef || !entityType) return [];
+    return entityDef.fields.filter((field) => isFieldVisibleInList(entityType, field.name));
+  }, [entityDef, entityType, isFieldVisibleInList]);
 
   const canCreate = isApiAvailable('entities.create', user || null, permissions || null);
   const canUpdate = isApiAvailable('entities.update', user || null, permissions || null);
@@ -94,16 +125,21 @@ export default function EntityList() {
         )}
       </div>
 
-      <div className="border rounded-lg">
+      <div className="border rounded-lg overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 ID
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Name
-              </th>
+              {visibleFields.map((field) => (
+                <th
+                  key={field.name}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                >
+                  {field.name}
+                </th>
+              ))}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Actions
               </th>
@@ -120,7 +156,7 @@ export default function EntityList() {
                         className="text-blue-600 hover:underline font-mono"
                         onClick={() => navigate(`/entities/${entityType}/${entity._id}`)}
                       >
-                        {entity._id}
+                        {entity._id.substring(0, 8)}...
                       </button>
                       <button
                         type="button"
@@ -132,9 +168,14 @@ export default function EntityList() {
                       </button>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {(entity as any).name || (entity as any).title || 'Untitled'}
-                  </td>
+                  {visibleFields.map((field) => {
+                    const value = (entity as any)[field.name];
+                    return (
+                      <td key={field.name} className="px-6 py-4 whitespace-nowrap text-sm">
+                        {value !== null && value !== undefined ? String(value) : '-'}
+                      </td>
+                    );
+                  })}
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex items-center gap-2">
                       {canUpdate && (
@@ -163,7 +204,10 @@ export default function EntityList() {
               ))
             ) : (
               <tr>
-                <td colSpan={3} className="px-6 py-4 text-center text-gray-500">
+                <td
+                  colSpan={visibleFields.length + 2}
+                  className="px-6 py-4 text-center text-gray-500"
+                >
                   No {entityType} found
                 </td>
               </tr>

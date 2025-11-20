@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { indexingApi, type TypesenseHealth, type TypesenseMetrics } from '@/lib/api/indexing';
+import {
+  indexingApi,
+  type TypesenseHealth,
+  type IndexingMetricsResponse,
+} from '@/lib/api/indexing';
 import { useAuthStore } from '@/stores/auth-store';
 import { Loader2, CheckCircle2, XCircle, RefreshCw, Database, Copy } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -32,7 +36,7 @@ export default function IndexingTab() {
     data: metrics,
     isLoading: metricsLoading,
     refetch: refetchMetrics,
-  } = useQuery<TypesenseMetrics>({
+  } = useQuery<IndexingMetricsResponse>({
     queryKey: ['indexing', 'metrics', tenantId, unitId],
     queryFn: () => (ctx ? indexingApi.getMetrics(ctx) : Promise.reject('No context')),
     enabled: !!ctx,
@@ -110,6 +114,83 @@ export default function IndexingTab() {
     refetchMetrics();
   };
 
+  const handleCopyMetrics = () => {
+    if (!metrics) return;
+    navigator.clipboard.writeText(JSON.stringify(metrics, null, 2)).then(() => {
+      toast({
+        title: 'Copied',
+        description: 'Indexing data copied to clipboard',
+      });
+    });
+  };
+
+  const renderCollectionSection = (
+    title: string,
+    items: IndexingMetricsResponse['globalCollections'],
+    emptyMessage: string
+  ) => {
+    if (!items.length) {
+      return <p className="text-sm text-gray-500">{emptyMessage}</p>;
+    }
+
+    const indexedCount = items.filter((item) => item.indexed).length;
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <span className="text-xs text-gray-500">
+            {indexedCount}/{items.length} indexed
+          </span>
+        </div>
+        <div className="space-y-2">
+          {items.map((stat) => (
+            <div key={`${stat.name}-${stat.unit_id || 'global'}`} className="rounded-lg border p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="flex-shrink-0">
+                    <div className="text-3xl font-bold text-blue-600">
+                      {stat.numDocuments.toLocaleString()}
+                    </div>
+                    <div className="text-xs text-gray-500 text-center">documents</div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">
+                      {stat.entity || stat.name}{' '}
+                      {stat.unit_id && (
+                        <span className="text-xs text-gray-500">({stat.unit_id})</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-500">{stat.name}</p>
+                  </div>
+                </div>
+                <div className="text-right text-xs">
+                  <div
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${
+                      stat.indexed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                    }`}
+                  >
+                    {stat.indexed ? 'Indexed' : 'Missing'}
+                  </div>
+                  {stat.createdAt ? (
+                    <p className="mt-1 text-gray-400">
+                      Created: {formatDate(new Date(stat.createdAt * 1000))}
+                    </p>
+                  ) : null}
+                  {stat.updatedAt ? (
+                    <p className="text-gray-400">
+                      Updated: {formatDate(new Date(stat.updatedAt * 1000))}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* Health Status */}
@@ -176,18 +257,24 @@ export default function IndexingTab() {
               <CardTitle>Indexing Metrics</CardTitle>
               <CardDescription>Statistics about indexed collections and documents</CardDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetchMetrics()}
-              disabled={metricsLoading}
-            >
-              {metricsLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleCopyMetrics} disabled={!metrics}>
+                <Copy className="h-4 w-4" />
+                <span className="ml-2 hidden sm:inline">Copy data</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchMetrics()}
+                disabled={metricsLoading}
+              >
+                {metricsLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -198,12 +285,14 @@ export default function IndexingTab() {
             </div>
           ) : metrics ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg border p-4">
                   <div className="flex items-center gap-2">
                     <Database className="h-5 w-5 text-blue-500" />
                     <div>
-                      <p className="text-2xl font-bold">{metrics.collections}</p>
+                      <p className="text-2xl font-bold">
+                        {metrics.summary.totalCollections.toLocaleString()}
+                      </p>
                       <p className="text-sm text-gray-500">Collections</p>
                     </div>
                   </div>
@@ -212,40 +301,60 @@ export default function IndexingTab() {
                   <div className="flex items-center gap-2">
                     <Database className="h-5 w-5 text-green-500" />
                     <div>
-                      <p className="text-2xl font-bold">{metrics.documents.toLocaleString()}</p>
+                      <p className="text-2xl font-bold">
+                        {metrics.summary.totalDocuments.toLocaleString()}
+                      </p>
                       <p className="text-sm text-gray-500">Documents</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <div className="flex items-center gap-2">
+                    <Database className="h-5 w-5 text-purple-500" />
+                    <div>
+                      <p className="text-2xl font-bold">
+                        {metrics.summary.global.indexed}/{metrics.summary.global.expected}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Global collections ({metrics.summary.global.documents.toLocaleString()}{' '}
+                        docs)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <div className="flex items-center gap-2">
+                    <Database className="h-5 w-5 text-orange-500" />
+                    <div>
+                      <p className="text-2xl font-bold">
+                        {metrics.summary.local.indexed}/{metrics.summary.local.expected}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Local collections ({metrics.summary.local.documents.toLocaleString()} docs)
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {metrics.collectionStats && metrics.collectionStats.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-sm font-semibold">Collection Details</h3>
-                  <div className="space-y-2">
-                    {metrics.collectionStats.map((stat) => (
-                      <div key={stat.name} className="rounded-lg border p-3 text-sm">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{stat.name}</p>
-                            <p className="text-gray-500">
-                              {stat.numDocuments.toLocaleString()} documents
-                            </p>
-                          </div>
-                          <div className="text-right text-xs text-gray-400">
-                            {stat.createdAt && (
-                              <p>Created: {formatDate(new Date(stat.createdAt * 1000))}</p>
-                            )}
-                            {stat.updatedAt && (
-                              <p>Updated: {formatDate(new Date(stat.updatedAt * 1000))}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="space-y-6">
+                {renderCollectionSection(
+                  'Global Collections',
+                  metrics.globalCollections,
+                  'No global collections configured for this tenant.'
+                )}
+                {renderCollectionSection(
+                  'Local Collections',
+                  metrics.localCollections,
+                  'No local collections configured for this tenant.'
+                )}
+                {metrics.unknownCollections.length > 0 &&
+                  renderCollectionSection(
+                    'Unknown Collections',
+                    metrics.unknownCollections,
+                    'No unexpected collections found.'
+                  )}
+              </div>
             </div>
           ) : (
             <p className="text-sm text-gray-500">Unable to load metrics</p>

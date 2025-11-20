@@ -1,7 +1,6 @@
 import { loadRootEnv } from '@crm-atlas/utils';
 import { connectMongo, getDb } from '@crm-atlas/db';
 import { MongoConfigLoader } from '@crm-atlas/config';
-import { collectionName } from '@crm-atlas/utils';
 import { getEmbeddableFields, concatFields } from '@crm-atlas/utils';
 import {
   ensureCollection,
@@ -11,6 +10,15 @@ import {
 } from '@crm-atlas/search';
 import { createEmbeddingsProvider, getProviderConfig } from '@crm-atlas/embeddings';
 import type { EntityDefinition } from '@crm-atlas/types';
+import {
+  buildQdrantPayload,
+  buildTenantContext,
+  buildTypesenseDocument,
+  isGlobalEntity,
+  normalizeDocument,
+  resolveMongoCollectionName,
+} from './typesense-helpers';
+import { ensureEmbeddingsApiKey } from './embeddings-config';
 
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/crm_atlas';
 const dbName = process.env.MONGODB_DB_NAME || 'crm_atlas';
@@ -27,6 +35,7 @@ export async function backfillIndexes(): Promise<void> {
   for (const tenant of tenants) {
     console.log(`\n📋 Tenant: ${tenant.tenant_id}`);
     const units = await configLoader.getUnits(tenant.tenant_id);
+    const processedGlobalEntities = new Set<string>();
 
     for (const unit of units) {
       console.log(`  Unit: ${unit.unit_id}`);
@@ -36,15 +45,26 @@ export async function backfillIndexes(): Promise<void> {
       });
 
       for (const entity of entities) {
+        const globalKey = `${tenant.tenant_id}:${entity.name}`;
+        const entityIsGlobal = isGlobalEntity(entity);
+
+        if (entityIsGlobal) {
+          if (processedGlobalEntities.has(globalKey)) {
+            continue;
+          }
+          processedGlobalEntities.add(globalKey);
+        }
+
         const indexed = await backfillEntity(
           tenant.tenant_id,
-          unit.unit_id,
+          entityIsGlobal ? null : unit.unit_id,
           entity.name,
           entity,
           configLoader
         );
         totalIndexed += indexed;
-        console.log(`    ✓ ${entity.name}: ${indexed} documenti indicizzati`);
+        const scopeLabel = entityIsGlobal ? 'global' : unit.unit_id;
+        console.log(`    ✓ ${entity.name} [${scopeLabel}]: ${indexed} documenti indicizzati`);
       }
     }
   }
@@ -54,13 +74,13 @@ export async function backfillIndexes(): Promise<void> {
 
 async function backfillEntity(
   tenantId: string,
-  unitId: string,
+  unitId: string | null,
   entity: string,
   entityDef: EntityDefinition,
   configLoader: MongoConfigLoader
 ): Promise<number> {
-  const ctx = { tenant_id: tenantId, unit_id: unitId };
-  const collName = collectionName(tenantId, unitId, entity);
+  const ctx = buildTenantContext(tenantId, unitId);
+  const collName = resolveMongoCollectionName(tenantId, unitId, entity, entityDef);
   const db = getDb();
   const collection = db.collection(collName);
 
@@ -71,6 +91,7 @@ async function backfillEntity(
   if (embeddableFields.length > 0) {
     try {
       const tenantConfig = await configLoader.getTenant(tenantId);
+      ensureEmbeddingsApiKey(tenantId, tenantConfig?.embeddingsProvider);
       const globalConfig = getProviderConfig();
 
       // Skip Qdrant if no embeddings provider is configured
@@ -96,24 +117,24 @@ async function backfillEntity(
   for (const doc of docs) {
     try {
       const docId = String(doc._id);
+      const normalizedDoc = normalizeDocument(doc as Record<string, unknown>);
 
       // Index in Typesense
-      await upsertDocument(
-        ctx,
-        entity,
-        {
-          id: docId,
-          ...doc,
-          tenant_id: tenantId,
-          unit_id: unitId,
-        },
+      const typesenseDoc = buildTypesenseDocument(
+        normalizedDoc,
+        docId,
+        tenantId,
+        unitId,
         entityDef
       );
+
+      await upsertDocument(ctx, entity, typesenseDoc, entityDef);
 
       // Index in Qdrant if has embeddable fields and embeddings provider is configured
       if (embeddableFields.length > 0) {
         try {
           const tenantConfig = await configLoader.getTenant(tenantId);
+          ensureEmbeddingsApiKey(tenantId, tenantConfig?.embeddingsProvider);
           const globalConfig = getProviderConfig();
 
           // Skip Qdrant indexing if no embeddings provider is configured
@@ -124,17 +145,14 @@ async function backfillEntity(
               globalConfig,
               tenantConfig?.embeddingsProvider
             );
-            const textToEmbed = concatFields(doc as Record<string, unknown>, embeddableFields);
+            const textToEmbed = concatFields(normalizedDoc, embeddableFields);
             if (textToEmbed.trim()) {
               const [vector] = await provider.embedTexts([textToEmbed]);
+              const payload = buildQdrantPayload(normalizedDoc, tenantId, unitId, entityDef);
               await upsertQdrantPoint(tenantId, entity, {
                 id: docId,
                 vector,
-                payload: {
-                  tenant_id: tenantId,
-                  unit_id: unitId,
-                  ...doc,
-                },
+                payload,
               });
             }
           }

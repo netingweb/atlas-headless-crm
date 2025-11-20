@@ -1,7 +1,6 @@
 import { loadRootEnv } from '@crm-atlas/utils';
 import { connectMongo, getDb } from '@crm-atlas/db';
 import { MongoConfigLoader } from '@crm-atlas/config';
-import { collectionName } from '@crm-atlas/utils';
 import { getEmbeddableFields, concatFields } from '@crm-atlas/utils';
 import {
   ensureCollection,
@@ -14,6 +13,15 @@ import {
 import { createEmbeddingsProvider, getProviderConfig } from '@crm-atlas/embeddings';
 import type { EntityDefinition } from '@crm-atlas/types';
 import { MongoClient, ChangeStream, ObjectId } from 'mongodb';
+import {
+  buildQdrantPayload,
+  buildTenantContext,
+  buildTypesenseDocument,
+  isGlobalEntity,
+  normalizeDocument,
+  resolveMongoCollectionName,
+} from './typesense-helpers';
+import { ensureEmbeddingsApiKey } from './embeddings-config';
 
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/crm_atlas';
 const dbName = process.env.MONGODB_DB_NAME || 'crm_atlas';
@@ -30,6 +38,7 @@ class IndexerService {
   private changeStreams: Map<string, ChangeStream> = new Map();
   private configLoader: MongoConfigLoader;
   private isRunning = false;
+  private watchedGlobalEntities: Set<string> = new Set();
 
   constructor() {
     this.configLoader = new MongoConfigLoader(getDb());
@@ -64,7 +73,23 @@ class IndexerService {
         });
 
         for (const entity of entities) {
-          await this.startChangeStream(tenant.tenant_id, unit.unit_id, entity.name, entity);
+          const isGlobal = isGlobalEntity(entity);
+          const globalKey = `${tenant.tenant_id}:${entity.name}`;
+
+          if (isGlobal && this.watchedGlobalEntities.has(globalKey)) {
+            continue;
+          }
+
+          await this.startChangeStream(
+            tenant.tenant_id,
+            isGlobal ? null : unit.unit_id,
+            entity.name,
+            entity
+          );
+
+          if (isGlobal) {
+            this.watchedGlobalEntities.add(globalKey);
+          }
         }
       }
     }
@@ -75,21 +100,24 @@ class IndexerService {
 
   private async startChangeStream(
     tenantId: string,
-    unitId: string,
+    unitId: string | null,
     entity: string,
     entityDef: EntityDefinition
   ): Promise<void> {
-    const collName = collectionName(tenantId, unitId, entity);
+    const isGlobal = isGlobalEntity(entityDef);
+    const collName = resolveMongoCollectionName(tenantId, unitId, entity, entityDef);
+    const ctx = buildTenantContext(tenantId, unitId);
     const db = getDb();
     const collection = db.collection(collName);
 
     try {
+      const tenantConfig = await this.configLoader.getTenant(tenantId);
       // Ensure collections exist in Typesense and Qdrant
-      await ensureCollection({ tenant_id: tenantId, unit_id: unitId }, entity, entityDef);
+      await ensureCollection(ctx, entity, entityDef);
 
       const embeddableFields = getEmbeddableFields(entityDef);
       if (embeddableFields.length > 0) {
-        const tenantConfig = await this.configLoader.getTenant(tenantId);
+        ensureEmbeddingsApiKey(tenantId, tenantConfig?.embeddingsProvider);
         const globalConfig = getProviderConfig();
         const provider = createEmbeddingsProvider(globalConfig, tenantConfig?.embeddingsProvider);
         const [sampleVector] = await provider.embedTexts(['sample']);
@@ -118,8 +146,9 @@ class IndexerService {
         console.error(`❌ Errore change stream per ${collName}:`, error);
       });
 
-      this.changeStreams.set(collName, changeStream);
-      console.log(`  ✓ Monitoring: ${collName}`);
+      const streamKey = `${tenantId}:${unitId ?? 'global'}:${entity}`;
+      this.changeStreams.set(streamKey, changeStream);
+      console.log(`  ✓ Monitoring: ${collName} (${isGlobal ? 'global' : unitId})`);
     } catch (error) {
       console.error(`❌ Errore avvio change stream per ${collName}:`, error);
     }
@@ -128,11 +157,11 @@ class IndexerService {
   private async handleChange(
     change: ChangeEvent,
     tenantId: string,
-    unitId: string,
+    unitId: string | null,
     entity: string,
     entityDef: EntityDefinition
   ): Promise<void> {
-    const ctx = { tenant_id: tenantId, unit_id: unitId };
+    const ctx = buildTenantContext(tenantId, unitId);
     const docId = String(change.documentKey._id);
 
     if (change.operationType === 'delete') {
@@ -155,7 +184,7 @@ class IndexerService {
     // This prevents race conditions where fullDocument might contain stale data
     if (change.operationType === 'update' || change.operationType === 'replace') {
       const db = getDb();
-      const collName = collectionName(tenantId, unitId, entity);
+      const collName = resolveMongoCollectionName(tenantId, unitId, entity, entityDef);
       const collection = db.collection(collName);
       // Convert _id to ObjectId if needed
       const docIdObj =
@@ -184,14 +213,8 @@ class IndexerService {
 
     // Index in Typesense with latest document data
     // Prepare document for Typesense (ensure id is string and remove MongoDB _id)
-    const typesenseDoc: { id: string; [key: string]: unknown } = {
-      id: docId,
-      ...doc,
-      tenant_id: tenantId,
-      unit_id: unitId,
-    };
-    // Remove _id to avoid duplication (we use id instead)
-    delete typesenseDoc._id;
+    const normalizedDoc = normalizeDocument(doc as Record<string, unknown>);
+    const typesenseDoc = buildTypesenseDocument(normalizedDoc, docId, tenantId, unitId, entityDef);
 
     await upsertDocument(ctx, entity, typesenseDoc, entityDef);
 
@@ -199,20 +222,18 @@ class IndexerService {
     const embeddableFields = getEmbeddableFields(entityDef);
     if (embeddableFields.length > 0) {
       const tenantConfig = await this.configLoader.getTenant(tenantId);
+      ensureEmbeddingsApiKey(tenantId, tenantConfig?.embeddingsProvider);
       const globalConfig = getProviderConfig();
       const provider = createEmbeddingsProvider(globalConfig, tenantConfig?.embeddingsProvider);
 
-      const textToEmbed = concatFields(doc as Record<string, unknown>, embeddableFields);
+      const textToEmbed = concatFields(normalizedDoc, embeddableFields);
       if (textToEmbed.trim()) {
         const [vector] = await provider.embedTexts([textToEmbed]);
+        const payload = buildQdrantPayload(normalizedDoc, tenantId, unitId, entityDef);
         await upsertQdrantPoint(tenantId, entity, {
           id: docId,
           vector,
-          payload: {
-            tenant_id: tenantId,
-            unit_id: unitId,
-            ...doc,
-          },
+          payload,
         });
       }
     }
@@ -229,6 +250,7 @@ class IndexerService {
     }
 
     this.changeStreams.clear();
+    this.watchedGlobalEntities.clear();
 
     if (this.client) {
       await this.client.close();

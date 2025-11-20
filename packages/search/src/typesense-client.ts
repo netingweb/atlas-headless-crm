@@ -90,7 +90,7 @@ export async function ensureCollection(
   try {
     await client.collections(collName).retrieve();
   } catch {
-    const schema = buildTypesenseSchema(entityDef, collName);
+    const schema = buildTypesenseSchema(entityDef, collName, isGlobal);
     await client.collections().create(schema);
   }
 }
@@ -154,13 +154,18 @@ export async function search(
 
 function buildTypesenseSchema(
   entityDef: EntityDefinition,
-  name: string
+  name: string,
+  isGlobal = false
 ): TypesenseCollectionCreateSchema {
   const fields: TypesenseField[] = [
     { name: 'id', type: 'string' },
     { name: 'tenant_id', type: 'string', facet: true, optional: true },
-    { name: 'unit_id', type: 'string', facet: true, optional: true },
   ];
+
+  // Only include unit_id for local entities
+  if (!isGlobal) {
+    fields.push({ name: 'unit_id', type: 'string', facet: true, optional: true });
+  }
 
   for (const field of entityDef.fields) {
     if (field.indexed || field.searchable) {
@@ -289,9 +294,11 @@ export async function getTypesenseMetrics(ctx: TenantContext): Promise<Typesense
     const tenantPrefix = `${ctx.tenant_id}_`;
 
     const filteredCollections = allCollections.filter((collection) => {
+      const name = collection.name;
       // Include collections that start with tenant prefix
       // This includes both global collections (tenant-wide) and local collections (unit-specific)
-      return collection.name.startsWith(tenantPrefix);
+      // Make sure it's an exact match (not just a substring match)
+      return name.startsWith(tenantPrefix) && name.length > tenantPrefix.length;
     });
 
     // Count documents in filtered collections
@@ -349,8 +356,10 @@ export async function getCollectionStats(ctx: TenantContext): Promise<Collection
   const tenantPrefix = `${ctx.tenant_id}_`;
 
   for (const collection of collections) {
+    const name = collection.name;
     // Include all collections that belong to this tenant
-    if (collection.name.startsWith(tenantPrefix)) {
+    // Make sure it's an exact match (not just a substring match)
+    if (name.startsWith(tenantPrefix) && name.length > tenantPrefix.length) {
       try {
         const collectionInfo = await client.collections(collection.name).retrieve();
         const infoResponse = collectionInfo as {

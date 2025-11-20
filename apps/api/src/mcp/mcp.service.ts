@@ -716,7 +716,20 @@ export class MCPService {
 
       if (action === 'get') {
         const id = args.id as string;
-        const doc = await this.repository.findById(ctx, entity, id);
+        // Load entity definition to determine scope (tenant vs unit)
+        const entityDef = await this.configLoader.getEntity(ctx, entity);
+        if (!entityDef) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({ error: 'Entity definition not found' }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+        const doc = await this.repository.findById(ctx, entity, id, entityDef);
 
         if (!doc) {
           return {
@@ -797,8 +810,21 @@ export class MCPService {
 
         // If not confirmed, return preview and require confirmation
         if (!confirmed) {
+          // Load entity definition to determine scope (tenant vs unit)
+          const entityDef = await this.configLoader.getEntity(ctx, entity);
+          if (!entityDef) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({ error: 'Entity definition not found' }, null, 2),
+                },
+              ],
+              isError: true,
+            };
+          }
           // Get current entity state
-          const currentEntity = await this.repository.findById(ctx, entity, id);
+          const currentEntity = await this.repository.findById(ctx, entity, id, entityDef);
           if (!currentEntity) {
             return {
               content: [
@@ -911,8 +937,21 @@ export class MCPService {
 
         // If not confirmed, return preview and require confirmation
         if (!confirmed) {
+          // Load entity definition to determine scope (tenant vs unit)
+          const entityDef = await this.configLoader.getEntity(ctx, entity);
+          if (!entityDef) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({ error: 'Entity definition not found' }, null, 2),
+                },
+              ],
+              isError: true,
+            };
+          }
           // Get current entity state
-          const currentEntity = await this.repository.findById(ctx, entity, id);
+          const currentEntity = await this.repository.findById(ctx, entity, id, entityDef);
           if (!currentEntity) {
             return {
               content: [
@@ -1250,20 +1289,151 @@ export class MCPService {
 
       // Get all entities for this tenant/unit
       const entities = await this.configLoader.getEntities(ctx);
+      this.logger.debug(`[GlobalSearch] Searching across ${entities.length} entities:`, {
+        entities: entities.map((e) => e.name),
+        query: normalizedQuery,
+        searchType,
+      });
+
       const results: Array<{ entity: string; items: unknown[]; count: number }> = [];
+
+      // Determine if we should use semantic search
+      const useSemanticSearch =
+        normalizedQuery !== '*' && (searchType === 'semantic' || searchType === 'hybrid');
+
+      // Get embeddings provider if needed
+      let queryVector: number[] | null = null;
+      if (useSemanticSearch) {
+        try {
+          const tenantConfig = await this.configLoader.getTenant(ctx.tenant_id);
+          const globalConfig = getProviderConfig();
+          const provider = createEmbeddingsProvider(globalConfig, tenantConfig?.embeddingsProvider);
+          const vectors = await provider.embedTexts([normalizedQuery]);
+          queryVector = vectors[0];
+          this.logger.debug('[GlobalSearch] Generated query vector for semantic search');
+        } catch (error) {
+          this.logger.warn(
+            '[GlobalSearch] Failed to generate embeddings, falling back to text search',
+            error instanceof Error ? error.message : String(error)
+          );
+          // Fallback to text search if embeddings fail
+        }
+      }
 
       // Search each entity type
       for (const entityDef of entities) {
         try {
           const entityName = entityDef.name;
-
-          // Use text search for global search (simpler and more reliable across all entities)
           const searchLimit = countOnly ? 0 : limit;
-          const searchResults = await search(ctx, entityName, {
-            q: normalizedQuery,
-            per_page: searchLimit,
-            page: 1,
-          });
+          let searchResults: { hits: unknown[]; found: number; page: number } | null = null;
+
+          // Try semantic/hybrid search if enabled and query vector is available
+          if (useSemanticSearch && queryVector) {
+            const embeddableFields = getEmbeddableFields(entityDef);
+            if (embeddableFields.length > 0) {
+              try {
+                const semanticResults = await searchQdrant(ctx.tenant_id, entityName, {
+                  vector: queryVector,
+                  limit: searchLimit,
+                  filter: {
+                    must: [
+                      { key: 'tenant_id', match: { value: ctx.tenant_id } },
+                      { key: 'unit_id', match: { value: ctx.unit_id } },
+                    ],
+                  },
+                });
+
+                this.logger.debug(`[GlobalSearch] Semantic search for ${entityName}:`, {
+                  query: normalizedQuery,
+                  resultsCount: semanticResults.length,
+                });
+
+                // For hybrid search, combine with text search
+                if (searchType === 'hybrid') {
+                  const textResults = await search(ctx, entityName, {
+                    q: normalizedQuery,
+                    per_page: searchLimit,
+                    page: 1,
+                  });
+
+                  // Combine results: prioritize semantic, add text results not in semantic
+                  const semanticIds = new Set(semanticResults.map((r) => String(r.id)));
+                  const combinedResults = [
+                    ...semanticResults.map((r) => ({
+                      id: r.id,
+                      score: r.score,
+                      payload: r.payload,
+                      source: 'semantic' as const,
+                    })),
+                    ...textResults.hits
+                      .filter((h) => {
+                        const id = String(
+                          (h as { id?: string; _id?: string }).id ||
+                            (h as { id?: string; _id?: string })._id
+                        );
+                        return !semanticIds.has(id);
+                      })
+                      .map((h) => ({
+                        id:
+                          (h as { id?: string; _id?: string }).id ||
+                          (h as { id?: string; _id?: string })._id,
+                        score: 0.5,
+                        payload: h as Record<string, unknown>,
+                        source: 'text' as const,
+                      })),
+                  ].slice(0, limit);
+
+                  // Convert to searchResults format
+                  searchResults = {
+                    hits: combinedResults.map((r) => {
+                      const docId = r.id || (r.payload as { document_id?: string })?.document_id;
+                      return {
+                        id: docId,
+                        _id: docId,
+                        ...(r.payload as Record<string, unknown>),
+                      };
+                    }),
+                    found: textResults.found,
+                    page: 1,
+                  };
+                } else {
+                  // Pure semantic search
+                  searchResults = {
+                    hits: semanticResults.map((r) => {
+                      const docId = r.id || (r.payload as { document_id?: string })?.document_id;
+                      return {
+                        id: docId,
+                        _id: docId,
+                        ...(r.payload as Record<string, unknown>),
+                      };
+                    }),
+                    found: semanticResults.length,
+                    page: 1,
+                  };
+                }
+              } catch (semanticError) {
+                this.logger.warn(
+                  `[GlobalSearch] Semantic search failed for ${entityName}, falling back to text search`,
+                  semanticError instanceof Error ? semanticError.message : String(semanticError)
+                );
+                // Fallback to text search
+              }
+            }
+          }
+
+          // Fallback to text search if semantic search wasn't used or failed
+          if (!searchResults) {
+            searchResults = await search(ctx, entityName, {
+              q: normalizedQuery,
+              per_page: searchLimit,
+              page: 1,
+            });
+            this.logger.debug(`[GlobalSearch] Text search for ${entityName}:`, {
+              query: normalizedQuery,
+              found: searchResults.found,
+              hitsCount: searchResults.hits.length,
+            });
+          }
 
           if (searchResults.hits && searchResults.hits.length > 0) {
             // Map hits to ensure consistent structure and add view links
@@ -1301,6 +1471,11 @@ export class MCPService {
               items: mappedItems,
               count: searchResults.found,
             });
+
+            this.logger.debug(`[GlobalSearch] Added results for ${entityName}:`, {
+              itemsCount: mappedItems.length,
+              totalFound: searchResults.found,
+            });
           } else if (searchResults.found > 0) {
             // If count_only is true, we still want to include entities with matches
             results.push({
@@ -1312,11 +1487,20 @@ export class MCPService {
         } catch (error) {
           // Skip entities that fail to search (log but don't fail entire search)
           this.logger.warn(
-            `Global search failed for entity ${entityDef.name}`,
+            `[GlobalSearch] Failed for entity ${entityDef.name}`,
             error instanceof Error ? error.stack : String(error)
           );
         }
       }
+
+      const totalCount = results.reduce((sum, r) => sum + r.count, 0);
+      this.logger.debug('[GlobalSearch] Final results:', {
+        query: normalizedQuery,
+        searchType,
+        totalEntities: results.length,
+        totalCount,
+        entitiesWithResults: results.map((r) => ({ entity: r.entity, count: r.count })),
+      });
 
       return {
         content: [
@@ -1328,7 +1512,7 @@ export class MCPService {
                 searchType,
                 results,
                 totalEntities: results.length,
-                totalCount: results.reduce((sum, r) => sum + r.count, 0),
+                totalCount,
               },
               null,
               2
