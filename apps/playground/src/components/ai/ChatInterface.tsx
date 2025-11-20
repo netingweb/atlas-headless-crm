@@ -12,6 +12,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { MemoryManager } from '@/lib/ai/memory';
 import ReactMarkdown from 'react-markdown';
+import ChainOfThought from './ChainOfThought';
+import { agentLogger, type ToolCallLog, type ThinkingLog } from '@/lib/ai/agent-logger';
 
 export interface ChatInterfaceHandle {
   copyChat: () => Promise<void>;
@@ -221,6 +223,12 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
     };
     setMessages((prev) => [...prev, assistantMessage]);
 
+    // Initialize variables before try block so they're available in catch
+    const executionStartTime = Date.now();
+    let assistantResponse = '';
+    const thinkingLogs: ThinkingLog[] = [];
+    const toolCallLogs: Map<string, { startTime: number; toolCall: ToolCallLog }> = new Map();
+
     try {
       // Add user message to memory
       if (memoryManagerRef.current) {
@@ -236,7 +244,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
           }));
 
       // Stream agent response
-      let assistantResponse = '';
+
       for await (const event of runAgentStream(agentRef.current, userInput, chatHistory)) {
         setMessages((prev) => {
           const updated = [...prev];
@@ -249,6 +257,10 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
             case 'thinking':
               if (event.content) {
                 currentMsg.thinking = [...(currentMsg.thinking || []), event.content];
+                thinkingLogs.push({
+                  content: event.content,
+                  timestamp: Date.now(),
+                });
               }
               break;
             case 'content':
@@ -259,6 +271,8 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
               break;
             case 'tool_call':
               if (event.toolName) {
+                const toolCallId = `${event.toolName}-${Date.now()}`;
+                const toolCallStartTime = Date.now();
                 currentMsg.toolCalls = [
                   ...(currentMsg.toolCalls || []),
                   {
@@ -266,6 +280,15 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                     args: event.toolArgs || {},
                   },
                 ];
+                // Track tool call start
+                toolCallLogs.set(toolCallId, {
+                  startTime: toolCallStartTime,
+                  toolCall: {
+                    toolName: event.toolName,
+                    args: event.toolArgs || {},
+                    timestamp: toolCallStartTime,
+                  },
+                });
               }
               break;
             case 'tool_result':
@@ -279,6 +302,16 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                     error: event.error,
                   };
                   currentMsg.toolCalls = toolCalls;
+                }
+                // Update tool call log with result
+                const toolCallEntry = Array.from(toolCallLogs.values()).find(
+                  (entry) => entry.toolCall.toolName === event.toolName && !entry.toolCall.result
+                );
+                if (toolCallEntry) {
+                  const durationMs = Date.now() - toolCallEntry.startTime;
+                  toolCallEntry.toolCall.result = event.toolResult;
+                  toolCallEntry.toolCall.error = event.error;
+                  toolCallEntry.toolCall.durationMs = durationMs;
                 }
               }
               break;
@@ -347,10 +380,38 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
         await memoryManagerRef.current.addMessage('assistant', assistantResponse);
       }
 
+      // Log execution
+      const executionDurationMs = Date.now() - executionStartTime;
+      agentLogger.logExecution({
+        conversationId: conversationIdRef.current,
+        messageId: assistantMessageId,
+        userMessage: userInput,
+        assistantResponse,
+        thinking: thinkingLogs,
+        toolCalls: Array.from(toolCallLogs.values()).map((entry) => entry.toolCall),
+        timestamp: executionStartTime,
+        durationMs: executionDurationMs,
+      });
+
       setLoading(false);
     } catch (err) {
       console.error('Failed to run agent:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to process message';
+
+      // Log execution with error
+      const executionDurationMs = Date.now() - executionStartTime;
+      agentLogger.logExecution({
+        conversationId: conversationIdRef.current,
+        messageId: assistantMessageId,
+        userMessage: userInput,
+        assistantResponse: assistantResponse || '',
+        thinking: thinkingLogs,
+        toolCalls: Array.from(toolCallLogs.values()).map((entry) => entry.toolCall),
+        timestamp: executionStartTime,
+        durationMs: executionDurationMs,
+        error: errorMessage,
+      });
+
       setError(errorMessage);
       toast({
         title: 'Error',
@@ -469,7 +530,9 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
           {messages.map((message) => (
             <div
               key={message.id}
-              className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
+              className={
+                message.role === 'user' ? 'flex flex-col items-end' : 'flex flex-col items-start'
+              }
             >
               <div
                 className={`
@@ -551,6 +614,12 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                   </ReactMarkdown>
                 </div>
               </div>
+              {/* Chain of Thought visualization for assistant messages */}
+              {message.role === 'assistant' && (
+                <div className="w-full max-w-[80%]">
+                  <ChainOfThought thinking={message.thinking} toolCalls={message.toolCalls} />
+                </div>
+              )}
             </div>
           ))}
           {loading && (

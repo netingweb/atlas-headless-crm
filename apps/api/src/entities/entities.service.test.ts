@@ -147,7 +147,7 @@ describe('EntitiesService', () => {
 
       expect(result).toEqual(created);
       expect(configLoader.getEntity).toHaveBeenCalledWith(ctx, 'contact');
-      expect(repository.create).toHaveBeenCalledWith(ctx, 'contact', data);
+      expect(repository.create).toHaveBeenCalledWith(ctx, 'contact', data, entityDef);
     });
 
     it('should throw NotFoundError if entity definition not found', async () => {
@@ -182,7 +182,7 @@ describe('EntitiesService', () => {
       const result = await service.findById(ctx, 'contact', '123');
 
       expect(result).toEqual(doc);
-      expect(repository.findById).toHaveBeenCalledWith(ctx, 'contact', '123');
+      expect(repository.findById).toHaveBeenCalledWith(ctx, 'contact', '123', entityDef);
     });
 
     it('should throw NotFoundError if entity not found', async () => {
@@ -224,7 +224,7 @@ describe('EntitiesService', () => {
       const result = await service.update(ctx, 'contact', '123', data);
 
       expect(result).toEqual(updated);
-      expect(repository.update).toHaveBeenCalledWith(ctx, 'contact', '123', data);
+      expect(repository.update).toHaveBeenCalledWith(ctx, 'contact', '123', data, entityDef);
     });
   });
 
@@ -241,7 +241,7 @@ describe('EntitiesService', () => {
 
       await service.delete(ctx, 'contact', '123');
 
-      expect(repository.delete).toHaveBeenCalledWith(ctx, 'contact', '123');
+      expect(repository.delete).toHaveBeenCalledWith(ctx, 'contact', '123', entityDef);
     });
 
     it('should throw NotFoundError if entity not found', async () => {

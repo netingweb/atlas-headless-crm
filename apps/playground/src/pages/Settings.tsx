@@ -6,6 +6,7 @@ import APIMethodsTab from '@/components/settings/APIMethodsTab';
 import CacheTab from '@/components/settings/CacheTab';
 import QueueMonitorTab from '@/components/settings/QueueMonitorTab';
 import EntityVisibilityTab from '@/components/settings/EntityVisibilityTab';
+import AgentObservabilityTab from '@/components/settings/AgentObservabilityTab';
 
 export default function Settings() {
   return (
@@ -20,6 +21,7 @@ export default function Settings() {
           <TabsTrigger value="mcp">MCP Tools</TabsTrigger>
           <TabsTrigger value="api">API Methods</TabsTrigger>
           <TabsTrigger value="ai">AI Engine</TabsTrigger>
+          <TabsTrigger value="observability">Agent Observability</TabsTrigger>
           <TabsTrigger value="visibility">Entity Visibility</TabsTrigger>
           <TabsTrigger value="indexing">Indexing</TabsTrigger>
           <TabsTrigger value="queue">Queue Monitor</TabsTrigger>
@@ -36,6 +38,10 @@ export default function Settings() {
 
         <TabsContent value="ai">
           <AIEngineTab />
+        </TabsContent>
+
+        <TabsContent value="observability">
+          <AgentObservabilityTab />
         </TabsContent>
 
         <TabsContent value="visibility">
