@@ -1,11 +1,11 @@
 {
-  "tenant_id": "demo2",
-  "name": "Demo2 Automotive Tenant",
+  "tenant_id": "demo",
+  "name": "Demo Tenant",
   "settings": {
     "playground": {
       "ai": {
         "provider": "openai",
-        "apiKey": "REMOVED_COMPROMISED_KEY",
+        "apiKey": "${OPENAI_API_KEY}",
         "model": "text-embedding-3-small",
         "temperature": 0.7,
         "maxTokens": 2000
@@ -14,7 +14,7 @@
   },
   "embeddingsProvider": {
     "name": "openai",
-    "apiKey": "REMOVED_COMPROMISED_KEY",
+    "apiKey": "${OPENAI_API_KEY}",
     "model": "text-embedding-3-small"
   },
   "storage": {
@@ -30,7 +30,7 @@
   "visionProvider": {
     "name": "openai",
     "model": "gpt-4-vision-preview",
-    "apiKey": "REMOVED_COMPROMISED_KEY"
+    "apiKey": "${OPENAI_API_KEY}"
   },
   "documentProcessing": {
     "maxFileSize": 104857600,
@@ -47,3 +47,4 @@
     }
   }
 }
+
