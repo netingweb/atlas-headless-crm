@@ -167,6 +167,9 @@ All entities support:
 - Dictionaries for predefined values
 - Embeddable fields for semantic search
 - Searchable fields for full-text search
+- **Multiple values**: Fields can accept arrays of values (`multiple: true`) for enum and reference types
+- **Human-readable labels**: Optional `label` property for entities and fields for better UI display
+- **Customizable search results**: Control which fields appear in search results with `show_in_search_results: true`
 
 See [docs/guides/data-model.md](docs/guides/data-model.md) for complete details.
 
