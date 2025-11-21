@@ -115,14 +115,14 @@ jobs:
           find apps/api/dist -name "main.js" -type f || echo "No main.js found in dist"
       - name: Start API (background)
         run: |
-          cd apps/api
-          node dist/apps/api/src/main.js > /tmp/api.log 2>&1 &
+          node apps/api/dist/apps/api/src/main.js > /tmp/api.log 2>&1 &
           API_PID=$!
           echo "API_PID=$API_PID" >> $GITHUB_ENV
           sleep 20
         env:
           MONGODB_URI: mongodb://localhost:27017/crm_atlas_test
           MONGODB_DB_NAME: crm_atlas_test
+          NODE_ENV: production
       - name: Wait for API to be ready
         run: |
           for i in {1..40}; do
