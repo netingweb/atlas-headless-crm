@@ -7,6 +7,6 @@ import { EntityEvents } from './entities.events';
 @Module({
   controllers: [EntitiesController],
   providers: [EntitiesService, RelationsService, EntityEvents],
-  exports: [EntitiesService],
+  exports: [EntitiesService, RelationsService],
 })
 export class EntitiesModule {}

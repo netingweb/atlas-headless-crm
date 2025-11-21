@@ -1,11 +1,16 @@
 import { apiClient } from './client';
 
+export interface EntityStats {
+  name: string;
+  label: string;
+  total: number;
+  recent: number;
+  pending?: number;
+  value?: number;
+}
+
 export interface StatsResponse {
-  contacts: { total: number; recent: number };
-  companies: { total: number; recent: number };
-  tasks: { total: number; pending: number };
-  opportunities: { total: number; value: number };
-  notes: { total: number; recent: number };
+  entities: EntityStats[];
 }
 
 export interface Note {

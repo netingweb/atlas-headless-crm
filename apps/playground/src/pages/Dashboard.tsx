@@ -1,9 +1,40 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
-import { statsApi, type Note } from '@/lib/api/stats';
+import { statsApi, type Note, type EntityStats } from '@/lib/api/stats';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Building2, Target, CheckSquare } from 'lucide-react';
+import {
+  Users,
+  Building2,
+  Target,
+  CheckSquare,
+  FileText,
+  Package,
+  ShoppingCart,
+  Wrench,
+  File,
+  type LucideIcon,
+} from 'lucide-react';
 import { format } from 'date-fns';
+
+// Map entity names to icons
+const entityIconMap: Record<string, LucideIcon> = {
+  contact: Users,
+  company: Building2,
+  task: CheckSquare,
+  opportunity: Target,
+  note: FileText,
+  product: Package,
+  deal: ShoppingCart,
+  service_order: Wrench,
+  document: File,
+};
+
+// Default icon for unknown entities
+const DefaultIcon = FileText;
+
+function getEntityIcon(entityName: string): LucideIcon {
+  return entityIconMap[entityName] || DefaultIcon;
+}
 
 export default function Dashboard() {
   const { tenantId, unitId } = useAuthStore();
@@ -21,33 +52,6 @@ export default function Dashboard() {
     enabled: !!tenantId && !!unitId,
   });
 
-  const kpis = [
-    {
-      label: 'Contacts',
-      value: stats?.contacts.total ?? 0,
-      recent: stats?.contacts.recent ?? 0,
-      icon: Users,
-    },
-    {
-      label: 'Companies',
-      value: stats?.companies.total ?? 0,
-      recent: stats?.companies.recent ?? 0,
-      icon: Building2,
-    },
-    {
-      label: 'Tasks',
-      value: stats?.tasks.total ?? 0,
-      pending: stats?.tasks.pending ?? 0,
-      icon: CheckSquare,
-    },
-    {
-      label: 'Opportunities',
-      value: stats?.opportunities.total ?? 0,
-      valueAmount: stats?.opportunities.value ?? 0,
-      icon: Target,
-    },
-  ];
-
   return (
     <div className="space-y-6">
       <div>
@@ -56,31 +60,35 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {kpis.map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <Card key={kpi.label}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{kpi.label}</CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {statsLoading ? '...' : kpi.value.toLocaleString()}
-                </div>
-                <CardDescription>
-                  {kpi.label === 'Tasks' && kpi.pending !== undefined
-                    ? `${kpi.pending} pending`
-                    : kpi.label === 'Opportunities' && kpi.valueAmount !== undefined
-                      ? `€${kpi.valueAmount.toLocaleString()} total value`
-                      : kpi.recent !== undefined
-                        ? `${kpi.recent} new this week`
-                        : `Total ${kpi.label.toLowerCase()}`}
-                </CardDescription>
-              </CardContent>
-            </Card>
-          );
-        })}
+        {statsLoading ? (
+          <div className="col-span-full text-center text-gray-500">Loading statistics...</div>
+        ) : stats?.entities && stats.entities.length > 0 ? (
+          stats.entities.map((entity: EntityStats) => {
+            const Icon = getEntityIcon(entity.name);
+            return (
+              <Card key={entity.name}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">{entity.label}</CardTitle>
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{entity.total.toLocaleString()}</div>
+                  <CardDescription>
+                    {entity.name === 'task' && entity.pending !== undefined
+                      ? `${entity.pending} pending`
+                      : entity.name === 'opportunity' && entity.value !== undefined
+                        ? `€${entity.value.toLocaleString()} total value`
+                        : entity.recent !== undefined && entity.recent > 0
+                          ? `${entity.recent} new this week`
+                          : `Total ${entity.label.toLowerCase()}`}
+                  </CardDescription>
+                </CardContent>
+              </Card>
+            );
+          })
+        ) : (
+          <div className="col-span-full text-center text-gray-500">No entities found</div>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

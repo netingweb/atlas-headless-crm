@@ -7,6 +7,7 @@ import { createEmbeddingsProvider, getProviderConfig } from '@crm-atlas/embeddin
 import { getEmbeddableFields } from '@crm-atlas/utils';
 import type { TenantContext } from '@crm-atlas/core';
 import { EntitiesService } from '../entities/entities.service';
+import { RelationsService } from '../entities/relations.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class MCPService {
 
   constructor(
     private readonly entitiesService: EntitiesService,
+    private readonly relationsService: RelationsService,
     @Optional()
     @Inject(forwardRef(() => WorkflowsService))
     private readonly workflowsService?: WorkflowsService
@@ -92,11 +94,17 @@ export class MCPService {
       // Get entity by ID tool
       tools.push({
         name: `get_${entity.name}`,
-        description: `Get a ${entityLabel} by ID`,
+        description: `Get a ${entityLabel} by ID with all related entities populated (direct references and inverse relations)`,
         inputSchema: {
           type: 'object',
           properties: {
             id: { type: 'string', description: 'Entity ID' },
+            deep: {
+              type: 'boolean',
+              description:
+                'If true (default), explore relations up to 2 levels deep. If false, only populate direct references.',
+              default: true,
+            },
           },
           required: ['id'],
         },
@@ -274,6 +282,182 @@ export class MCPService {
     });
 
     return tools;
+  }
+
+  /**
+   * Get populated field name (e.g., company_id -> _company)
+   */
+  private getPopulatedFieldName(fieldName: string): string {
+    if (fieldName.endsWith('_ids')) {
+      return `_${fieldName.replace('_ids', '')}`;
+    }
+    if (fieldName.endsWith('_id')) {
+      return `_${fieldName.replace('_id', '')}`;
+    }
+    return `_${fieldName}`;
+  }
+
+  /**
+   * Populate entity with all relations (direct references and inverse relations)
+   * with cross-exploration up to 2 levels deep
+   */
+  private async populateEntityWithRelations(
+    ctx: TenantContext,
+    entity: string,
+    entityId: string,
+    entityDef: any,
+    doc: Record<string, unknown>,
+    visited: Set<string> = new Set(),
+    depth: number = 0,
+    maxDepth: number = 2
+  ): Promise<Record<string, unknown>> {
+    const entityKey = `${entity}:${entityId}`;
+    if (visited.has(entityKey) || depth > maxDepth) {
+      return doc;
+    }
+    visited.add(entityKey);
+
+    // Step 1: Populate direct references
+    const populated = await this.relationsService.populateReferences(ctx, entityDef, doc);
+
+    // Step 2: Find inverse relations (entities that reference this entity)
+    const allEntities = await this.configLoader.getEntities(ctx);
+    const relatedEntitiesMap: Record<string, unknown[]> = {};
+
+    for (const relatedEntityDef of allEntities) {
+      const relatedEntityName = relatedEntityDef.name;
+
+      // Skip if same entity or already visited
+      if (relatedEntityName === entity) {
+        continue;
+      }
+
+      // Find reference fields that point to the current entity
+      const refFields = await this.relationsService.getReferenceFieldsToEntity(
+        ctx,
+        relatedEntityName,
+        entity
+      );
+
+      if (refFields.length === 0) {
+        continue;
+      }
+
+      // For each reference field found, get related entities
+      for (const { field } of refFields) {
+        try {
+          const relatedDocs = await this.relationsService.getRelatedEntities(
+            ctx,
+            entity,
+            entityId,
+            relatedEntityName,
+            field.name
+          );
+
+          if (relatedDocs && relatedDocs.length > 0) {
+            // Populate references for each related entity (level 2)
+            const populatedRelatedDocs = await Promise.all(
+              relatedDocs.map(async (relatedDoc: unknown) => {
+                const doc = relatedDoc as Record<string, unknown>;
+                const relatedDocId = String(doc._id || doc.id);
+                const populatedRelated = await this.populateEntityWithRelations(
+                  ctx,
+                  relatedEntityName,
+                  relatedDocId,
+                  relatedEntityDef,
+                  doc,
+                  new Set(visited), // New visited set to allow cross-references
+                  depth + 1,
+                  maxDepth
+                );
+
+                // Add view link
+                const relatedDocWithLink = {
+                  ...populatedRelated,
+                  view_link: this.generateEntityViewLink(relatedEntityName, relatedDocId),
+                };
+                return relatedDocWithLink;
+              })
+            );
+
+            // Group by entity type
+            if (!relatedEntitiesMap[relatedEntityName]) {
+              relatedEntitiesMap[relatedEntityName] = [];
+            }
+            relatedEntitiesMap[relatedEntityName].push(...populatedRelatedDocs);
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Failed to get related entities ${relatedEntityName} for ${entity}/${entityId}:`,
+            error
+          );
+        }
+      }
+    }
+
+    // Step 3: Also populate references for direct referenced entities (level 2)
+    const referenceFields = entityDef.fields.filter(
+      (f: any) => f.type === 'reference' && f.reference_entity
+    );
+
+    for (const field of referenceFields) {
+      const populatedFieldName = this.getPopulatedFieldName(field.name);
+      const refValue = populated[populatedFieldName] || doc[field.name];
+
+      if (!refValue) {
+        continue;
+      }
+
+      const referencedEntity = field.reference_entity!;
+      const referencedEntityDef = await this.configLoader.getEntity(ctx, referencedEntity);
+      if (!referencedEntityDef) {
+        continue;
+      }
+
+      const values = Array.isArray(refValue) ? refValue : [refValue];
+
+      for (const refDoc of values) {
+        if (typeof refDoc === 'object' && refDoc !== null) {
+          const refDocId = String((refDoc as any)._id || (refDoc as any).id);
+          if (refDocId && !visited.has(`${referencedEntity}:${refDocId}`)) {
+            // Populate references for referenced entity (level 2)
+            const populatedRef = await this.populateEntityWithRelations(
+              ctx,
+              referencedEntity,
+              refDocId,
+              referencedEntityDef,
+              refDoc as Record<string, unknown>,
+              new Set(visited),
+              depth + 1,
+              maxDepth
+            );
+
+            // Update the populated reference
+            if (field.multiple === true) {
+              const index = values.indexOf(refDoc);
+              if (index >= 0 && Array.isArray(populated[populatedFieldName])) {
+                (populated[populatedFieldName] as unknown[])[index] = {
+                  ...populatedRef,
+                  view_link: this.generateEntityViewLink(referencedEntity, refDocId),
+                };
+              }
+            } else {
+              populated[populatedFieldName] = {
+                ...populatedRef,
+                view_link: this.generateEntityViewLink(referencedEntity, refDocId),
+              };
+            }
+          }
+        }
+      }
+    }
+
+    // Step 4: Add inverse relations to the result
+    if (Object.keys(relatedEntitiesMap).length > 0) {
+      populated._related_entities = relatedEntitiesMap;
+    }
+
+    return populated;
   }
 
   /**
@@ -1029,6 +1213,8 @@ export class MCPService {
 
       if (action === 'get') {
         const id = args.id as string;
+        const deep = (args.deep as boolean) !== false; // Default to true
+
         // Load entity definition to determine scope (tenant vs unit)
         const entityDef = await this.configLoader.getEntity(ctx, entity);
         if (!entityDef) {
@@ -1056,9 +1242,28 @@ export class MCPService {
           };
         }
 
+        // Populate entity with relations if deep exploration is enabled
+        let populatedDoc: Record<string, unknown>;
+        if (deep) {
+          populatedDoc = await this.populateEntityWithRelations(
+            ctx,
+            entity,
+            id,
+            entityDef,
+            doc as unknown as Record<string, unknown>
+          );
+        } else {
+          // Only populate direct references
+          populatedDoc = await this.relationsService.populateReferences(
+            ctx,
+            entityDef,
+            doc as unknown as Record<string, unknown>
+          );
+        }
+
         // Add view link to entity with prominent display
         const docWithLink = {
-          ...doc,
+          ...populatedDoc,
           view_link: this.generateEntityViewLink(entity, id),
           '🔗 VIEW_LINK': this.generateEntityViewLink(entity, id),
           _IMPORTANT: `This ${entity} can be viewed at: ${this.generateEntityViewLink(entity, id)}`,
