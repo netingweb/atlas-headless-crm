@@ -669,6 +669,10 @@ importers:
         version: 5.9.3
 
   packages/utils:
+    dependencies:
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.4.5
     devDependencies:
       '@types/jest':
         specifier: ^29.5.11
@@ -676,9 +680,6 @@ importers:
       '@types/node':
         specifier: ^20.11.0
         version: 20.19.24
-      dotenv:
-        specifier: ^16.4.5
-        version: 16.4.5
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@20.19.24)
@@ -6320,6 +6321,7 @@ packages:
   /dotenv@16.4.5:
     resolution: {integrity: sha512-ZmdL2rui+eB2YwhsWzjInR8LldtZHGDoQ1ugH85ppHKwpUHL7j7rN0Ti9NCnGiQbhaZ11FpR+7ao1dNsmduNUg==}
     engines: {node: '>=12'}
+    dev: false
 
   /duck@0.1.12:
     resolution: {integrity: sha512-wkctla1O6VfP89gQ+J/yDesM0S7B7XLXjKGzXxMDVFg7uEn706niAtyYovKbyq1oT9YwDcly721/iUWoc8MVRg==}
