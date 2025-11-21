@@ -14,6 +14,7 @@ Rappresenta un contatto/persona nel CRM.
 - `source` (string, optional) - Fonte del contatto (dictionary: `contact_source`)
 - `role` (string, optional) - Ruolo del contatto (dictionary: `contact_role`)
 - `status` (string, optional) - Stato del contatto (dictionary: `contact_status`)
+- `labels` (string[], optional, multiple) - Etichette assegnate al contatto (enum: `vip`, `prospect`, `customer`, `partner`, `supplier`)
 - `company_id` (reference → company, optional) - Relazione con l'azienda
 
 **Relazioni:**
@@ -36,6 +37,7 @@ Rappresenta un'azienda/cliente.
 - `size` (string, optional) - Dimensione aziendale (dictionary: `company_size`)
 - `industry` (string, optional) - Settore di appartenenza (dictionary: `company_industry`)
 - `address` (text, optional) - Indirizzo completo
+- `key_contact_ids` (reference[], optional, multiple) - Contatti chiave associati all’azienda
 
 **Relazioni:**
 
@@ -110,6 +112,7 @@ Il sistema supporta diversi tipi di campo per definire le proprietà delle entit
 - `default` (any, optional) - Valore di default per il campo
 - `validation` (object, optional) - Regole di validazione aggiuntive (es. enum, min, max)
 - `reference_entity` (string, optional) - Per campi di tipo `reference`, specifica l'entità referenziata
+- `multiple` (boolean, default: false) - Se `true`, il campo accetta array di valori (es. enum multipli o reference multiple)
 
 ### Tipi di Campo Disponibili
 

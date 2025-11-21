@@ -249,6 +249,7 @@ export default function EntityVisibilityTab() {
                               embeddable?: boolean;
                               validation?: unknown;
                               reference_entity?: string;
+                              multiple?: boolean;
                             }) => {
                               const fieldSettings = entitySettings.fields[field.name] || {
                                 visibleInList: true,
@@ -301,6 +302,14 @@ export default function EntityVisibilityTab() {
                                             Embeddable
                                           </Badge>
                                         )}
+                                        {field.multiple && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-xs flex items-center gap-1"
+                                          >
+                                            Multiple
+                                          </Badge>
+                                        )}
                                       </div>
 
                                       {/* Enum values */}
@@ -316,6 +325,11 @@ export default function EntityVisibilityTab() {
                                                   Enum values:{' '}
                                                 </span>
                                                 <span className="text-gray-600">{enumValues}</span>
+                                                {field.multiple && (
+                                                  <span className="text-gray-500 ml-1">
+                                                    (multiple selections allowed)
+                                                  </span>
+                                                )}
                                               </div>
                                             );
                                           })()
@@ -330,6 +344,11 @@ export default function EntityVisibilityTab() {
                                           <span className="text-blue-600">
                                             {String(field.reference_entity)}
                                           </span>
+                                          {field.multiple && (
+                                            <span className="text-blue-500 ml-1 text-xs">
+                                              (multiple references allowed)
+                                            </span>
+                                          )}
                                         </div>
                                       )}
                                     </div>

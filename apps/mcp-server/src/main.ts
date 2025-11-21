@@ -364,6 +364,8 @@ class MCPServer {
       validation?: { enum?: unknown[]; [key: string]: unknown };
       default?: unknown;
       description?: string;
+      reference_entity?: string;
+      multiple?: boolean;
     }>;
   }): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
@@ -429,6 +431,28 @@ class MCPServer {
       // Add field description if present
       if (field.description) {
         schema.description = field.description;
+      }
+
+      if (field.multiple === true) {
+        const { enum: enumValues, description, ...rest } = schema;
+        const itemSchema: Record<string, unknown> = { ...rest };
+        if (enumValues) {
+          itemSchema.enum = enumValues;
+        }
+
+        const arraySchema: Record<string, unknown> = {
+          type: 'array',
+          items: Object.keys(itemSchema).length > 0 ? itemSchema : {},
+        };
+
+        if (description) {
+          arraySchema.description = `${description} (multiple values allowed)`;
+        } else {
+          arraySchema.description = 'Multiple values allowed';
+        }
+
+        properties[field.name] = arraySchema;
+        continue;
       }
 
       properties[field.name] = schema;

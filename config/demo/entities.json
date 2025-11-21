@@ -57,6 +57,18 @@
           }
         },
         {
+          "name": "labels",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "multiple": true,
+          "validation": {
+            "enum": ["vip", "prospect", "customer", "partner", "supplier"]
+          }
+        },
+        {
           "name": "company_id",
           "type": "reference",
           "required": false,
@@ -133,6 +145,16 @@
           "indexed": false,
           "searchable": true,
           "embeddable": false
+        },
+        {
+          "name": "key_contact_ids",
+          "type": "reference",
+          "required": false,
+          "indexed": false,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact",
+          "multiple": true
         }
       ]
     },

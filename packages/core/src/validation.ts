@@ -62,53 +62,67 @@ export class ValidatorCache {
   }
 
   private fieldToJsonSchema(field: FieldDefinition): Record<string, unknown> {
-    const schema: Record<string, unknown> = {};
+    const baseSchema: Record<string, unknown> = {};
 
     switch (field.type) {
       case 'string':
       case 'email':
       case 'url':
       case 'text':
-        schema.type = 'string';
+        baseSchema.type = 'string';
         if (field.type === 'email') {
-          schema.format = 'email';
+          baseSchema.format = 'email';
         } else if (field.type === 'url') {
-          schema.format = 'uri';
+          baseSchema.format = 'uri';
         }
         break;
       case 'number':
-        schema.type = 'number';
+        baseSchema.type = 'number';
         break;
       case 'boolean':
-        schema.type = 'boolean';
+        baseSchema.type = 'boolean';
         break;
       case 'date':
-        schema.type = 'string';
+        baseSchema.type = 'string';
         // Use pattern to validate YYYY-MM-DD format (ISO date)
-        schema.pattern = '^\\d{4}-\\d{2}-\\d{2}$';
+        baseSchema.pattern = '^\\d{4}-\\d{2}-\\d{2}$';
         break;
       case 'datetime':
-        schema.type = 'string';
+        baseSchema.type = 'string';
         // Use date-time format to validate ISO 8601 datetime format (YYYY-MM-DDTHH:mm:ss.sssZ or YYYY-MM-DDTHH:mm:ss)
-        schema.format = 'date-time';
+        baseSchema.format = 'date-time';
         break;
       case 'json':
-        schema.type = 'object';
+        baseSchema.type = 'object';
         break;
       case 'reference':
-        schema.type = 'string';
+        baseSchema.type = 'string';
         break;
     }
 
     if (field.default !== undefined) {
-      schema.default = field.default;
+      baseSchema.default = field.default;
     }
 
     if (field.validation) {
-      Object.assign(schema, field.validation);
+      Object.assign(baseSchema, field.validation);
     }
 
-    return schema;
+    if (field.multiple === true) {
+      const { default: itemDefault, ...itemSchema } = baseSchema;
+      const arraySchema: Record<string, unknown> = {
+        type: 'array',
+        items: Object.keys(itemSchema).length > 0 ? itemSchema : { type: 'string' },
+      };
+
+      if (itemDefault !== undefined) {
+        arraySchema.default = itemDefault;
+      }
+
+      return arraySchema;
+    }
+
+    return baseSchema;
   }
 
   clear(tenantId?: string): void {

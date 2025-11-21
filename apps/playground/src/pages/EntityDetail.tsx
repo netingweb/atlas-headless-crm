@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Save, Copy } from 'lucide-react';
@@ -474,6 +475,39 @@ export default function EntityDetail() {
 
     if (hasEnum) {
       const enumValues = (field.validation as { enum: string[] }).enum;
+      if (field.multiple === true) {
+        const selectedValues = Array.isArray(fieldValue)
+          ? (fieldValue as unknown[]).map((value) => String(value))
+          : fieldValue
+            ? [String(fieldValue)]
+            : [];
+
+        return (
+          <div key={field.name} className="space-y-2">
+            <Label htmlFor={field.name}>
+              {field.name}
+              {field.required && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <MultiSelect
+              value={selectedValues}
+              onValueChange={(values) => handleFieldChange(field.name, values)}
+              options={enumValues.map((enumValue) => ({
+                value: enumValue,
+                label: enumValue.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+              }))}
+              placeholder={`Select ${field.name}${field.required ? '' : ' (optional)'}`}
+            />
+          </div>
+        );
+      }
+
+      const selectValue =
+        Array.isArray(fieldValue) && fieldValue.length > 0
+          ? String(fieldValue[0])
+          : fieldValue
+            ? String(fieldValue)
+            : undefined;
+
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
@@ -481,7 +515,7 @@ export default function EntityDetail() {
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Select
-            value={fieldValue ? String(fieldValue) : undefined}
+            value={selectValue}
             onValueChange={(value) => handleFieldChange(field.name, value || null)}
           >
             <SelectTrigger>
@@ -1257,6 +1291,7 @@ function ReferenceField({
   });
 
   const isReadonly = READONLY_FIELDS.includes(field.name);
+  const isMultiple = field.multiple === true;
 
   // Use local state to ensure Select is always controlled
   // Use a sentinel value "__none__" to represent "no selection" instead of undefined
@@ -1268,8 +1303,10 @@ function ReferenceField({
 
   // Sync local state with prop value when it changes
   useEffect(() => {
-    setSelectValue(value != null ? String(value) : NONE_VALUE);
-  }, [value]);
+    if (!isMultiple) {
+      setSelectValue(value != null ? String(value) : NONE_VALUE);
+    }
+  }, [value, isMultiple]);
 
   if (isReadonly) {
     return (
@@ -1278,6 +1315,43 @@ function ReferenceField({
           {field.name} (readonly)
         </Label>
         <Input id={field.name} value={String(value ?? '')} readOnly className="bg-gray-50" />
+      </div>
+    );
+  }
+
+  const normalizedOptions =
+    options?.map((option) => {
+      const optionId = (option._id || option.id || '') as string | number;
+      const displayName = (option.name ||
+        option.title ||
+        option.email ||
+        String(optionId)) as string;
+      return {
+        value: String(optionId),
+        label: displayName,
+      };
+    }) ?? [];
+
+  if (isMultiple) {
+    const selectedValues = Array.isArray(value)
+      ? (value as unknown[]).map((item) => String(item))
+      : value
+        ? [String(value)]
+        : [];
+
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={field.name}>
+          {field.name}
+          {field.required && <span className="text-red-500 ml-1">*</span>}
+        </Label>
+        <MultiSelect
+          value={selectedValues}
+          onValueChange={(values) => onChange(values)}
+          options={normalizedOptions}
+          disabled={isLoading}
+          placeholder={`Select ${referenceEntity}${field.required ? '' : ' (optional)'}`}
+        />
       </div>
     );
   }
@@ -1304,18 +1378,11 @@ function ReferenceField({
         </SelectTrigger>
         <SelectContent>
           {!field.required && <SelectItem value={NONE_VALUE}>None</SelectItem>}
-          {options?.map((option) => {
-            const optionId = (option._id || option.id || '') as string | number;
-            const displayName = (option.name ||
-              option.title ||
-              option.email ||
-              String(optionId)) as string;
-            return (
-              <SelectItem key={String(optionId)} value={String(optionId)}>
-                {displayName}
-              </SelectItem>
-            );
-          })}
+          {normalizedOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

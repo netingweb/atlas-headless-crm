@@ -122,6 +122,46 @@ async function fixDemo2Data(): Promise<void> {
       }
     }
     const fallbackContactId = normalizedContacts[0]?._id;
+    const fallbackContactIdString = fallbackContactId ? String(fallbackContactId) : null;
+
+    const labelOptions = ['vip', 'prospect', 'hot_lead', 'customer', 'partner', 'supplier'];
+    let updatedLabels = 0;
+    for (const [index, contact] of normalizedContacts.entries()) {
+      const selectionCount = (index % 3) + 1;
+      const labels = new Set<string>();
+      for (let i = 0; i < selectionCount; i++) {
+        const option = labelOptions[(index + i) % labelOptions.length];
+        labels.add(option);
+      }
+      await db
+        .collection('demo2_contact')
+        .updateOne({ _id: contact._id }, { $set: { labels: Array.from(labels) } });
+      updatedLabels++;
+    }
+    console.log(`✅ Assigned labels to ${updatedLabels} contact(s)`);
+
+    const companyContactsMap = new Map<string, string[]>();
+    for (const contact of normalizedContacts) {
+      if (!contact.company_id) {
+        continue;
+      }
+      const companyId = String(contact.company_id);
+      const contactId = String(contact._id);
+      const existing = companyContactsMap.get(companyId) || [];
+      existing.push(contactId);
+      companyContactsMap.set(companyId, existing);
+    }
+    const companies = await db.collection('demo2_company').find({}).toArray();
+    for (const company of companies) {
+      const companyId = company._id.toString();
+      const keyContacts =
+        companyContactsMap.get(companyId)?.slice(0, 3) ||
+        (fallbackContactIdString ? [fallbackContactIdString] : []);
+      await db
+        .collection('demo2_company')
+        .updateOne({ _id: company._id }, { $set: { key_contact_ids: keyContacts } });
+    }
+    console.log(`✅ Assigned key contacts to ${companies.length} company(s)`);
 
     // Ensure deals have deal_number
     const dealCollections = unitIds.map((unitId) => ({

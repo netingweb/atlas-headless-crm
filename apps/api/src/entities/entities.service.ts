@@ -231,59 +231,66 @@ export class EntitiesService {
    * Convert field definition to JSON schema property
    */
   private fieldToJsonSchema(field: FieldDefinition): Record<string, unknown> {
-    const schema: Record<string, unknown> = {};
+    const baseSchema: Record<string, unknown> = {};
 
     switch (field.type) {
       case 'string':
       case 'text':
       case 'email':
       case 'url':
-        schema.type = 'string';
+        baseSchema.type = 'string';
         break;
       case 'number':
-        schema.type = 'number';
+        baseSchema.type = 'number';
         break;
       case 'boolean':
-        schema.type = 'boolean';
+        baseSchema.type = 'boolean';
         break;
       case 'date':
-        schema.type = 'string';
-        schema.format = 'date-time';
+        baseSchema.type = 'string';
+        baseSchema.format = 'date-time';
         break;
       case 'datetime':
-        schema.type = 'string';
-        schema.format = 'date-time';
+        baseSchema.type = 'string';
+        baseSchema.format = 'date-time';
         break;
       case 'json':
         // JSON fields can be any type
         break;
       case 'reference':
-        schema.type = 'string';
+        baseSchema.type = 'string';
         break;
       default:
-        schema.type = 'string';
+        baseSchema.type = 'string';
     }
 
     // Handle validation constraints
     if (field.validation) {
       if ('enum' in field.validation && Array.isArray(field.validation.enum)) {
-        schema.enum = field.validation.enum;
+        baseSchema.enum = field.validation.enum;
       }
       if ('min' in field.validation) {
-        schema.minimum = field.validation.min;
+        baseSchema.minimum = field.validation.min;
       }
       if ('max' in field.validation) {
-        schema.maximum = field.validation.max;
+        baseSchema.maximum = field.validation.max;
       }
       if ('minLength' in field.validation) {
-        schema.minLength = field.validation.minLength;
+        baseSchema.minLength = field.validation.minLength;
       }
       if ('maxLength' in field.validation) {
-        schema.maxLength = field.validation.maxLength;
+        baseSchema.maxLength = field.validation.maxLength;
       }
     }
 
-    return schema;
+    if (field.multiple === true) {
+      return {
+        type: 'array',
+        items: Object.keys(baseSchema).length > 0 ? baseSchema : {},
+      };
+    }
+
+    return baseSchema;
   }
 
   /**

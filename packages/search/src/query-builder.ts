@@ -27,7 +27,14 @@ export function buildTypesenseQuery(
   if (query.filters) {
     for (const [key, value] of Object.entries(query.filters)) {
       if (value !== undefined && value !== null) {
-        filterParts.push(`${key}:=${value}`);
+        if (Array.isArray(value)) {
+          const formattedArray = formatFilterArray(value);
+          if (formattedArray) {
+            filterParts.push(`${key}:=${formattedArray}`);
+          }
+        } else {
+          filterParts.push(`${key}:=${formatFilterValue(value)}`);
+        }
       }
     }
   }
@@ -40,4 +47,26 @@ export function buildTypesenseQuery(
     per_page: query.per_page || 10,
     page: query.page || 1,
   };
+}
+
+function formatFilterArray(values: unknown[]): string {
+  const formattedValues = values
+    .filter((value) => value !== undefined && value !== null)
+    .map((value) => formatFilterValue(value));
+
+  if (formattedValues.length === 0) {
+    return '';
+  }
+
+  return `[${formattedValues.join(',')}]`;
+}
+
+function formatFilterValue(value: unknown): string {
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  const stringValue = String(value);
+  const escaped = stringValue.replace(/"/g, '\\"');
+  return `"${escaped}"`;
 }

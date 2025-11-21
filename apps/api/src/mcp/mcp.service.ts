@@ -323,6 +323,7 @@ export class MCPService {
       default?: unknown;
       description?: string;
       reference_entity?: string;
+      multiple?: boolean;
     }>;
   }): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
@@ -390,6 +391,28 @@ export class MCPService {
         schema.description = field.description;
       }
 
+      if (field.multiple === true) {
+        const { enum: enumValues, description, ...rest } = schema;
+        const itemSchema: Record<string, unknown> = { ...rest };
+        if (enumValues) {
+          itemSchema.enum = enumValues;
+        }
+
+        const arraySchema: Record<string, unknown> = {
+          type: 'array',
+          items: Object.keys(itemSchema).length > 0 ? itemSchema : {},
+        };
+
+        if (description) {
+          arraySchema.description = `${description} (multiple values allowed)`;
+        } else {
+          arraySchema.description = 'Multiple values allowed';
+        }
+
+        properties[field.name] = arraySchema;
+        continue;
+      }
+
       properties[field.name] = schema;
     }
 
@@ -419,10 +442,43 @@ export class MCPService {
     if (schema.properties) {
       for (const [field, value] of Object.entries(args)) {
         const prop = schema.properties[field] as
-          | { type?: string; enum?: unknown[]; description?: string }
+          | {
+              type?: string;
+              enum?: unknown[];
+              description?: string;
+              items?: Record<string, unknown>;
+            }
           | undefined;
 
         if (prop) {
+          if (prop.type === 'array') {
+            if (!Array.isArray(value)) {
+              errors.push(`Field '${field}' must be an array, got ${typeof value}`);
+              continue;
+            }
+
+            const itemSchema = prop.items || {};
+            const itemType = itemSchema.type as string | undefined;
+            const itemEnum = Array.isArray(itemSchema.enum)
+              ? (itemSchema.enum as unknown[])
+              : undefined;
+
+            for (const item of value) {
+              if (itemEnum && !itemEnum.includes(item)) {
+                errors.push(
+                  `Field '${field}' has invalid value '${item}'. Must be one of: ${itemEnum.join(', ')}`
+                );
+              }
+              if (itemType && typeof item !== itemType) {
+                errors.push(
+                  `Field '${field}' array items must be of type ${itemType}, got ${typeof item}`
+                );
+              }
+            }
+
+            continue;
+          }
+
           // Check enum values
           if (prop.enum && Array.isArray(prop.enum) && !prop.enum.includes(value)) {
             errors.push(

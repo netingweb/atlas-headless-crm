@@ -102,7 +102,7 @@ async function bootstrap(): Promise<void> {
     const config = new DocumentBuilder()
       .setTitle('Atlas CRM Headless API')
       .setDescription(
-        'Headless CRM multi-tenant, API-first, MCP-ready. Complete API documentation for managing contacts, companies, tasks, notes, and opportunities.'
+        'Headless CRM multi-tenant, API-first, MCP-ready. Complete API documentation for managing contacts, companies, tasks, notes, and opportunities. Entity definitions support enum/reference fields with multiple selections via the `multiple: true` flag.'
       )
       .setVersion('0.1.0')
       .setContact('Luca Mainieri', 'https://www.neting.it', 'info@neting.it')

@@ -22,6 +22,7 @@ export const FieldDefinitionSchema = z.object({
   indexed: z.boolean().default(false),
   searchable: z.boolean().default(false),
   embeddable: z.boolean().default(false),
+  multiple: z.boolean().default(false).optional(),
   reference_entity: z.string().optional(),
   default: z.unknown().optional(),
   validation: z.record(z.unknown()).optional(),

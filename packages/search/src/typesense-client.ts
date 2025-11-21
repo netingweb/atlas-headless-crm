@@ -245,9 +245,10 @@ function buildTypesenseSchema(
 
   for (const field of entityDef.fields) {
     if (field.indexed || field.searchable) {
+      const isMultiple = field.multiple === true;
       const tsField: TypesenseField = {
         name: field.name,
-        type: mapFieldTypeToTypesense(field.type),
+        type: mapFieldTypeToTypesense(field.type, isMultiple),
         optional: !field.required, // Make field optional if not required in entity definition
       };
 
@@ -289,22 +290,42 @@ function buildTypesenseSchema(
   return schema;
 }
 
-function mapFieldTypeToTypesense(fieldType: string): TypesenseField['type'] {
-  switch (fieldType) {
+function mapFieldTypeToTypesense(fieldType: string, isMultiple = false): TypesenseField['type'] {
+  const baseType = (() => {
+    switch (fieldType) {
+      case 'string':
+      case 'email':
+      case 'url':
+      case 'text':
+      case 'reference':
+        return 'string';
+      case 'number':
+        return 'int32';
+      case 'boolean':
+        return 'bool';
+      case 'date':
+      case 'datetime':
+        return 'int64';
+      default:
+        return 'string';
+    }
+  })();
+
+  if (!isMultiple) {
+    return baseType as TypesenseField['type'];
+  }
+
+  switch (baseType) {
     case 'string':
-    case 'email':
-    case 'url':
-    case 'text':
-      return 'string';
-    case 'number':
-      return 'int32';
-    case 'boolean':
-      return 'bool';
-    case 'date':
-    case 'datetime':
-      return 'int64';
+      return 'string[]';
+    case 'int32':
+      return 'int32[]';
+    case 'int64':
+      return 'int64[]';
+    case 'bool':
+      return 'bool[]';
     default:
-      return 'string';
+      return 'string[]';
   }
 }
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { NotFoundError } from '@crm-atlas/core';
-import type { TenantContext } from '@crm-atlas/core';
+import type { TenantContext, BaseDocument } from '@crm-atlas/core';
 import { EntityRepository } from '@crm-atlas/db';
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { getDb } from '@crm-atlas/db';
@@ -47,15 +47,18 @@ export class RelationsService {
       );
     }
 
-    // Query related entities
-    const relatedDocs = await this.repository.find(
-      ctx,
-      relatedEntity,
-      {
-        [referenceField]: id,
-      },
-      relatedEntityDef
-    );
+    const filter =
+      refField.multiple === true
+        ? {
+            [referenceField]: {
+              $in: [id],
+            },
+          }
+        : {
+            [referenceField]: id,
+          };
+
+    const relatedDocs = await this.repository.find(ctx, relatedEntity, filter, relatedEntityDef);
 
     return relatedDocs;
   }
@@ -74,129 +77,16 @@ export class RelationsService {
 
     for (const field of referenceFields) {
       const refValue = data[field.name];
-      if (refValue && typeof refValue === 'string') {
-        const referencedEntity = field.reference_entity!;
-        // Load entity definition for referenced entity to determine scope (tenant vs unit)
-        const referencedEntityDef = await this.configLoader.getEntity(ctx, referencedEntity);
-        if (!referencedEntityDef) {
-          throw new NotFoundError(
-            `Referenced entity definition not found: ${referencedEntity} (field: ${field.name})`
-          );
+      if (!refValue) {
+        continue;
+      }
+
+      const values = Array.isArray(refValue) ? refValue : [refValue];
+      for (const value of values) {
+        if (typeof value !== 'string') {
+          continue;
         }
-
-        // Verify scope is set correctly
-        if (!referencedEntityDef.scope) {
-          console.warn('[RelationsService] Entity definition missing scope, defaulting to unit:', {
-            referencedEntity,
-            field: field.name,
-          });
-          referencedEntityDef.scope = 'unit';
-        }
-
-        // Log for debugging
-        console.log('[RelationsService] Validating reference:', {
-          field: field.name,
-          referencedEntity,
-          refValue,
-          scope: referencedEntityDef.scope,
-          tenant_id: ctx.tenant_id,
-          unit_id: ctx.unit_id,
-          entityDefName: referencedEntityDef.name,
-          isGlobal: referencedEntityDef.scope === 'tenant',
-        });
-
-        // Pass entityDef to findById so it knows the correct scope (tenant vs unit)
-        console.log('[RelationsService] Calling repository.findById with entityDef:', {
-          referencedEntity,
-          refValue,
-          scope: referencedEntityDef.scope,
-          hasEntityDef: !!referencedEntityDef,
-          entityDefKeys: referencedEntityDef ? Object.keys(referencedEntityDef) : [],
-        });
-        let refDoc = await this.repository.findById(
-          ctx,
-          referencedEntity,
-          refValue,
-          referencedEntityDef
-        );
-        console.log('[RelationsService] findById result:', {
-          found: !!refDoc,
-          referencedEntity,
-          refValue,
-          scope: referencedEntityDef.scope,
-        });
-
-        // If not found and entity is global, try searching without unit_id filter as fallback
-        // This handles cases where entities were created before scope was properly defined
-        if (!refDoc && referencedEntityDef.scope === 'tenant') {
-          console.warn(
-            '[RelationsService] Global entity not found with scope check, trying direct collection lookup:',
-            {
-              referencedEntity,
-              refValue,
-              tenant_id: ctx.tenant_id,
-            }
-          );
-
-          // Try direct lookup in global collection without unit_id filter
-          // First try without unit_id filter at all
-          const { ObjectId } = await import('mongodb');
-          const db = getDb();
-          const globalCollection = db.collection(`${ctx.tenant_id}_${referencedEntity}`);
-
-          // Try simple lookup first (most common case)
-          let globalDoc = await globalCollection.findOne({
-            _id: new ObjectId(refValue),
-            tenant_id: ctx.tenant_id,
-          });
-
-          // If found but has unit_id, it's not a global entity - skip it
-          if (globalDoc && globalDoc.unit_id) {
-            globalDoc = null;
-          }
-
-          // If still not found, try with explicit null/undefined check
-          if (!globalDoc) {
-            globalDoc = await globalCollection.findOne({
-              _id: new ObjectId(refValue),
-              tenant_id: ctx.tenant_id,
-              $or: [{ unit_id: { $exists: false } }, { unit_id: null }],
-            });
-          }
-
-          if (globalDoc) {
-            console.warn('[RelationsService] Found entity in global collection without unit_id');
-            // Normalize the document
-            const normalized: Record<string, unknown> = Object.assign({}, globalDoc);
-            normalized._id = globalDoc._id.toString();
-            refDoc = normalized as any;
-          }
-        }
-
-        if (!refDoc) {
-          // Log additional info for debugging
-          const isGlobal = referencedEntityDef.scope === 'tenant';
-          const expectedCollection = isGlobal
-            ? `${ctx.tenant_id}_${referencedEntity}`
-            : `${ctx.tenant_id}_${ctx.unit_id}_${referencedEntity}`;
-
-          console.error('[RelationsService] Reference not found:', {
-            field: field.name,
-            referencedEntity,
-            refValue,
-            scope: referencedEntityDef.scope,
-            tenant_id: ctx.tenant_id,
-            unit_id: ctx.unit_id,
-            isGlobal,
-            expectedCollection,
-          });
-
-          throw new NotFoundError(
-            `Referenced entity not found: ${referencedEntity}/${refValue} (field: ${field.name}). ` +
-              `Expected in collection: ${expectedCollection} (scope: ${referencedEntityDef.scope}). ` +
-              `Please verify that the ${referencedEntity} with ID ${refValue} exists in the database.`
-          );
-        }
+        await this.ensureReferenceValueExists(ctx, field, value);
       }
     }
   }
@@ -217,23 +107,47 @@ export class RelationsService {
 
     for (const field of referenceFields) {
       const refValue = doc[field.name];
-      if (refValue && typeof refValue === 'string') {
-        const referencedEntity = field.reference_entity!;
-        // Load entity definition for referenced entity to determine scope (tenant vs unit)
-        const referencedEntityDef = await this.configLoader.getEntity(ctx, referencedEntity);
-        if (referencedEntityDef) {
-          // Pass entityDef to findById so it knows the correct scope (tenant vs unit)
+      if (!refValue) {
+        continue;
+      }
+
+      const referencedEntity = field.reference_entity!;
+      const referencedEntityDef = await this.configLoader.getEntity(ctx, referencedEntity);
+      if (!referencedEntityDef) {
+        continue;
+      }
+
+      const populatedFieldName = this.getPopulatedFieldName(field.name);
+      const values = Array.isArray(refValue) ? refValue : [refValue];
+
+      if (field.multiple === true) {
+        const populatedRefs: BaseDocument[] = [];
+        for (const value of values) {
+          if (typeof value !== 'string') {
+            continue;
+          }
           const refDoc = await this.repository.findById(
             ctx,
             referencedEntity,
-            refValue,
+            value,
             referencedEntityDef
           );
           if (refDoc) {
-            // Add populated field with _ prefix (e.g., company_id -> _company)
-            const populatedFieldName = `_${field.name.replace('_id', '')}`;
-            populated[populatedFieldName] = refDoc;
+            populatedRefs.push(refDoc as BaseDocument);
           }
+        }
+        if (populatedRefs.length > 0) {
+          populated[populatedFieldName] = populatedRefs;
+        }
+      } else if (typeof values[0] === 'string') {
+        const refDoc = await this.repository.findById(
+          ctx,
+          referencedEntity,
+          values[0] as string,
+          referencedEntityDef
+        );
+        if (refDoc) {
+          populated[populatedFieldName] = refDoc;
         }
       }
     }
@@ -257,5 +171,108 @@ export class RelationsService {
     return sourceEntityDef.fields
       .filter((f) => f.type === 'reference' && f.reference_entity === targetEntity)
       .map((field) => ({ field, entity: sourceEntity }));
+  }
+
+  private async ensureReferenceValueExists(
+    ctx: TenantContext,
+    field: FieldDefinition,
+    refValue: string
+  ): Promise<void> {
+    const referencedEntity = field.reference_entity!;
+    const referencedEntityDef = await this.configLoader.getEntity(ctx, referencedEntity);
+    if (!referencedEntityDef) {
+      throw new NotFoundError(
+        `Referenced entity definition not found: ${referencedEntity} (field: ${field.name})`
+      );
+    }
+
+    if (!referencedEntityDef.scope) {
+      console.warn('[RelationsService] Entity definition missing scope, defaulting to unit:', {
+        referencedEntity,
+        field: field.name,
+      });
+      referencedEntityDef.scope = 'unit';
+    }
+
+    console.log('[RelationsService] Validating reference:', {
+      field: field.name,
+      referencedEntity,
+      refValue,
+      scope: referencedEntityDef.scope,
+      tenant_id: ctx.tenant_id,
+      unit_id: ctx.unit_id,
+      entityDefName: referencedEntityDef.name,
+      isGlobal: referencedEntityDef.scope === 'tenant',
+    });
+
+    let refDoc = await this.repository.findById(
+      ctx,
+      referencedEntity,
+      refValue,
+      referencedEntityDef
+    );
+
+    if (!refDoc && referencedEntityDef.scope === 'tenant') {
+      const { ObjectId } = await import('mongodb');
+      const db = getDb();
+      const globalCollection = db.collection(`${ctx.tenant_id}_${referencedEntity}`);
+
+      let globalDoc = await globalCollection.findOne({
+        _id: new ObjectId(refValue),
+        tenant_id: ctx.tenant_id,
+      });
+
+      if (globalDoc && globalDoc.unit_id) {
+        globalDoc = null;
+      }
+
+      if (!globalDoc) {
+        globalDoc = await globalCollection.findOne({
+          _id: new ObjectId(refValue),
+          tenant_id: ctx.tenant_id,
+          $or: [{ unit_id: { $exists: false } }, { unit_id: null }],
+        });
+      }
+
+      if (globalDoc) {
+        const normalized: Record<string, unknown> = Object.assign({}, globalDoc);
+        normalized._id = globalDoc._id.toString();
+        refDoc = normalized as any;
+      }
+    }
+
+    if (!refDoc) {
+      const isGlobal = referencedEntityDef.scope === 'tenant';
+      const expectedCollection = isGlobal
+        ? `${ctx.tenant_id}_${referencedEntity}`
+        : `${ctx.tenant_id}_${ctx.unit_id}_${referencedEntity}`;
+
+      console.error('[RelationsService] Reference not found:', {
+        field: field.name,
+        referencedEntity,
+        refValue,
+        scope: referencedEntityDef.scope,
+        tenant_id: ctx.tenant_id,
+        unit_id: ctx.unit_id,
+        isGlobal,
+        expectedCollection,
+      });
+
+      throw new NotFoundError(
+        `Referenced entity not found: ${referencedEntity}/${refValue} (field: ${field.name}). ` +
+          `Expected in collection: ${expectedCollection} (scope: ${referencedEntityDef.scope}). ` +
+          `Please verify that the ${referencedEntity} with ID ${refValue} exists in the database.`
+      );
+    }
+  }
+
+  private getPopulatedFieldName(fieldName: string): string {
+    if (fieldName.endsWith('_ids')) {
+      return `_${fieldName.replace('_ids', '')}`;
+    }
+    if (fieldName.endsWith('_id')) {
+      return `_${fieldName.replace('_id', '')}`;
+    }
+    return `_${fieldName}`;
   }
 }
