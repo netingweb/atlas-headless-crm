@@ -254,6 +254,43 @@
         "description": "Schedule mensile per reminder tagliandi veicoli",
         "version": 1
       }
+    },
+    {
+      "tenant_id": "demo2",
+      "unit_id": "milano_sales",
+      "name": "Test webhook contatto modificato",
+      "type": "event",
+      "enabled": true,
+      "status": "active",
+      "trigger": {
+        "type": "event",
+        "event": "entity.updated",
+        "entity": "contact"
+      },
+      "actions": [
+        {
+          "type": "webhook",
+          "webhook_url": "https://example.com/api/contact-updated",
+          "webhook_method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "data": {
+            "tenant_id": "{{tenant_id}}",
+            "unit_id": "{{unit_id}}",
+            "entity": "{{entity}}",
+            "entity_id": "{{entity_id}}",
+            "contact_data": "{{data}}"
+          },
+          "timeout": 30000
+        }
+      ],
+      "chained_workflows": [],
+      "metadata": {
+        "created_by": "system",
+        "description": "Workflow di test che chiama un endpoint POST ogni volta che un contatto viene modificato, inviando tutti i dati del contatto modificato",
+        "version": 1
+      }
     }
   ]
 }

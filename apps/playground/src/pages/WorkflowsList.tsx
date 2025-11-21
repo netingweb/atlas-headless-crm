@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { workflowsApi } from '@/lib/api/workflows';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
+import type { WorkflowExecutionLog } from '@crm-atlas/types';
 
 export default function WorkflowsList() {
   const navigate = useNavigate();
@@ -24,7 +26,7 @@ export default function WorkflowsList() {
 
   const { data: executions } = useQuery({
     queryKey: ['workflow-executions', tenantId, unitId],
-    queryFn: () => workflowsApi.getAllExecutions(tenantId || '', unitId || '', 100, 0),
+    queryFn: () => workflowsApi.getAllExecutions(tenantId || '', unitId || '', 500, 0),
     enabled: !!tenantId && !!unitId,
   });
 
@@ -119,13 +121,34 @@ export default function WorkflowsList() {
     updateStatusMutation.mutate({ workflowId, status: 'inactive', enabled: false });
   };
 
+  // Create a map of workflow_id to last execution for efficient lookup
+  const lastExecutionsMap = useMemo(() => {
+    if (!executions || executions.length === 0) return new Map<string, WorkflowExecutionLog>();
+
+    const map = new Map<string, WorkflowExecutionLog>();
+
+    executions.forEach((execution) => {
+      const workflowId = execution.workflow_id;
+      if (!workflowId) return;
+
+      const existing = map.get(workflowId);
+      if (!existing) {
+        map.set(workflowId, execution);
+      } else {
+        // Keep the most recent execution
+        const existingDate = new Date(existing.started_at).getTime();
+        const currentDate = new Date(execution.started_at).getTime();
+        if (currentDate > existingDate) {
+          map.set(workflowId, execution);
+        }
+      }
+    });
+
+    return map;
+  }, [executions]);
+
   const getLastExecution = (workflowId: string) => {
-    if (!executions) return null;
-    const workflowExecutions = executions.filter((e) => e.workflow_id === workflowId);
-    if (workflowExecutions.length === 0) return null;
-    return workflowExecutions.sort(
-      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
-    )[0];
+    return lastExecutionsMap.get(workflowId) || null;
   };
 
   const getStatusBadge = (workflow: any) => {
@@ -305,7 +328,13 @@ export default function WorkflowsList() {
                   executions.map((execution) => (
                     <tr key={execution.log_id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {execution.workflow_id}
+                        <button
+                          type="button"
+                          className="text-blue-600 hover:underline font-mono"
+                          onClick={() => navigate(`/workflows/${execution.workflow_id}`)}
+                        >
+                          {execution.workflow_id}
+                        </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm capitalize">
                         {execution.trigger_type}
