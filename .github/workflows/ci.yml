@@ -126,8 +126,7 @@ jobs:
       - name: Download OpenAPI spec
         run: |
           curl -f http://localhost:3000/docs-json -o openapi.json || exit 1
+      - name: Install Spectral CLI
+        run: npm install -g @stoplight/spectral-cli
       - name: Validate OpenAPI spec
-        uses: docker://stoplight/spectral-cli:latest
-        with:
-          args: lint openapi.json
-        continue-on-error: false
+        run: spectral lint openapi.json
