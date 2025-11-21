@@ -15,9 +15,52 @@ async function syncConfig(tenantId: string): Promise<void> {
 
   const configDir = join(process.cwd(), 'config', tenantId);
 
+  // Helper function to replace environment variable placeholders
+  function replaceEnvVars(obj: unknown): unknown {
+    if (typeof obj === 'string') {
+      // Replace ${VAR_NAME} with actual environment variable value
+      return obj.replace(/\$\{([^}]+)\}/g, (match, varName) => {
+        const value = process.env[varName];
+        if (value === undefined) {
+          console.warn(`⚠️  Environment variable ${varName} not found, keeping placeholder`);
+          return match;
+        }
+        return value;
+      });
+    }
+    if (Array.isArray(obj)) {
+      return obj.map((item) => replaceEnvVars(item));
+    }
+    if (obj && typeof obj === 'object') {
+      const result: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = replaceEnvVars(value);
+      }
+      return result;
+    }
+    return obj;
+  }
+
   try {
     // Sync tenant config
-    const tenantConfig = JSON.parse(readFileSync(join(configDir, 'tenant.json'), 'utf-8'));
+    let tenantConfig = JSON.parse(readFileSync(join(configDir, 'tenant.json'), 'utf-8'));
+
+    // Replace environment variable placeholders
+    tenantConfig = replaceEnvVars(tenantConfig) as typeof tenantConfig;
+
+    // Override API keys from environment variables if present (highest priority)
+    if (process.env.OPENAI_API_KEY) {
+      if (tenantConfig.settings?.playground?.ai) {
+        tenantConfig.settings.playground.ai.apiKey = process.env.OPENAI_API_KEY;
+      }
+      if (tenantConfig.embeddingsProvider) {
+        tenantConfig.embeddingsProvider.apiKey = process.env.OPENAI_API_KEY;
+      }
+      if (tenantConfig.visionProvider) {
+        tenantConfig.visionProvider.apiKey = process.env.OPENAI_API_KEY;
+      }
+    }
+
     await db
       .collection('tenant_config')
       .replaceOne({ tenant_id: tenantId }, tenantConfig, { upsert: true });

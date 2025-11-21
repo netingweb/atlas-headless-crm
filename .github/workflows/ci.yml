@@ -83,6 +83,16 @@ jobs:
   validate-openapi:
     name: Validate OpenAPI
     runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2
@@ -99,10 +109,20 @@ jobs:
       - name: Start API (background)
         run: |
           pnpm --filter @crm-atlas/api start &
-          sleep 10
+          sleep 15
         env:
           MONGODB_URI: mongodb://localhost:27017/crm_atlas_test
           MONGODB_DB_NAME: crm_atlas_test
+      - name: Wait for API to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -f http://localhost:3000/api/health > /dev/null 2>&1; then
+              echo "API is ready"
+              break
+            fi
+            echo "Waiting for API... ($i/30)"
+            sleep 2
+          done
       - name: Download OpenAPI spec
         run: |
           curl -f http://localhost:3000/docs-json -o openapi.json || exit 1
@@ -110,3 +130,4 @@ jobs:
         uses: docker://stoplight/spectral-cli:latest
         with:
           args: lint openapi.json
+        continue-on-error: false

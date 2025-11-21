@@ -35,14 +35,68 @@ export class MongoConfigLoader implements ConfigLoader {
 
   async getTenant(tenantId: string): Promise<TenantConfig | null> {
     const cached = this.cache.getTenant(tenantId);
-    if (cached) return cached;
+    if (cached) {
+      // Apply environment variable overrides even for cached configs
+      return this.applyEnvOverrides(cached);
+    }
 
     const doc = await this.db.collection('tenant_config').findOne({ tenant_id: tenantId });
     if (!doc) return null;
 
     const config = doc as TenantConfig;
-    this.cache.setTenant(tenantId, config);
-    return config;
+    const configWithOverrides = this.applyEnvOverrides(config);
+    this.cache.setTenant(tenantId, configWithOverrides);
+    return configWithOverrides;
+  }
+
+  /**
+   * Apply environment variable overrides to tenant config
+   * This ensures API keys from environment variables take precedence over stored config
+   */
+  private applyEnvOverrides(config: TenantConfig): TenantConfig {
+    const overridden = { ...config };
+
+    // Override OpenAI API keys from environment variables if present
+    if (process.env.OPENAI_API_KEY) {
+      // Override playground AI settings if present
+      if (overridden.settings) {
+        const settings = overridden.settings as Record<string, unknown>;
+        if (settings.playground && typeof settings.playground === 'object') {
+          const playground = settings.playground as Record<string, unknown>;
+          if (playground.ai && typeof playground.ai === 'object') {
+            const ai = playground.ai as Record<string, unknown>;
+            overridden.settings = {
+              ...settings,
+              playground: {
+                ...playground,
+                ai: {
+                  ...ai,
+                  apiKey: process.env.OPENAI_API_KEY,
+                },
+              },
+            };
+          }
+        }
+      }
+
+      // Override embeddings provider
+      if (overridden.embeddingsProvider) {
+        overridden.embeddingsProvider = {
+          ...overridden.embeddingsProvider,
+          apiKey: process.env.OPENAI_API_KEY,
+        };
+      }
+
+      // Override vision provider
+      if (overridden.visionProvider) {
+        overridden.visionProvider = {
+          ...overridden.visionProvider,
+          apiKey: process.env.OPENAI_API_KEY,
+        };
+      }
+    }
+
+    return overridden;
   }
 
   async getTenants(): Promise<TenantConfig[]> {

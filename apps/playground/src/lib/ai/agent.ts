@@ -292,6 +292,455 @@ function createToolFromMCP(
   });
 }
 
+/**
+ * Detect language from text (simple heuristic)
+ */
+function detectLanguage(text: string): 'it' | 'en' {
+  // Simple heuristic: check for common Italian words/patterns
+  const italianPatterns = [
+    /\b(vuoi|vuole|vuoi|creare|crea|aggiungere|aggiungi|collegare|collega|vedere|vedi|mostrami|mostra|filtrare|filtra|raffinare|raffina|documenti|documento|contatto|contatti|azienda|aziende|opportunità|task|collegato|collegata)\b/i,
+    /\b(questo|questa|questi|queste|quello|quella|quelli|quelle)\b/i,
+    /\b(un|una|uno|del|della|dei|delle|al|alla|agli|alle)\b/i,
+  ];
+
+  const italianMatches = italianPatterns.reduce((count, pattern) => {
+    return count + (text.match(pattern)?.length || 0);
+  }, 0);
+
+  // If we find Italian patterns, assume Italian, otherwise default to English
+  return italianMatches > 2 ? 'it' : 'en';
+}
+
+/**
+ * Create supervisor tool for response evaluation and actionable questions generation
+ */
+function createSupervisorTool(config: AIConfig): DynamicStructuredTool {
+  return new DynamicStructuredTool({
+    name: 'supervisor_evaluate_response',
+    description:
+      "Evaluate if the agent's response is complete and satisfactory. Use this after generating a response to ensure all user questions are answered. Also generates actionable follow-up questions based on context.",
+    schema: z.object({
+      user_question: z.string().describe('Original user question/message'),
+      agent_response: z.string().describe("Agent's generated response"),
+      conversation_history: z
+        .array(
+          z.object({
+            role: z.string(),
+            content: z.string(),
+          })
+        )
+        .optional()
+        .describe('Recent conversation context'),
+      tools_used: z.array(z.string()).optional().describe('List of tools that were called'),
+      tool_results: z
+        .array(
+          z.object({
+            tool_name: z.string(),
+            tool_args: z.record(z.unknown()),
+            tool_result: z.unknown().optional(),
+          })
+        )
+        .optional()
+        .describe('Details of tools executed with their results'),
+    }),
+    func: async (args) => {
+      try {
+        // Create a simple LLM instance for evaluation (reuse config)
+        const evaluatorLLM = new ChatOpenAI({
+          model: config.model,
+          temperature: 0.3, // Lower temperature for more consistent evaluation
+          maxTokens: 1000,
+          apiKey: config.apiKey,
+          openAIApiKey: config.apiKey,
+        });
+
+        // Detect language from user question
+        const language = detectLanguage(args.user_question);
+        const isItalian = language === 'it';
+
+        const evaluationPrompt = `You are a supervisor evaluating an AI assistant's response quality.
+
+User Question: ${args.user_question}
+
+Agent Response: ${args.agent_response}
+
+${args.tools_used ? `Tools Used: ${args.tools_used.join(', ')}` : ''}
+${
+  args.tool_results
+    ? `Tool Results Summary: ${JSON.stringify(
+        args.tool_results.map((tr: { tool_name: string; tool_result?: unknown }) => ({
+          tool: tr.tool_name,
+          has_result: !!tr.tool_result,
+          result_preview:
+            typeof tr.tool_result === 'string'
+              ? tr.tool_result.substring(0, 200)
+              : JSON.stringify(tr.tool_result).substring(0, 200),
+        }))
+      )}`
+    : ''
+}
+
+IMPORTANT: The user's question is in ${isItalian ? 'Italian' : 'English'}. You MUST respond in the SAME language as the user's question.
+
+CRITICAL CHECKS:
+1. **Contradiction Detection**: Check if the agent says "not found" or "no results" but the tool results show data. This is a CRITICAL ERROR - mark is_satisfactory as false.
+   IMPORTANT: Only consider it a contradiction if:
+   - The user asked for a SPECIFIC search term (like "aleksandra", "Mario Rossi", etc.)
+   - AND the tool results for that SPECIFIC search show data (count > 0 or results array has items)
+   - AND the agent says "not found"
+   DO NOT mark as contradiction if:
+   - The specific search returned empty results (count: 0, results: [])
+   - The agent correctly reports that the specific search found nothing
+   - Other unrelated tool calls returned data (those are different searches)
+2. **Data Presence**: If tool results contain data (like names, IDs, results array with items), but the agent says nothing was found, this is WRONG.
+   BUT: Only check the tool results that match the user's specific query. If user asked for "aleksandra" and that search returned empty, it's correct to say "not found" even if other searches returned data.
+3. **Incomplete Information**: If the agent mentions partial information (like a surname) but says "not found", this is contradictory.
+
+Evaluate the response based on:
+1. Completeness: Are all questions answered?
+2. Accuracy: Is the information correct? (CRITICAL: Check for contradictions between tool results and agent response)
+3. Clarity: Is the response understandable?
+4. Usefulness: Is the response helpful?
+5. **Contradiction Check**: Does the agent claim "not found" when tool results show data? This is a CRITICAL error.
+
+Also, based on the tools used and results, suggest 2-4 actionable follow-up questions that would be helpful. 
+
+${
+  isItalian
+    ? `
+CRITICAL LANGUAGE REQUIREMENT FOR ACTIONABLE QUESTIONS:
+- ALL "question" fields MUST be in Italian
+- ALL "action" fields MUST be in Italian  
+- Use Italian verbs, grammar, and phrasing
+- Examples of Italian actionable questions:
+  * "Vuoi creare un task collegato a questo contatto?"
+  * "Vuoi filtrare o raffinare la ricerca di contatti?"
+  * "Mostrami i documenti collegati a questo contatto"
+- DO NOT use English for actionable questions - they MUST be in Italian
+`
+    : `
+CRITICAL LANGUAGE REQUIREMENT FOR ACTIONABLE QUESTIONS:
+- ALL "question" fields MUST be in English
+- ALL "action" fields MUST be in English
+- Use English verbs, grammar, and phrasing
+- Examples of English actionable questions:
+  * "Do you want to create a task linked to this contact?"
+  * "Do you want to filter or refine the search for contacts?"
+  * "Show me documents linked to this contact"
+- DO NOT use Italian for actionable questions - they MUST be in English
+`
+}
+
+Return a JSON object with this structure:
+{
+  "is_satisfactory": boolean (MUST be false if contradictions detected),
+  "completeness_score": number (0-1),
+  "missing_answers": string[] (if any questions weren't answered),
+  "suggested_improvements": string[] (if response could be improved, MUST include contradiction fixes if detected),
+  "contradiction_detected": boolean (true if agent says "not found" but tool results show data),
+  "actionable_questions": [
+    {
+      "question": "Text to show on button ${isItalian ? '(MUST be in Italian - esempio: "Vuoi creare un task?")' : '(MUST be in English - example: "Do you want to create a task?")'}",
+      "action": "Prompt to send when clicked ${isItalian ? '(MUST be in Italian - esempio: "Crea un task collegato al contatto 123")' : '(MUST be in English - example: "Create a task linked to contact 123")'}",
+      "category": "follow_up_creation" | "search_refinement" | "related_action" | "clarification",
+      "priority": number (1-4, lower is higher priority)
+    }
+  ]
+}
+
+Be concise and focus on actionable improvements. ${isItalian ? 'Rispondi sempre in italiano, inclusi tutti i campi delle actionable_questions.' : 'Always respond in English, including all actionable_questions fields.'}`;
+
+        const response = await evaluatorLLM.invoke([new HumanMessage(evaluationPrompt)]);
+        const content =
+          typeof response.content === 'string' ? response.content : String(response.content);
+
+        // Try to parse JSON response
+        try {
+          // Extract JSON from markdown code blocks if present
+          const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || [null, content];
+          const jsonStr = jsonMatch[1] || content;
+          const parsed = JSON.parse(jsonStr);
+          return JSON.stringify(parsed, null, 2);
+        } catch {
+          // If parsing fails, return a default structure
+          return JSON.stringify({
+            is_satisfactory: true,
+            completeness_score: 0.8,
+            missing_answers: [],
+            suggested_improvements: [],
+            actionable_questions: [],
+          });
+        }
+      } catch (error) {
+        console.error('[Supervisor] Error evaluating response:', error);
+        return JSON.stringify({
+          is_satisfactory: true, // Default to satisfactory on error
+          completeness_score: 0.8,
+          missing_answers: [],
+          suggested_improvements: [],
+          actionable_questions: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  });
+}
+
+/**
+ * Check if a tool call should be interrupted for confirmation
+ */
+function shouldInterruptToolCall(toolName: string): boolean {
+  return toolName.startsWith('update_') || toolName.startsWith('delete_');
+}
+
+/**
+ * Generate preview of changes for interrupt confirmation
+ */
+async function generateInterruptPreview(
+  toolCall: { name: string; args: Record<string, unknown> },
+  ctx: TenantContext
+): Promise<{
+  entity_type: string;
+  entity_id: string;
+  current_state?: Record<string, unknown>;
+  proposed_changes?: Record<string, unknown>;
+  action_type: 'update' | 'delete';
+}> {
+  const entityType = toolCall.name.replace(/^(update_|delete_)/, '');
+  const entityId = toolCall.args.id as string;
+
+  const preview: {
+    entity_type: string;
+    entity_id: string;
+    current_state?: Record<string, unknown>;
+    proposed_changes?: Record<string, unknown>;
+    action_type: 'update' | 'delete';
+  } = {
+    entity_type: entityType,
+    entity_id: entityId,
+    action_type: toolCall.name.startsWith('delete_') ? 'delete' : 'update',
+  };
+
+  if (toolCall.name.startsWith('update_')) {
+    // Extract proposed changes (all args except id and confirmed)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _id, confirmed: _confirmed, ...proposedChanges } = toolCall.args;
+    preview.proposed_changes = proposedChanges;
+
+    // Try to get current state from API
+    try {
+      const { entitiesApi } = await import('@/lib/api/entities');
+      const currentEntity = await entitiesApi.getById(
+        ctx.tenant_id,
+        ctx.unit_id,
+        entityType,
+        entityId,
+        true
+      );
+      preview.current_state = currentEntity as Record<string, unknown>;
+    } catch (error) {
+      console.warn('[Supervisor] Could not fetch current state for preview:', error);
+    }
+  }
+
+  return preview;
+}
+
+/**
+ * Generate actionable questions based on executed tools
+ */
+function generateActionableQuestions(
+  toolsExecuted: Array<{
+    name: string;
+    args: Record<string, unknown>;
+    result?: unknown;
+  }>,
+  userMessage?: string
+): Array<{
+  question: string;
+  action: string;
+  category:
+    | 'confirmation'
+    | 'follow_up_creation'
+    | 'search_refinement'
+    | 'related_action'
+    | 'clarification';
+  priority: number;
+  icon?: string;
+  tool_call_context?: {
+    tool_name: string;
+    tool_result?: unknown;
+  };
+}> {
+  // Detect language from user message
+  const language = userMessage ? detectLanguage(userMessage) : 'it'; // Default to Italian
+
+  const actionableQuestions: Array<{
+    question: string;
+    action: string;
+    category:
+      | 'confirmation'
+      | 'follow_up_creation'
+      | 'search_refinement'
+      | 'related_action'
+      | 'clarification';
+    priority: number;
+    icon?: string;
+    tool_call_context?: {
+      tool_name: string;
+      tool_result?: unknown;
+    };
+  }> = [];
+
+  // Italian translations
+  const translations = {
+    it: {
+      createTaskForContact: 'Vuoi creare un task collegato a questo contatto?',
+      createTaskAction: (id: string) => `Crea un task collegato al contatto ${id}`,
+      addContactForCompany: 'Vuoi aggiungere un contatto per questa azienda?',
+      addContactAction: (id: string) => `Aggiungi un contatto per l'azienda ${id}`,
+      linkOpportunity: 'Vuoi collegare questa opportunità a un contatto esistente?',
+      linkOpportunityAction: (id: string) => `Collega l'opportunità ${id} a un contatto`,
+      refineSearch: (entityType: string) =>
+        `Vuoi filtrare o raffinare la ricerca di ${entityType}?`,
+      refineSearchAction: (entityType: string) =>
+        `Mostrami opzioni per filtrare la ricerca di ${entityType}`,
+      viewDocuments: (entityType: string) =>
+        `Vuoi vedere i documenti collegati a questo ${entityType}?`,
+      viewDocumentsAction: (entityType: string, id: string) =>
+        `Mostrami i documenti collegati al ${entityType} ${id}`,
+    },
+    en: {
+      createTaskForContact: 'Do you want to create a task linked to this contact?',
+      createTaskAction: (id: string) => `Create a task linked to contact ${id}`,
+      addContactForCompany: 'Do you want to add a contact for this company?',
+      addContactAction: (id: string) => `Add a contact for company ${id}`,
+      linkOpportunity: 'Do you want to link this opportunity to an existing contact?',
+      linkOpportunityAction: (id: string) => `Link opportunity ${id} to a contact`,
+      refineSearch: (entityType: string) =>
+        `Do you want to filter or refine the search for ${entityType}?`,
+      refineSearchAction: (entityType: string) =>
+        `Show me options to filter the search for ${entityType}`,
+      viewDocuments: (entityType: string) =>
+        `Do you want to see documents linked to this ${entityType}?`,
+      viewDocumentsAction: (entityType: string, id: string) =>
+        `Show me documents linked to ${entityType} ${id}`,
+    },
+  };
+
+  const t = translations[language];
+
+  for (const toolExec of toolsExecuted) {
+    const toolName = toolExec.name;
+
+    // Follow-up after creation
+    if (toolName.startsWith('create_')) {
+      const entityType = toolName.replace('create_', '');
+      let entityId: string | undefined;
+
+      // Try to extract entity ID from result
+      try {
+        const resultStr =
+          typeof toolExec.result === 'string' ? toolExec.result : JSON.stringify(toolExec.result);
+        const resultObj = JSON.parse(resultStr);
+        entityId = resultObj?._id || resultObj?.id;
+      } catch {
+        // Ignore parsing errors
+      }
+
+      if (entityType === 'contact' && entityId) {
+        actionableQuestions.push({
+          question: t.createTaskForContact,
+          action: t.createTaskAction(entityId),
+          category: 'follow_up_creation',
+          priority: 2,
+          icon: 'Plus',
+          tool_call_context: {
+            tool_name: toolName,
+            tool_result: toolExec.result,
+          },
+        });
+      } else if (entityType === 'company' && entityId) {
+        actionableQuestions.push({
+          question: t.addContactForCompany,
+          action: t.addContactAction(entityId),
+          category: 'follow_up_creation',
+          priority: 2,
+          icon: 'Plus',
+          tool_call_context: {
+            tool_name: toolName,
+            tool_result: toolExec.result,
+          },
+        });
+      } else if (entityType === 'opportunity' && entityId) {
+        actionableQuestions.push({
+          question: t.linkOpportunity,
+          action: t.linkOpportunityAction(entityId),
+          category: 'follow_up_creation',
+          priority: 2,
+          icon: 'Link',
+          tool_call_context: {
+            tool_name: toolName,
+            tool_result: toolExec.result,
+          },
+        });
+      }
+    }
+
+    // Search refinement
+    if (toolName.startsWith('search_')) {
+      const entityType = toolName.replace('search_', '');
+      let resultCount = 0;
+
+      try {
+        const resultStr =
+          typeof toolExec.result === 'string' ? toolExec.result : JSON.stringify(toolExec.result);
+        const resultObj = JSON.parse(resultStr);
+        resultCount = resultObj?.count || resultObj?.results?.length || 0;
+      } catch {
+        // Ignore parsing errors
+      }
+
+      if (resultCount > 0) {
+        actionableQuestions.push({
+          question: t.refineSearch(entityType),
+          action: t.refineSearchAction(entityType),
+          category: 'search_refinement',
+          priority: 3,
+          icon: 'Filter',
+          tool_call_context: {
+            tool_name: toolName,
+            tool_result: toolExec.result,
+          },
+        });
+      }
+    }
+
+    // Related actions after get
+    if (toolName.startsWith('get_')) {
+      const entityType = toolName.replace('get_', '');
+      const entityId = toolExec.args.id as string;
+
+      if (entityId) {
+        actionableQuestions.push({
+          question: t.viewDocuments(entityType),
+          action: t.viewDocumentsAction(entityType, entityId),
+          category: 'related_action',
+          priority: 3,
+          icon: 'FileText',
+          tool_call_context: {
+            tool_name: toolName,
+            tool_result: toolExec.result,
+          },
+        });
+      }
+    }
+  }
+
+  // Sort by priority and limit to 4
+  return actionableQuestions.sort((a, b) => a.priority - b.priority).slice(0, 4);
+}
+
 export interface Agent {
   llm: ReturnType<ChatOpenAI['bindTools']>;
   tools: DynamicStructuredTool[];
@@ -339,7 +788,11 @@ export async function createAgent(
   // Convert MCP tools to LangChain tools
   const tools = filteredTools.map((tool) => createToolFromMCP(tool, ctx));
 
-  console.log(`[Agent] Created ${tools.length} LangChain tools`);
+  // Add supervisor tool
+  const supervisorTool = createSupervisorTool(config);
+  tools.push(supervisorTool);
+
+  console.log(`[Agent] Created ${tools.length} LangChain tools (including supervisor)`);
 
   // Create LLM with tools bound
   const llm = createLLM(config).bindTools(tools);
@@ -356,9 +809,12 @@ export async function createAgent(
 
       // Add usage examples for common search tools
       if (tool.name.startsWith('search_')) {
-        toolInfo += `\n    Usage examples:\n    - To get count only: { "query": "*", "count_only": true }\n    - To search all: { "query": "*", "limit": 50 }\n    - To search specific: { "query": "search term", "limit": 10 }`;
+        const entityType = tool.name.replace('search_', '');
+        toolInfo += `\n    CRITICAL: When user asks for a specific ${entityType} by name, ALWAYS extract the name and pass it as "query" parameter!
+    Usage examples:\n    - To search for specific ${entityType}: { "query": "name or search term", "limit": 10 }\n    - To get count only: { "query": "*", "count_only": true }\n    - To search all: { "query": "*", "limit": 50 }\n    - Example: User says "dammi i dati di aleksandra" → { "query": "aleksandra", "limit": 10 }\n    - Example: User says "trova Mario Rossi" → { "query": "Mario Rossi", "limit": 10 } or { "query": "Mario", "limit": 10 }`;
       } else if (tool.name === 'global_search') {
-        toolInfo += `\n    Usage examples:\n    - To search all entities: { "query": "search term", "limit": 10 }\n    - To get counts: { "query": "*", "count_only": true }`;
+        toolInfo += `\n    CRITICAL: When user asks for a specific entity by name, ALWAYS extract the name and pass it as "query" parameter!
+    Usage examples:\n    - To search for specific entity: { "query": "name or search term", "limit": 10 }\n    - To get counts: { "query": "*", "count_only": true }`;
       }
 
       if (requiredFields.length > 0) {
@@ -495,14 +951,47 @@ ${totalToolsCount}. tool_name_last: description"
 CRITICAL - YOU MUST USE TOOLS:
 When users ask questions about data in the CRM system (like "quanti prodotti abbiamo?", "how many contacts?", "cerca BMW", "find products", etc.), you MUST use the available tools to get the information. DO NOT guess or say you don't have access - USE THE TOOLS!
 
+CRITICAL - EXTRACTING SEARCH TERMS FROM USER REQUESTS:
+When a user asks for information about a specific person, entity, or item, you MUST extract the search term and pass it to the search tool:
+- "dammi i dati di aleksandra" → Use search_contact with query: "aleksandra" (NOT empty args!)
+- "trova il contatto Mario Rossi" → Use search_contact with query: "Mario Rossi" or query: "Mario" or query: "Rossi"
+- "cerca l'azienda Acme" → Use search_company with query: "Acme"
+- "mostrami i dati di Giuseppe" → Use search_contact with query: "Giuseppe"
+- "find contact John Doe" → Use search_contact with query: "John Doe" or query: "John" or query: "Doe"
+
+NEVER call search tools with empty arguments {} when the user mentions a specific name, term, or identifier!
+ALWAYS extract the search term from the user's request and pass it as the "query" parameter.
+
 Examples of when to use tools:
 - "quanti prodotti abbiamo?" → Use search_product with query: "*" and count_only: true
 - "quanti contatti ci sono?" → Use search_contact with query: "*" and count_only: true  
 - "cerca prodotti BMW" → Use search_product with query: "BMW" or global_search with query: "BMW"
 - "mostrami tutti i prodotti" → Use search_product with query: "*" and limit: 50
 - "trova contatti interessati" → Use search_contact with query: "interessati" or global_search
+- "dammi i dati di aleksandra" → Use search_contact with query: "aleksandra" (CRITICAL: extract the name!)
+- "trova il contatto con nome Marco" → Use search_contact with query: "Marco" (CRITICAL: extract the name!)
 
 NEVER say "I don't have access" or "I can't retrieve" - ALWAYS try using the tools first!
+NEVER call search tools with empty query when user mentions a specific name or term - ALWAYS extract and use that term!
+
+CRITICAL - INTERPRETING SEARCH RESULTS:
+When you receive tool results from search operations:
+1. ALWAYS check the "results" array or "count" field in the tool response
+2. If "count" > 0 or "results" array has items, you HAVE FOUND DATA - report it!
+3. NEVER say "not found" or "no results" if the tool results show data
+4. If tool results contain names, IDs, or any data fields, you MUST present that data to the user
+5. If you mention partial information (like a surname) in your response, you HAVE found the data - don't contradict yourself by saying "not found"
+6. Always read the FULL tool result JSON before responding - check for "results", "count", "hits", or data arrays
+7. If search results show a "count" > 0 or a "results" array with items, you MUST say what you found, not that you found nothing
+
+Example CORRECT behavior:
+- Tool result: { "count": 1, "results": [{ "name": "Aleksandra Mikhailichenko", "_id": "123" }] }
+- CORRECT response: "Ho trovato il contatto Aleksandra Mikhailichenko. [Visualizza dettagli](/entities/contact/123)"
+- WRONG response: "Non ho trovato alcun contatto" (this contradicts the tool results!)
+
+Example CORRECT behavior for partial matches:
+- Tool result shows partial data (like surname in response) → You HAVE found data, present it fully
+- NEVER say "not found" if you're mentioning any data from the search results
 
 IMPORTANT RULES:
 - Always provide ALL required fields when creating entities
@@ -614,7 +1103,18 @@ export async function runAgent(
 }
 
 export interface StreamEvent {
-  type: 'thinking' | 'tool_call' | 'tool_result' | 'content' | 'done' | 'error' | 'entity_updated';
+  type:
+    | 'thinking'
+    | 'tool_call'
+    | 'tool_result'
+    | 'content'
+    | 'done'
+    | 'error'
+    | 'entity_updated'
+    | 'supervisor_evaluation'
+    | 'actionable_questions'
+    | 'clarification_request'
+    | 'interrupt_confirmation';
   content?: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;
@@ -623,6 +1123,40 @@ export interface StreamEvent {
   entityType?: string;
   entityId?: string;
   changes?: Record<string, unknown>;
+  evaluation?: {
+    is_satisfactory: boolean;
+    completeness_score: number;
+    missing_answers?: string[];
+    suggested_improvements?: string[];
+  };
+  questions?: Array<{
+    question: string;
+    action: string;
+    category:
+      | 'confirmation'
+      | 'follow_up_creation'
+      | 'search_refinement'
+      | 'related_action'
+      | 'clarification';
+    priority?: number;
+    icon?: string;
+    tool_call_context?: {
+      tool_name: string;
+      tool_result?: unknown;
+    };
+  }>;
+  // Interrupt confirmation fields
+  interrupt_tool_call?: {
+    name: string;
+    args: Record<string, unknown>;
+  };
+  interrupt_preview?: {
+    entity_type: string;
+    entity_id: string;
+    current_state?: Record<string, unknown>;
+    proposed_changes?: Record<string, unknown>;
+    action_type: 'update' | 'delete';
+  };
 }
 
 /**
@@ -631,7 +1165,8 @@ export interface StreamEvent {
 export async function* runAgentStream(
   agent: Agent,
   userMessage: string,
-  chatHistory: Array<{ role: string; content: string }> = []
+  chatHistory: Array<{ role: string; content: string }> = [],
+  ctx?: TenantContext
 ): AsyncGenerator<StreamEvent, void, unknown> {
   // Build messages array (can include ToolMessage)
   const messages: Array<SystemMessage | HumanMessage | AIMessage | ToolMessage> = [
@@ -644,6 +1179,13 @@ export async function* runAgentStream(
     }),
     new HumanMessage(userMessage),
   ];
+
+  // Track executed tools for actionable questions generation
+  const executedTools: Array<{
+    name: string;
+    args: Record<string, unknown>;
+    result?: unknown;
+  }> = [];
 
   try {
     // Stream LLM response
@@ -765,6 +1307,42 @@ export async function* runAgentStream(
             continue;
           }
 
+          // Check if tool call requires confirmation (interrupt pattern)
+          if (shouldInterruptToolCall(toolCall.name) && !toolCall.args.confirmed) {
+            // Generate interrupt for confirmation
+            if (ctx) {
+              const preview = await generateInterruptPreview(toolCall, ctx);
+              yield {
+                type: 'interrupt_confirmation',
+                interrupt_tool_call: {
+                  name: toolCall.name,
+                  args: toolCall.args,
+                },
+                interrupt_preview: preview,
+              };
+              // Pause execution - wait for user confirmation
+              // The tool call will be executed later when user confirms
+              return;
+            }
+          }
+
+          // Warn if search tool is called with empty args when user message contains a name/term
+          if (
+            toolCall.name.startsWith('search_') &&
+            Object.keys(toolCall.args || {}).length === 0
+          ) {
+            // Simple heuristic: check if user message contains what looks like a name or search term
+            const hasSearchTerm =
+              /\b(?:dammi|trova|cerca|mostrami|dati di|contatto|azienda|prodotto)\s+([a-zàèéìòù]+(?:\s+[a-zàèéìòù]+)?)/i.test(
+                userMessage
+              );
+            if (hasSearchTerm) {
+              console.warn(
+                `[Agent] WARNING: Search tool ${toolCall.name} called with empty args, but user message appears to contain a search term: "${userMessage}"`
+              );
+            }
+          }
+
           try {
             yield {
               type: 'thinking',
@@ -780,6 +1358,13 @@ export async function* runAgentStream(
             const resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
 
             console.log(`[Agent] Tool ${toolCall.name} result:`, resultStr);
+
+            // Track executed tool for actionable questions
+            executedTools.push({
+              name: toolCall.name,
+              args: toolCall.args,
+              result: result,
+            });
 
             // Check if this tool modifies an entity and emit entity_updated event
             const toolName = toolCall.name;
@@ -855,6 +1440,7 @@ export async function* runAgentStream(
         }
 
         // After executing all tool calls, check if LLM wants to call more tools
+        // NOTE: Actionable questions will be generated AFTER supervisor evaluation, not here
         yield { type: 'thinking', content: 'Processing tool results...' };
 
         // Check if there are more tool calls needed by invoking again
@@ -865,21 +1451,280 @@ export async function* runAgentStream(
           pendingResponse = nextResponse;
           continue;
         } else {
-          // No more tool calls, stream the final response
-          messages.push(nextResponse);
-          const finalStream = await agent.llm.stream(messages);
+          // No more tool calls, generate the final response
+          let finalResponseContent = '';
 
-          for await (const chunk of finalStream) {
-            if (chunk.content) {
-              const content = Array.isArray(chunk.content)
-                ? chunk.content
-                    .map((c: unknown) => (typeof c === 'string' ? c : JSON.stringify(c)))
-                    .join('')
-                : typeof chunk.content === 'string'
+          // Check if nextResponse already has content
+          if (nextResponse.content) {
+            // Use the content directly from nextResponse
+            const content =
+              typeof nextResponse.content === 'string'
+                ? nextResponse.content
+                : String(nextResponse.content);
+            finalResponseContent = content;
+            messages.push(nextResponse);
+            yield { type: 'content', content };
+          } else {
+            // No content in nextResponse, need to generate it
+            // Add nextResponse to messages first (it might have tool_calls metadata)
+            messages.push(nextResponse);
+
+            // Then stream the final response
+            const finalStream = await agent.llm.stream(messages);
+            for await (const chunk of finalStream) {
+              if (chunk.content) {
+                const content = Array.isArray(chunk.content)
                   ? chunk.content
-                  : String(chunk.content);
+                      .map((c: unknown) => (typeof c === 'string' ? c : JSON.stringify(c)))
+                      .join('')
+                  : typeof chunk.content === 'string'
+                    ? chunk.content
+                    : String(chunk.content);
+                finalResponseContent += content;
+                yield { type: 'content', content };
+              }
+            }
+          }
+
+          // If we still don't have content, try one more time with a direct invoke
+          if (!finalResponseContent || finalResponseContent.trim() === '') {
+            console.warn('[Agent] No content from streaming, trying direct invoke');
+            const directResponse = await agent.llm.invoke(messages);
+            if (directResponse.content) {
+              const content =
+                typeof directResponse.content === 'string'
+                  ? directResponse.content
+                  : String(directResponse.content);
+              finalResponseContent = content;
               yield { type: 'content', content };
             }
+          }
+
+          // Evaluate response with supervisor
+          try {
+            const supervisorTool = agent.tools.find(
+              (t) => t.name === 'supervisor_evaluate_response'
+            );
+            if (supervisorTool && finalResponseContent) {
+              const evaluationResult = await supervisorTool.invoke({
+                user_question: userMessage,
+                agent_response: finalResponseContent,
+                conversation_history: chatHistory,
+                tools_used: executedTools.map((t) => t.name),
+                tool_results: executedTools.map((t) => ({
+                  tool_name: t.name,
+                  tool_args: t.args,
+                  tool_result: t.result,
+                })),
+              });
+
+              try {
+                const evaluation = JSON.parse(
+                  typeof evaluationResult === 'string'
+                    ? evaluationResult
+                    : JSON.stringify(evaluationResult)
+                );
+
+                yield {
+                  type: 'supervisor_evaluation',
+                  evaluation: {
+                    is_satisfactory: evaluation.is_satisfactory ?? true,
+                    completeness_score: evaluation.completeness_score ?? 0.8,
+                    missing_answers: evaluation.missing_answers ?? [],
+                    suggested_improvements: evaluation.suggested_improvements ?? [],
+                  },
+                };
+
+                // If contradiction detected, trigger refinement
+                // But first verify it's a real contradiction by checking if the specific search found results
+                if (evaluation.contradiction_detected) {
+                  // Check if there's a tool result that matches the user's query and has data
+                  const userQueryLower = userMessage.toLowerCase();
+                  let hasMatchingResults = false;
+
+                  // Try to extract search term from user message (simple heuristic)
+                  const searchTerms = userQueryLower.match(
+                    /\b(?:dammi|trova|cerca|mostrami|dati di|contatto|azienda)\s+([a-zàèéìòù]+(?:\s+[a-zàèéìòù]+)?)/i
+                  );
+                  const extractedTerm = searchTerms ? searchTerms[1] : null;
+
+                  // Check tool results for matching searches
+                  for (const toolResult of executedTools) {
+                    if (toolResult.name.startsWith('search_')) {
+                      const toolQuery = (toolResult.args?.query as string)?.toLowerCase() || '';
+                      // Check if this tool call matches the user's search intent
+                      if (extractedTerm && toolQuery.includes(extractedTerm.toLowerCase())) {
+                        // Parse result to check if it has data
+                        try {
+                          const resultStr =
+                            typeof toolResult.result === 'string'
+                              ? toolResult.result
+                              : JSON.stringify(toolResult.result);
+                          const resultObj = JSON.parse(resultStr);
+                          const count = resultObj?.count || resultObj?.results?.length || 0;
+                          if (
+                            count > 0 ||
+                            (Array.isArray(resultObj?.results) && resultObj.results.length > 0)
+                          ) {
+                            hasMatchingResults = true;
+                            break;
+                          }
+                        } catch {
+                          // Ignore parsing errors
+                        }
+                      }
+                    }
+                  }
+
+                  // Only trigger correction if we actually found matching results
+                  if (hasMatchingResults) {
+                    console.warn(
+                      '[Supervisor] Contradiction detected - agent said "not found" but tool results show data'
+                    );
+                    const isItalian = detectLanguage(userMessage) === 'it';
+
+                    // Generate a correction prompt and continue the loop
+                    const correctionPrompt = isItalian
+                      ? `ERRORE CRITICO: Hai detto che non hai trovato risultati, ma i risultati dei tool per la ricerca specifica mostrano dati. 
+                      Per favore, rileggi attentamente i risultati dei tool che corrispondono alla ricerca richiesta dall'utente e fornisci una risposta corretta con i dati trovati.
+                      Non dire mai "non trovato" se i risultati dei tool per la ricerca specifica contengono dati.
+                      Presenta SOLO i dati trovati che corrispondono alla ricerca richiesta.`
+                      : `CRITICAL ERROR: You said you found nothing, but the tool results for the specific search show data.
+                      Please carefully re-read the tool results that match the user's search request and provide a correct response with the found data.
+                      Never say "not found" if the tool results for the specific search contain data.
+                      Present ONLY the data found that matches the requested search.`;
+
+                    messages.push(new HumanMessage(correctionPrompt));
+                    const correctedResponse = await agent.llm.invoke(messages);
+                    messages.push(correctedResponse);
+
+                    // Stream the corrected response
+                    if (correctedResponse.content) {
+                      const correctedContent =
+                        typeof correctedResponse.content === 'string'
+                          ? correctedResponse.content
+                          : String(correctedResponse.content);
+                      yield {
+                        type: 'content',
+                        content: `\n\n⚠️ ${isItalian ? 'Correzione:' : 'Correction:'}\n\n${correctedContent}`,
+                      };
+
+                      // Update finalResponseContent with corrected content for supervisor re-evaluation
+                      finalResponseContent = correctedContent;
+
+                      // Re-evaluate the corrected response with supervisor
+                      try {
+                        const reEvaluationResult = await supervisorTool.invoke({
+                          user_question: userMessage,
+                          agent_response: finalResponseContent,
+                          conversation_history: chatHistory,
+                          tools_used: executedTools.map((t) => t.name),
+                          tool_results: executedTools.map((t) => ({
+                            tool_name: t.name,
+                            tool_args: t.args,
+                            tool_result: t.result,
+                          })),
+                        });
+
+                        try {
+                          const reEvaluation = JSON.parse(
+                            typeof reEvaluationResult === 'string'
+                              ? reEvaluationResult
+                              : JSON.stringify(reEvaluationResult)
+                          );
+
+                          // Update evaluation with corrected response evaluation
+                          Object.assign(evaluation, reEvaluation);
+                        } catch {
+                          // Ignore re-evaluation parsing errors
+                        }
+                      } catch {
+                        // Ignore re-evaluation errors
+                      }
+                    }
+                  } else {
+                    console.log(
+                      '[Supervisor] Contradiction flagged but no matching results found - likely false positive, ignoring'
+                    );
+                  }
+                }
+
+                // STEP 5: Emit actionable questions ONLY after supervisor evaluation and any corrections
+                // This ensures actionable questions are based on the final, verified response
+                if (evaluation.actionable_questions && evaluation.actionable_questions.length > 0) {
+                  // Verify language consistency - if supervisor generated questions in wrong language, use fallback
+                  const isItalian = detectLanguage(userMessage) === 'it';
+                  const firstQuestion = evaluation.actionable_questions[0]?.question || '';
+                  const isQuestionInCorrectLanguage = isItalian
+                    ? detectLanguage(firstQuestion) === 'it'
+                    : detectLanguage(firstQuestion) === 'en';
+
+                  if (isQuestionInCorrectLanguage) {
+                    yield {
+                      type: 'actionable_questions',
+                      questions: evaluation.actionable_questions,
+                    };
+                  } else {
+                    // Supervisor generated questions in wrong language, use fallback instead
+                    console.warn(
+                      '[Supervisor] Actionable questions in wrong language, using fallback generator'
+                    );
+                    if (
+                      evaluation.is_satisfactory !== false &&
+                      !evaluation.contradiction_detected
+                    ) {
+                      const actionableQuestions = generateActionableQuestions(
+                        executedTools,
+                        userMessage
+                      );
+                      if (actionableQuestions.length > 0) {
+                        yield {
+                          type: 'actionable_questions',
+                          questions: actionableQuestions,
+                        };
+                      }
+                    }
+                  }
+                } else {
+                  // Fallback: generate actionable questions from executed tools if supervisor didn't provide any
+                  // But only if response is satisfactory (no contradictions)
+                  if (evaluation.is_satisfactory !== false && !evaluation.contradiction_detected) {
+                    const actionableQuestions = generateActionableQuestions(
+                      executedTools,
+                      userMessage
+                    );
+                    if (actionableQuestions.length > 0) {
+                      yield {
+                        type: 'actionable_questions',
+                        questions: actionableQuestions,
+                      };
+                    }
+                  }
+                }
+
+                // If response is not satisfactory and needs clarification (but no contradiction)
+                if (
+                  !evaluation.is_satisfactory &&
+                  evaluation.needs_clarification &&
+                  !evaluation.contradiction_detected
+                ) {
+                  const isItalian = detectLanguage(userMessage) === 'it';
+                  yield {
+                    type: 'clarification_request',
+                    content:
+                      evaluation.clarification_question ||
+                      (isItalian
+                        ? 'Potresti fornire più dettagli?'
+                        : 'Could you provide more details?'),
+                  };
+                }
+              } catch (parseError) {
+                console.warn('[Supervisor] Failed to parse evaluation result:', parseError);
+              }
+            }
+          } catch (evalError) {
+            console.warn('[Supervisor] Error evaluating response:', evalError);
+            // Continue even if evaluation fails
           }
 
           yield { type: 'done' };
@@ -890,6 +1735,7 @@ export async function* runAgentStream(
         messages.push(response);
         const finalStream = await agent.llm.stream(messages);
 
+        let finalResponseContent = '';
         for await (const chunk of finalStream) {
           if (chunk.content) {
             const content = Array.isArray(chunk.content)
@@ -899,8 +1745,120 @@ export async function* runAgentStream(
               : typeof chunk.content === 'string'
                 ? chunk.content
                 : String(chunk.content);
+            finalResponseContent += content;
             yield { type: 'content', content };
           }
+        }
+
+        // Evaluate response with supervisor even if no tools were used
+        try {
+          const supervisorTool = agent.tools.find((t) => t.name === 'supervisor_evaluate_response');
+          if (supervisorTool && finalResponseContent) {
+            const evaluationResult = await supervisorTool.invoke({
+              user_question: userMessage,
+              agent_response: finalResponseContent,
+              conversation_history: chatHistory,
+              tools_used: executedTools.map((t) => t.name),
+              tool_results: executedTools.map((t) => ({
+                tool_name: t.name,
+                tool_args: t.args,
+                tool_result: t.result,
+              })),
+            });
+
+            try {
+              const evaluation = JSON.parse(
+                typeof evaluationResult === 'string'
+                  ? evaluationResult
+                  : JSON.stringify(evaluationResult)
+              );
+
+              yield {
+                type: 'supervisor_evaluation',
+                evaluation: {
+                  is_satisfactory: evaluation.is_satisfactory ?? true,
+                  completeness_score: evaluation.completeness_score ?? 0.8,
+                  missing_answers: evaluation.missing_answers ?? [],
+                  suggested_improvements: evaluation.suggested_improvements ?? [],
+                },
+              };
+
+              // STEP 5: Emit actionable questions ONLY after supervisor evaluation
+              // This ensures actionable questions are based on the final, verified response
+              if (evaluation.actionable_questions && evaluation.actionable_questions.length > 0) {
+                // Verify language consistency - if supervisor generated questions in wrong language, use fallback
+                const isItalian = detectLanguage(userMessage) === 'it';
+                const firstQuestion = evaluation.actionable_questions[0]?.question || '';
+                const isQuestionInCorrectLanguage = isItalian
+                  ? detectLanguage(firstQuestion) === 'it'
+                  : detectLanguage(firstQuestion) === 'en';
+
+                if (isQuestionInCorrectLanguage) {
+                  yield {
+                    type: 'actionable_questions',
+                    questions: evaluation.actionable_questions,
+                  };
+                } else {
+                  // Supervisor generated questions in wrong language, use fallback instead
+                  console.warn(
+                    '[Supervisor] Actionable questions in wrong language, using fallback generator'
+                  );
+                  if (
+                    evaluation.is_satisfactory !== false &&
+                    !evaluation.contradiction_detected &&
+                    executedTools.length > 0
+                  ) {
+                    const actionableQuestions = generateActionableQuestions(
+                      executedTools,
+                      userMessage
+                    );
+                    if (actionableQuestions.length > 0) {
+                      yield {
+                        type: 'actionable_questions',
+                        questions: actionableQuestions,
+                      };
+                    }
+                  }
+                }
+              } else {
+                // Fallback: generate actionable questions from executed tools if supervisor didn't provide any
+                // But only if response is satisfactory (no contradictions)
+                if (
+                  evaluation.is_satisfactory !== false &&
+                  !evaluation.contradiction_detected &&
+                  executedTools.length > 0
+                ) {
+                  const actionableQuestions = generateActionableQuestions(
+                    executedTools,
+                    userMessage
+                  );
+                  if (actionableQuestions.length > 0) {
+                    yield {
+                      type: 'actionable_questions',
+                      questions: actionableQuestions,
+                    };
+                  }
+                }
+              }
+
+              // If response is not satisfactory and needs clarification
+              if (!evaluation.is_satisfactory && evaluation.needs_clarification) {
+                const isItalian = detectLanguage(userMessage) === 'it';
+                yield {
+                  type: 'clarification_request',
+                  content:
+                    evaluation.clarification_question ||
+                    (isItalian
+                      ? 'Potresti fornire più dettagli?'
+                      : 'Could you provide more details?'),
+                };
+              }
+            } catch (parseError) {
+              console.warn('[Supervisor] Failed to parse evaluation result:', parseError);
+            }
+          }
+        } catch (evalError) {
+          console.warn('[Supervisor] Error evaluating response:', evalError);
         }
 
         yield { type: 'done' };

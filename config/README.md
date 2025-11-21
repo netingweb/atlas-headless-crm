@@ -149,6 +149,32 @@ curl -X GET "http://localhost:3000/api/demo/config/clear-cache" \
 
 Oppure riavvia l'API per ricaricare le configurazioni.
 
+## 🔐 Sicurezza delle Chiavi API
+
+**IMPORTANTE**: I file `tenant.json` con chiavi API reali sono **esclusi** dal repository Git per sicurezza.
+
+### Setup Sicuro
+
+1. **Usa i file di esempio**: Copia `tenant.json.example` in `tenant.json`:
+
+   ```bash
+   cp config/demo/tenant.json.example config/demo/tenant.json
+   ```
+
+2. **Configura le variabili d'ambiente**: Crea un file `.env` nella root del progetto:
+
+   ```bash
+   OPENAI_API_KEY=sk-your-actual-key-here
+   ```
+
+3. **Usa placeholder nei file JSON**: I file `tenant.json.example` usano placeholder come `${OPENAI_API_KEY}` che vengono sostituiti automaticamente durante il sync.
+
+4. **Le variabili d'ambiente hanno priorità**: Anche se le chiavi sono nel file JSON, le variabili d'ambiente le sovrascrivono a runtime.
+
+Per maggiori dettagli, consulta la [Guida alla Sicurezza delle Chiavi API](../docs/guides/api-keys-security.md).
+
 ## Versionamento
 
 I file JSON sono versionati in Git, permettendo di tracciare le modifiche alle configurazioni nel tempo.
+
+**Nota**: Solo i file `*.example` sono committati. I file `tenant.json` con chiavi reali sono esclusi da Git.

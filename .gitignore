@@ -1,6 +1,6 @@
 # Dependencies
 node_modules
-pnpm-lock.yaml
+# pnpm-lock.yaml - MUST be committed for reproducible builds
 package-lock.json
 yarn.lock
 
@@ -13,6 +13,10 @@ build
 .env
 .env.local
 .env.*.local
+
+# Tenant config files with real API keys (use .example files instead)
+config/*/tenant.json
+!config/*/tenant.json.example
 
 # Logs
 *.log
