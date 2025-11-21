@@ -121,28 +121,68 @@ async function syncConfig(tenantId: string): Promise<void> {
     try {
       const workflowsConfig = JSON.parse(readFileSync(join(configDir, 'workflows.json'), 'utf-8'));
 
+      // Get existing workflows from database to preserve workflow_id
+      const existingWorkflowsDoc = await db
+        .collection('workflows')
+        .findOne({ tenant_id: tenantId });
+      const existingWorkflows = existingWorkflowsDoc?.workflows || [];
+
+      // Create a map of existing workflows by name+unit_id for quick lookup
+      const existingWorkflowsMap = new Map<string, { workflow_id: string; created_at?: string }>();
+      for (const existing of existingWorkflows) {
+        if (existing.name && existing.unit_id) {
+          const key = `${existing.name}::${existing.unit_id}`;
+          existingWorkflowsMap.set(key, {
+            workflow_id: existing.workflow_id,
+            created_at: existing.created_at,
+          });
+        }
+      }
+
       // Generate UUID for workflows that don't have workflow_id
       if (workflowsConfig.workflows && Array.isArray(workflowsConfig.workflows)) {
         const now = new Date().toISOString();
         let generatedCount = 0;
+        let preservedCount = 0;
         for (const workflow of workflowsConfig.workflows) {
           if (!workflow.workflow_id) {
-            workflow.workflow_id = randomUUID();
-            generatedCount++;
-            console.log(
-              `  Generated UUID for workflow: ${workflow.name} -> ${workflow.workflow_id}`
-            );
+            // Try to find existing workflow by name and unit_id
+            const key = `${workflow.name}::${workflow.unit_id || ''}`;
+            const existing = existingWorkflowsMap.get(key);
+
+            if (existing) {
+              // Preserve existing workflow_id
+              workflow.workflow_id = existing.workflow_id;
+              preservedCount++;
+              console.log(
+                `  Preserved UUID for workflow: ${workflow.name} -> ${workflow.workflow_id}`
+              );
+            } else {
+              // Generate new UUID for new workflow
+              workflow.workflow_id = randomUUID();
+              generatedCount++;
+              console.log(
+                `  Generated UUID for workflow: ${workflow.name} -> ${workflow.workflow_id}`
+              );
+            }
+          } else {
+            // Workflow already has workflow_id, preserve it
+            preservedCount++;
           }
+
           // Ensure created_at and updated_at are set if missing
           if (!workflow.created_at) {
-            workflow.created_at = now;
+            // Try to preserve existing created_at if available
+            const key = `${workflow.name}::${workflow.unit_id || ''}`;
+            const existing = existingWorkflowsMap.get(key);
+            workflow.created_at = existing?.created_at || now;
           }
           if (!workflow.updated_at) {
             workflow.updated_at = now;
           }
         }
         console.log(
-          `  Total workflows: ${workflowsConfig.workflows.length}, Generated UUIDs: ${generatedCount}`
+          `  Total workflows: ${workflowsConfig.workflows.length}, Generated UUIDs: ${generatedCount}, Preserved UUIDs: ${preservedCount}`
         );
       }
 

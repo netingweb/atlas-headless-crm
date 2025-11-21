@@ -296,6 +296,14 @@ export class WorkflowsService {
   }
 
   /**
+   * Delete all execution logs for a tenant
+   */
+  async deleteAllExecutions(ctx: TenantContext): Promise<{ deletedCount: number }> {
+    const deletedCount = await this.workflowLogger.deleteAllTenantExecutions(ctx.tenant_id);
+    return { deletedCount };
+  }
+
+  /**
    * Get execution logs for a tenant
    */
   async getTenantExecutions(

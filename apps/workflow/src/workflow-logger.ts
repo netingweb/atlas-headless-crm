@@ -36,6 +36,13 @@ export class WorkflowLogger {
     const logId = randomUUID();
     const now = new Date().toISOString();
 
+    // Ensure workflow_id is present and valid
+    if (!workflow.workflow_id) {
+      throw new Error(
+        `Workflow missing workflow_id: ${JSON.stringify({ name: workflow.name, tenant_id: workflow.tenant_id, unit_id: workflow.unit_id })}`
+      );
+    }
+
     const log: WorkflowExecutionLog = {
       log_id: logId,
       workflow_id: workflow.workflow_id,
@@ -53,6 +60,15 @@ export class WorkflowLogger {
       actions_executed: [],
       chained_workflows: workflow.chained_workflows,
     };
+
+    // Log the workflow_id being saved for debugging
+    const { logger } = await import('@crm-atlas/utils');
+    logger.debug(`Creating execution log with workflow_id: ${workflow.workflow_id}`, {
+      workflow_name: workflow.name,
+      tenant_id: workflow.tenant_id,
+      unit_id: workflow.unit_id,
+      trigger_type: triggerType,
+    });
 
     await this.db.collection(this.collection).insertOne(log);
 
@@ -297,5 +313,15 @@ export class WorkflowLogger {
       average_duration_ms: Math.round(average_duration_ms),
       last_execution,
     };
+  }
+
+  /**
+   * Delete all execution logs for a tenant
+   */
+  async deleteAllTenantExecutions(tenantId: string): Promise<number> {
+    const result = await this.db.collection(this.collection).deleteMany({
+      tenant_id: tenantId,
+    });
+    return result.deletedCount;
   }
 }

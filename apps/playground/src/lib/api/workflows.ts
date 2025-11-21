@@ -129,6 +129,13 @@ export const workflowsApi = {
     return response.data;
   },
 
+  deleteAllExecutions: async (tenant: string, unit: string): Promise<{ deletedCount: number }> => {
+    const response = await apiClient.delete<{ deletedCount: number }>(
+      `/${tenant}/${unit}/workflows/executions`
+    );
+    return response.data;
+  },
+
   getStats: async (tenant: string, unit: string, workflowId: string): Promise<WorkflowStats> => {
     const response = await apiClient.get<WorkflowStats>(
       `/${tenant}/${unit}/workflows/${workflowId}/stats`

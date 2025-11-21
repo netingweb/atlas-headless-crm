@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { workflowsApi } from '@/lib/api/workflows';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Play, Pause, Eye, Copy } from 'lucide-react';
+import { Plus, Trash2, Play, Pause, Eye, Copy, Trash } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -24,7 +24,7 @@ export default function WorkflowsList() {
     enabled: !!tenantId && !!unitId,
   });
 
-  const { data: executions } = useQuery({
+  const { data: executions, isLoading: isLoadingExecutions } = useQuery({
     queryKey: ['workflow-executions', tenantId, unitId],
     queryFn: () => workflowsApi.getAllExecutions(tenantId || '', unitId || '', 500, 0),
     enabled: !!tenantId && !!unitId,
@@ -107,6 +107,49 @@ export default function WorkflowsList() {
     },
   });
 
+  const deleteAllExecutionsMutation = useMutation({
+    mutationFn: () => workflowsApi.deleteAllExecutions(tenantId || '', unitId || ''),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['workflow-executions', tenantId, unitId] });
+      queryClient.invalidateQueries({ queryKey: ['workflows', tenantId, unitId] });
+      toast({
+        title: 'Success',
+        description: `Deleted ${data.deletedCount} execution log(s)`,
+      });
+    },
+    onError: (error: any) => {
+      const errorMessage = error.message || 'Failed to delete execution logs';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+        action: (
+          <ToastAction
+            altText="Copy error message"
+            onClick={() => {
+              navigator.clipboard.writeText(errorMessage).then(() => {
+                toast({
+                  title: 'Copied',
+                  description: 'Error message copied to clipboard',
+                });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </ToastAction>
+        ),
+      });
+    },
+  });
+
+  const handleDeleteAllExecutions = () => {
+    if (
+      confirm('Are you sure you want to delete ALL execution logs? This action cannot be undone.')
+    ) {
+      deleteAllExecutionsMutation.mutate();
+    }
+  };
+
   const handleDelete = (workflowId: string) => {
     if (confirm('Are you sure you want to delete this workflow?')) {
       deleteMutation.mutate(workflowId);
@@ -123,29 +166,43 @@ export default function WorkflowsList() {
 
   // Create a map of workflow_id to last execution for efficient lookup
   const lastExecutionsMap = useMemo(() => {
-    if (!executions || executions.length === 0) return new Map<string, WorkflowExecutionLog>();
+    if (!executions || executions.length === 0) {
+      return new Map<string, WorkflowExecutionLog>();
+    }
 
     const map = new Map<string, WorkflowExecutionLog>();
 
-    executions.forEach((execution) => {
+    // Filter executions by unit_id if unitId is available
+    const filteredExecutions = unitId
+      ? executions.filter((e) => !e.unit_id || e.unit_id === unitId)
+      : executions;
+
+    filteredExecutions.forEach((execution) => {
       const workflowId = execution.workflow_id;
-      if (!workflowId) return;
+      if (!workflowId) {
+        return;
+      }
 
       const existing = map.get(workflowId);
       if (!existing) {
         map.set(workflowId, execution);
       } else {
         // Keep the most recent execution
-        const existingDate = new Date(existing.started_at).getTime();
-        const currentDate = new Date(execution.started_at).getTime();
-        if (currentDate > existingDate) {
-          map.set(workflowId, execution);
+        try {
+          const existingDate = new Date(existing.started_at).getTime();
+          const currentDate = new Date(execution.started_at).getTime();
+          if (currentDate > existingDate) {
+            map.set(workflowId, execution);
+          }
+        } catch (error) {
+          // If date parsing fails, keep the existing one
+          console.warn('Failed to parse execution date:', error);
         }
       }
     });
 
     return map;
-  }, [executions]);
+  }, [executions, unitId]);
 
   const getLastExecution = (workflowId: string) => {
     return lastExecutionsMap.get(workflowId) || null;
@@ -159,7 +216,7 @@ export default function WorkflowsList() {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div>Loading workflows...</div>;
   }
 
   return (
@@ -247,9 +304,13 @@ export default function WorkflowsList() {
                           {getStatusBadge(workflow)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {lastExecution
-                            ? format(new Date(lastExecution.started_at), 'PPp')
-                            : 'Never'}
+                          {isLoadingExecutions ? (
+                            <span className="text-gray-400">Loading...</span>
+                          ) : lastExecution && lastExecution.started_at ? (
+                            format(new Date(lastExecution.started_at), 'PPp')
+                          ) : (
+                            'Never'
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <div className="flex items-center gap-2">
@@ -302,6 +363,24 @@ export default function WorkflowsList() {
         </TabsContent>
 
         <TabsContent value="executions" className="space-y-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold">Execution Logs</h2>
+              <p className="text-sm text-gray-500">
+                {executions ? `${executions.length} execution log(s)` : 'Loading...'}
+              </p>
+            </div>
+            {executions && executions.length > 0 && (
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAllExecutions}
+                disabled={deleteAllExecutionsMutation.isPending}
+              >
+                <Trash className="h-4 w-4 mr-2" />
+                {deleteAllExecutionsMutation.isPending ? 'Deleting...' : 'Delete All Logs'}
+              </Button>
+            )}
+          </div>
           <div className="border rounded-lg">
             <table className="w-full">
               <thead className="bg-gray-50">

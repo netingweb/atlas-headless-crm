@@ -253,6 +253,14 @@ export class WorkflowEngine {
       throw new Error(`Workflow ${workflowId} not found`);
     }
 
+    // Ensure workflow_id matches the requested workflowId
+    if (workflow.workflow_id !== workflowId) {
+      logger.warn(
+        `Workflow ID mismatch: requested ${workflowId}, found ${workflow.workflow_id}. Using requested ID.`
+      );
+      workflow.workflow_id = workflowId;
+    }
+
     // Use unit_id from workflow if provided, otherwise use the unit from context
     // This ensures consistency with how queues are named in ensureWorkflowQueue
     const workflowUnitId = workflow.unit_id || unitId;
@@ -768,7 +776,24 @@ export class WorkflowEngine {
     workflowId: string
   ): Promise<WorkflowDefinition | null> {
     const workflows = await this.loadWorkflows(tenantId);
-    return workflows.find((w) => w.workflow_id === workflowId) || null;
+    const found = workflows.find((w) => w.workflow_id === workflowId);
+
+    if (!found) {
+      logger.warn(
+        `Workflow ${workflowId} not found in tenant ${tenantId}. Available workflow IDs: ${workflows.map((w) => w.workflow_id).join(', ')}`
+      );
+      return null;
+    }
+
+    // Ensure the found workflow has the correct workflow_id
+    if (found.workflow_id !== workflowId) {
+      logger.error(
+        `Workflow ID mismatch in findWorkflow: requested ${workflowId}, found ${found.workflow_id}`
+      );
+      found.workflow_id = workflowId;
+    }
+
+    return found;
   }
 
   async stop(): Promise<void> {

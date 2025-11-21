@@ -244,6 +244,20 @@ export class WorkflowsController {
     );
   }
 
+  @Delete('executions')
+  @UseGuards(JwtAuthGuard, ScopesGuard)
+  @AuthScopes('workflows:manage')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete all execution logs for a tenant' })
+  @ApiResponse({ status: 200, description: 'Number of deleted execution logs' })
+  async deleteAllExecutions(
+    @Param('tenant') tenant: string,
+    @Param('unit') unit: string
+  ): Promise<{ deletedCount: number }> {
+    const ctx: TenantContext = { tenant_id: tenant, unit_id: unit };
+    return this.workflowsService.deleteAllExecutions(ctx);
+  }
+
   @Get(':id/stats')
   @UseGuards(JwtAuthGuard, ScopesGuard)
   @AuthScopes('crm:read')
