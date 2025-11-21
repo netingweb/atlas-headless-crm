@@ -6,6 +6,12 @@ import { useAIStore } from '@/stores/ai-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCurrentContext } from '@/stores/context-store';
 import { createAgent, runAgentStream, type Agent } from '@/lib/ai/agent';
+import { ActionableQuestions, type ActionableQuestion } from '@/components/ai/ActionableQuestions';
+import {
+  ConfirmationDialog,
+  type InterruptPreview,
+  type InterruptToolCall,
+} from '@/components/ai/ConfirmationDialog';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -32,6 +38,13 @@ interface Message {
     error?: string;
   }>;
   thinking?: string[];
+  actionableQuestions?: ActionableQuestion[];
+  supervisorEvaluation?: {
+    is_satisfactory: boolean;
+    completeness_score: number;
+    missing_answers?: string[];
+    suggested_improvements?: string[];
+  };
 }
 
 const createConversationId = () =>
@@ -52,6 +65,12 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
   const [error, setError] = useState<string | null>(null);
   const memoryManagerRef = useRef<MemoryManager | null>(null);
   const conversationIdRef = useRef<string>(createConversationId());
+  // State for interrupt confirmation
+  const [interruptState, setInterruptState] = useState<{
+    tool_call: InterruptToolCall;
+    preview: InterruptPreview;
+    resumeFunction: () => Promise<void>;
+  } | null>(null);
 
   const createMemoryManager = useCallback(
     (conversationId: string) => {
@@ -170,6 +189,16 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
   ]);
 
   const handleSend = async () => {
+    // If there's an active interrupt, don't allow new messages
+    if (interruptState) {
+      toast({
+        title: 'Please confirm or cancel the pending operation',
+        description: 'There is a pending operation waiting for your confirmation',
+        variant: 'default',
+      });
+      return;
+    }
+
     if (!input.trim() || loading || !agentReady || !agentRef.current) {
       if (!agentReady) {
         toast({
@@ -244,8 +273,10 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
           }));
 
       // Stream agent response
+      const { tenantId, unitId } = useAuthStore.getState();
+      const ctx = tenantId && unitId ? { tenant_id: tenantId, unit_id: unitId } : undefined;
 
-      for await (const event of runAgentStream(agentRef.current, userInput, chatHistory)) {
+      for await (const event of runAgentStream(agentRef.current, userInput, chatHistory, ctx)) {
         setMessages((prev) => {
           const updated = [...prev];
           const msgIndex = updated.findIndex((m) => m.id === assistantMessageId);
@@ -366,6 +397,91 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                     description: 'The entity has been updated. Refreshing...',
                   });
                 }
+              }
+              break;
+            case 'interrupt_confirmation':
+              // Pause execution and show confirmation dialog
+              if (event.interrupt_tool_call && event.interrupt_preview) {
+                const toolCall = event.interrupt_tool_call;
+                const preview = event.interrupt_preview;
+                const resumeExecution = async () => {
+                  // Resume execution by calling the tool with confirmed=true
+                  if (!agentRef.current || !ctx) return;
+
+                  const tool = agentRef.current.tools.find((t) => t.name === toolCall.name);
+                  if (!tool) {
+                    toast({
+                      title: 'Error',
+                      description: `Tool ${toolCall.name} not found`,
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+
+                  try {
+                    // Execute tool call with confirmed=true
+                    await tool.invoke({
+                      ...toolCall.args,
+                      confirmed: true,
+                    });
+
+                    // Continue agent execution with the result
+                    // For now, show a success message
+                    toast({
+                      title: 'Operation confirmed',
+                      description: `The ${preview.entity_type} has been ${preview.action_type === 'delete' ? 'deleted' : 'updated'}`,
+                    });
+
+                    // Invalidate queries to refresh data
+                    if (preview.action_type === 'update') {
+                      queryClient.invalidateQueries({
+                        queryKey: [
+                          'entity',
+                          ctx.tenant_id,
+                          ctx.unit_id,
+                          preview.entity_type,
+                          preview.entity_id,
+                        ],
+                      });
+                    }
+                  } catch (error) {
+                    toast({
+                      title: 'Error',
+                      description:
+                        error instanceof Error ? error.message : 'Failed to execute operation',
+                      variant: 'destructive',
+                    });
+                  }
+                };
+
+                setInterruptState({
+                  tool_call: toolCall,
+                  preview: preview,
+                  resumeFunction: resumeExecution,
+                });
+              }
+              break;
+            case 'actionable_questions':
+              // Save actionable questions to the message
+              if (event.questions && event.questions.length > 0) {
+                currentMsg.actionableQuestions = event.questions;
+              }
+              break;
+            case 'supervisor_evaluation':
+              // Store evaluation in message (optional, for debugging)
+              if (event.evaluation) {
+                currentMsg.supervisorEvaluation = event.evaluation;
+              }
+              break;
+            case 'clarification_request':
+              // Show clarification request to user
+              if (event.content) {
+                currentMsg.content += `\n\n⚠️ ${event.content}`;
+                toast({
+                  title: 'Clarification needed',
+                  description: event.content,
+                  variant: 'default',
+                });
               }
               break;
           }
@@ -617,9 +733,44 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
               {/* Chain of Thought visualization for assistant messages */}
               {message.role === 'assistant' && showChainOfThought && (
                 <div className="w-full max-w-[80%]">
-                  <ChainOfThought thinking={message.thinking} toolCalls={message.toolCalls} />
+                  <ChainOfThought
+                    thinking={message.thinking}
+                    toolCalls={message.toolCalls}
+                    userMessage={(() => {
+                      // Find the user message that precedes this assistant message
+                      const messageIndex = messages.findIndex((m) => m.id === message.id);
+                      if (messageIndex > 0) {
+                        // Look backwards for the most recent user message
+                        for (let i = messageIndex - 1; i >= 0; i--) {
+                          if (messages[i].role === 'user') {
+                            return messages[i].content;
+                          }
+                        }
+                      }
+                      return undefined;
+                    })()}
+                    assistantResponse={message.content}
+                  />
                 </div>
               )}
+              {/* Actionable Questions for assistant messages */}
+              {message.role === 'assistant' &&
+                message.actionableQuestions &&
+                message.actionableQuestions.length > 0 && (
+                  <div className="w-full max-w-[80%] mt-2">
+                    <ActionableQuestions
+                      questions={message.actionableQuestions}
+                      onQuestionClick={(action: string) => {
+                        // Send the action as a new user message
+                        setInput(action);
+                        // Trigger send after a brief delay to ensure input is set
+                        setTimeout(() => {
+                          handleSend();
+                        }, 100);
+                      }}
+                    />
+                  </div>
+                )}
             </div>
           ))}
           {loading && (
@@ -665,6 +816,28 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
           </Button>
         </div>
       </div>
+
+      {/* Confirmation Dialog for interrupt */}
+      {interruptState && (
+        <ConfirmationDialog
+          open={!!interruptState}
+          interrupt_tool_call={interruptState.tool_call}
+          interrupt_preview={interruptState.preview}
+          onConfirm={async () => {
+            await interruptState.resumeFunction();
+            setInterruptState(null);
+            setLoading(false);
+          }}
+          onCancel={() => {
+            setInterruptState(null);
+            setLoading(false);
+            toast({
+              title: 'Operation cancelled',
+              description: 'The operation has been cancelled',
+            });
+          }}
+        />
+      )}
     </div>
   );
 });
