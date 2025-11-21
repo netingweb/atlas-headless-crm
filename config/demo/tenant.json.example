@@ -1,0 +1,50 @@
+{
+  "tenant_id": "demo",
+  "name": "Demo Tenant",
+  "settings": {
+    "playground": {
+      "ai": {
+        "provider": "openai",
+        "apiKey": "${OPENAI_API_KEY}",
+        "model": "text-embedding-3-small",
+        "temperature": 0.7,
+        "maxTokens": 2000
+      }
+    }
+  },
+  "embeddingsProvider": {
+    "name": "openai",
+    "apiKey": "${OPENAI_API_KEY}",
+    "model": "text-embedding-3-small"
+  },
+  "storage": {
+    "type": "minio",
+    "config": {
+      "endpoint": "localhost:9000",
+      "accessKey": "minioadmin",
+      "secretKey": "minioadmin",
+      "useSSL": false,
+      "bucket": "documents"
+    }
+  },
+  "visionProvider": {
+    "name": "openai",
+    "model": "gpt-4-vision-preview",
+    "apiKey": "${OPENAI_API_KEY}"
+  },
+  "documentProcessing": {
+    "maxFileSize": 104857600,
+    "allowedMimeTypes": [
+      "application/pdf",
+      "image/*",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+      "text/csv"
+    ],
+    "chunkingDefaults": {
+      "chunkSize": 1000,
+      "chunkOverlap": 200
+    }
+  }
+}
+
