@@ -43,8 +43,20 @@ describe('API Key', () => {
   });
 
   it('should extract prefix from valid API key', () => {
-    const { fullKey, prefix } = generateApiKey();
+    const { fullKey, prefix, secret } = generateApiKey();
     const extracted = extractPrefix(fullKey);
+
+    // Debug info if test fails
+    if (extracted !== prefix) {
+      console.error('Extraction failed:', {
+        fullKey,
+        expectedPrefix: prefix,
+        extractedPrefix: extracted,
+        secret,
+        secretLength: secret.length,
+        keyLength: fullKey.length,
+      });
+    }
 
     expect(extracted).toBe(prefix);
   });

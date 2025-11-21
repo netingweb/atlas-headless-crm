@@ -50,19 +50,25 @@ export function extractPrefix(key: string): string | null {
   }
 
   // The secret is always the last API_KEY_SECRET_CHAR_LENGTH characters
-  // Before the secret, there must be an underscore separator
+  // Before the secret, there must be exactly one underscore separator (inserted during generation)
   const secretStartIndex = key.length - API_KEY_SECRET_CHAR_LENGTH;
 
-  // Verify there's an underscore before the secret (separator)
-  if (secretStartIndex <= 4 || key[secretStartIndex - 1] !== '_') {
+  // Verify there's an underscore separator before the secret
+  // The separator is at position secretStartIndex - 1
+  if (secretStartIndex <= 4) {
     return null;
   }
 
-  // Extract prefix: everything between "crm_" (starts at index 4) and the underscore before secret
+  const separatorIndex = secretStartIndex - 1;
+  if (key[separatorIndex] !== '_') {
+    return null;
+  }
+
+  // Extract prefix: everything between "crm_" (starts at index 4) and the separator underscore
   // prefixStart = 4 (after "crm_")
-  // prefixEnd = secretStartIndex - 1 (before the separator underscore)
+  // prefixEnd = separatorIndex (before the separator underscore, exclusive)
   const prefixStart = 4; // After "crm_"
-  const prefixEnd = secretStartIndex - 1; // Before the separator underscore
+  const prefixEnd = separatorIndex; // Before the separator underscore (exclusive)
 
   if (prefixEnd <= prefixStart) {
     return null;
