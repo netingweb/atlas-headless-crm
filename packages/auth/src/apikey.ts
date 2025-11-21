@@ -73,8 +73,14 @@ export function extractPrefix(key: string): string | null {
 }
 
 function getBase64UrlLength(byteLength: number): number {
-  const fullLength = Math.ceil(byteLength / 3) * 4;
+  // Base64url encoding: 3 bytes -> 4 characters
+  // For 32 bytes: 32 / 3 = 10.67 -> 11 groups of 3 bytes = 33 bytes needed
+  // But we only have 32 bytes, so: 32 = 10 * 3 + 2 (remainder 2)
+  // 10 groups * 4 chars = 40 chars, plus 2 bytes = 3 chars (no padding in base64url)
+  // Total: 40 + 3 = 43 characters
   const remainder = byteLength % 3;
-  const padding = remainder === 0 ? 0 : 3 - remainder;
-  return fullLength - padding;
+  // Base64url doesn't use padding, so we calculate the actual length
+  // For remainder 1: 2 chars, remainder 2: 3 chars, remainder 0: 0 extra chars
+  const extraChars = remainder === 1 ? 2 : remainder === 2 ? 3 : 0;
+  return Math.floor(byteLength / 3) * 4 + extraChars;
 }
