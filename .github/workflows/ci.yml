@@ -109,9 +109,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build API
         run: pnpm --filter @crm-atlas/api build
+      - name: Verify build output
+        run: |
+          ls -la apps/api/dist/apps/api/src/main.js || echo "Build output not found at expected location"
+          find apps/api/dist -name "main.js" -type f || echo "No main.js found in dist"
       - name: Start API (background)
         run: |
-          pnpm --filter @crm-atlas/api start > /tmp/api.log 2>&1 &
+          cd apps/api
+          node dist/apps/api/src/main.js > /tmp/api.log 2>&1 &
           API_PID=$!
           echo "API_PID=$API_PID" >> $GITHUB_ENV
           sleep 20
