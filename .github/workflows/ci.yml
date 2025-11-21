@@ -115,7 +115,8 @@ jobs:
           find apps/api/dist -name "main.js" -type f || echo "No main.js found in dist"
       - name: Start API (background)
         run: |
-          node apps/api/dist/apps/api/src/main.js > /tmp/api.log 2>&1 &
+          # Use pnpm to start API so workspace dependencies are resolved correctly
+          pnpm --filter @crm-atlas/api start > /tmp/api.log 2>&1 &
           API_PID=$!
           echo "API_PID=$API_PID" >> $GITHUB_ENV
           sleep 20
