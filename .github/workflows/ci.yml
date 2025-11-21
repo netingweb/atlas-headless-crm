@@ -21,10 +21,13 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build dependencies
+        run: pnpm -r --filter './packages/*' build
       - name: Lint
         run: pnpm lint
       - name: Type check
         run: pnpm typecheck
+        continue-on-error: false
 
   test:
     name: Test
@@ -108,21 +111,26 @@ jobs:
         run: pnpm --filter @crm-atlas/api build
       - name: Start API (background)
         run: |
-          pnpm --filter @crm-atlas/api start &
-          sleep 15
+          pnpm --filter @crm-atlas/api start > /tmp/api.log 2>&1 &
+          API_PID=$!
+          echo "API_PID=$API_PID" >> $GITHUB_ENV
+          sleep 20
         env:
           MONGODB_URI: mongodb://localhost:27017/crm_atlas_test
           MONGODB_DB_NAME: crm_atlas_test
       - name: Wait for API to be ready
         run: |
-          for i in {1..30}; do
+          for i in {1..40}; do
             if curl -f http://localhost:3000/api/health > /dev/null 2>&1; then
               echo "API is ready"
-              break
+              exit 0
             fi
-            echo "Waiting for API... ($i/30)"
-            sleep 2
+            echo "Waiting for API... ($i/40)"
+            sleep 3
           done
+          echo "API failed to start. Logs:"
+          cat /tmp/api.log || true
+          exit 1
       - name: Download OpenAPI spec
         run: |
           curl -f http://localhost:3000/docs-json -o openapi.json || exit 1

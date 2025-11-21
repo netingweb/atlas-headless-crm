@@ -68,7 +68,7 @@ export default function EntityVisibilityTab() {
       const defaults: Record<string, EntityVisibility> = {};
       entities.forEach((entity) => {
         const fields: Record<string, { visibleInList: boolean; visibleInDetail: boolean }> = {};
-        entity.fields.forEach((field) => {
+        entity.fields.forEach((field: { name: string; type: string }) => {
           fields[field.name] = {
             visibleInList: true,
             visibleInDetail: true,
@@ -239,140 +239,157 @@ export default function EntityVisibilityTab() {
                     <AccordionContent>
                       <div className="space-y-4 pt-2">
                         <div className="grid gap-4">
-                          {entity.fields.map((field) => {
-                            const fieldSettings = entitySettings.fields[field.name] || {
-                              visibleInList: true,
-                              visibleInDetail: true,
-                              ...(field.type === 'reference' && { visibleInReference: true }),
-                            };
+                          {entity.fields.map(
+                            (field: {
+                              name: string;
+                              type: string;
+                              required?: boolean;
+                              indexed?: boolean;
+                              searchable?: boolean;
+                              embeddable?: boolean;
+                              validation?: unknown;
+                              reference_entity?: string;
+                            }) => {
+                              const fieldSettings = entitySettings.fields[field.name] || {
+                                visibleInList: true,
+                                visibleInDetail: true,
+                                ...(field.type === 'reference' && { visibleInReference: true }),
+                              };
 
-                            const hasEnum =
-                              field.validation &&
-                              typeof field.validation === 'object' &&
-                              'enum' in field.validation &&
-                              Array.isArray(field.validation.enum);
+                              const hasEnum =
+                                field.validation &&
+                                typeof field.validation === 'object' &&
+                                'enum' in field.validation &&
+                                Array.isArray(field.validation.enum);
 
-                            return (
-                              <div key={field.name} className="border rounded-lg p-4 space-y-3">
-                                <div className="flex items-start justify-between">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <span className="font-medium">{field.name}</span>
-                                      <Badge variant="outline">{field.type}</Badge>
-                                      {field.required && (
-                                        <Badge variant="destructive" className="text-xs">
-                                          Required
-                                        </Badge>
-                                      )}
-                                      {field.indexed && (
-                                        <Badge
-                                          variant="secondary"
-                                          className="text-xs flex items-center gap-1"
-                                        >
-                                          <Key className="h-3 w-3" />
-                                          Indexed
-                                        </Badge>
-                                      )}
-                                      {field.searchable && (
-                                        <Badge
-                                          variant="secondary"
-                                          className="text-xs flex items-center gap-1"
-                                        >
-                                          <Search className="h-3 w-3" />
-                                          Searchable
-                                        </Badge>
-                                      )}
-                                      {field.embeddable && (
-                                        <Badge
-                                          variant="secondary"
-                                          className="text-xs flex items-center gap-1"
-                                        >
-                                          <Database className="h-3 w-3" />
-                                          Embeddable
-                                        </Badge>
+                              return (
+                                <div key={field.name} className="border rounded-lg p-4 space-y-3">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <span className="font-medium">{field.name}</span>
+                                        <Badge variant="outline">{field.type}</Badge>
+                                        {field.required && (
+                                          <Badge variant="destructive" className="text-xs">
+                                            Required
+                                          </Badge>
+                                        )}
+                                        {field.indexed && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-xs flex items-center gap-1"
+                                          >
+                                            <Key className="h-3 w-3" />
+                                            Indexed
+                                          </Badge>
+                                        )}
+                                        {field.searchable && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-xs flex items-center gap-1"
+                                          >
+                                            <Search className="h-3 w-3" />
+                                            Searchable
+                                          </Badge>
+                                        )}
+                                        {field.embeddable && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-xs flex items-center gap-1"
+                                          >
+                                            <Database className="h-3 w-3" />
+                                            Embeddable
+                                          </Badge>
+                                        )}
+                                      </div>
+
+                                      {/* Enum values */}
+                                      {hasEnum
+                                        ? (() => {
+                                            const enumValidation = field.validation as {
+                                              enum: string[];
+                                            };
+                                            const enumValues = enumValidation.enum.join(', ');
+                                            return (
+                                              <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                                                <span className="font-medium text-gray-700">
+                                                  Enum values:{' '}
+                                                </span>
+                                                <span className="text-gray-600">{enumValues}</span>
+                                              </div>
+                                            );
+                                          })()
+                                        : null}
+
+                                      {/* Reference entity */}
+                                      {field.type === 'reference' && field.reference_entity && (
+                                        <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
+                                          <span className="font-medium text-blue-700">
+                                            References:{' '}
+                                          </span>
+                                          <span className="text-blue-600">
+                                            {String(field.reference_entity)}
+                                          </span>
+                                        </div>
                                       )}
                                     </div>
-
-                                    {/* Enum values */}
-                                    {hasEnum && (
-                                      <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
-                                        <span className="font-medium text-gray-700">
-                                          Enum values:{' '}
-                                        </span>
-                                        <span className="text-gray-600">
-                                          {(field.validation as { enum: string[] }).enum.join(', ')}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {/* Reference entity */}
-                                    {field.type === 'reference' && field.reference_entity && (
-                                      <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
-                                        <span className="font-medium text-blue-700">
-                                          References:{' '}
-                                        </span>
-                                        <span className="text-blue-600">
-                                          {field.reference_entity}
-                                        </span>
-                                      </div>
-                                    )}
                                   </div>
-                                </div>
 
-                                <div className="flex flex-wrap gap-4 pt-2 border-t">
-                                  <Label className="flex items-center gap-2 cursor-pointer">
-                                    <Checkbox
-                                      checked={fieldSettings.visibleInList}
-                                      onCheckedChange={(checked) =>
-                                        handleFieldToggle(
-                                          entity.name,
-                                          field.name,
-                                          'visibleInList',
-                                          checked === true
-                                        )
-                                      }
-                                    />
-                                    <Eye className="h-4 w-4" />
-                                    <span>Visible in List</span>
-                                  </Label>
-
-                                  <Label className="flex items-center gap-2 cursor-pointer">
-                                    <Checkbox
-                                      checked={fieldSettings.visibleInDetail}
-                                      onCheckedChange={(checked) =>
-                                        handleFieldToggle(
-                                          entity.name,
-                                          field.name,
-                                          'visibleInDetail',
-                                          checked === true
-                                        )
-                                      }
-                                    />
-                                    <Eye className="h-4 w-4" />
-                                    <span>Visible in Detail</span>
-                                  </Label>
-
-                                  {field.type === 'reference' && (
+                                  <div className="flex flex-wrap gap-4 pt-2 border-t">
                                     <Label className="flex items-center gap-2 cursor-pointer">
                                       <Checkbox
-                                        checked={fieldSettings.visibleInReference ?? true}
+                                        checked={fieldSettings.visibleInList}
                                         onCheckedChange={(checked) =>
                                           handleFieldToggle(
                                             entity.name,
                                             field.name,
-                                            'visibleInReference',
+                                            'visibleInList',
                                             checked === true
                                           )
                                         }
                                       />
-                                      <Database className="h-4 w-4" />
-                                      <span>Visible in Reference</span>
+                                      <Eye className="h-4 w-4" />
+                                      <span>Visible in List</span>
                                     </Label>
-                                  )}
+
+                                    <Label className="flex items-center gap-2 cursor-pointer">
+                                      <Checkbox
+                                        checked={fieldSettings.visibleInDetail}
+                                        onCheckedChange={(checked) =>
+                                          handleFieldToggle(
+                                            entity.name,
+                                            field.name,
+                                            'visibleInDetail',
+                                            checked === true
+                                          )
+                                        }
+                                      />
+                                      <Eye className="h-4 w-4" />
+                                      <span>Visible in Detail</span>
+                                    </Label>
+
+                                    {field.type === 'reference' && (
+                                      <Label className="flex items-center gap-2 cursor-pointer">
+                                        <Checkbox
+                                          checked={fieldSettings.visibleInReference ?? true}
+                                          onCheckedChange={(checked) =>
+                                            handleFieldToggle(
+                                              entity.name,
+                                              field.name,
+                                              'visibleInReference',
+                                              checked === true
+                                            )
+                                          }
+                                        />
+                                        <Database className="h-4 w-4" />
+                                        <span>Visible in Reference</span>
+                                      </Label>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            }
+                          )}
                         </div>
                       </div>
                     </AccordionContent>
