@@ -19,6 +19,14 @@ export class ValidatorCache {
 
     if (!validator) {
       const schema = this.buildJsonSchema(entityDef);
+      // Debug: log schema for service_order
+      if (entityName === 'service_order' && schema.properties) {
+        const properties = schema.properties as Record<string, unknown>;
+        console.log(
+          '[ValidatorCache] Building schema for service_order:',
+          JSON.stringify(properties.service_type, null, 2)
+        );
+      }
       validator = ajv.compile(schema);
       this.cache.set(key, validator);
     }
@@ -108,8 +116,14 @@ export class ValidatorCache {
       Object.assign(baseSchema, field.validation);
     }
 
+    if (field.label) {
+      baseSchema.title = field.label;
+    }
+
     if (field.multiple === true) {
-      const { default: itemDefault, ...itemSchema } = baseSchema;
+      // Extract default and title separately, keep everything else (including enum) in itemSchema
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { default: itemDefault, title: itemTitle, ...itemSchema } = baseSchema;
       const arraySchema: Record<string, unknown> = {
         type: 'array',
         items: Object.keys(itemSchema).length > 0 ? itemSchema : { type: 'string' },
@@ -117,6 +131,19 @@ export class ValidatorCache {
 
       if (itemDefault !== undefined) {
         arraySchema.default = itemDefault;
+      }
+
+      if (field.label) {
+        arraySchema.title = field.label;
+      }
+
+      // Debug: log schema for multiple fields with enum
+      if (field.name === 'service_type' && field.validation?.enum) {
+        console.log(
+          '[ValidatorCache] Generated schema for service_type:',
+          JSON.stringify(arraySchema, null, 2)
+        );
+        console.log('[ValidatorCache] itemSchema:', JSON.stringify(itemSchema, null, 2));
       }
 
       return arraySchema;
@@ -133,6 +160,10 @@ export class ValidatorCache {
           keysToDelete.push(key);
         }
       }
+      console.log(
+        `[ValidatorCache] Clearing cache for tenant ${tenantId}, found ${keysToDelete.length} keys:`,
+        keysToDelete
+      );
       for (const key of keysToDelete) {
         this.cache.delete(key);
       }
@@ -146,9 +177,11 @@ export class ValidatorCache {
       for (const key of updateKeysToDelete) {
         this.updateCache.delete(key);
       }
+      console.log(`[ValidatorCache] Cache cleared for tenant ${tenantId}`);
     } else {
       this.cache.clear();
       this.updateCache.clear();
+      console.log('[ValidatorCache] All cache cleared');
     }
   }
 }

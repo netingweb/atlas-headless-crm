@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store';
 import { configApi } from '@/lib/api/config';
@@ -17,6 +17,76 @@ import {
 import { Search, LogOut, User, Building2, Loader2, Copy } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
+import type { EntityDefinition } from '@crm-atlas/types';
+
+/**
+ * Get display name for search result item based on entity definition
+ * Priority:
+ * 1. Fields with show_in_search_results: true (concatenated with " | ")
+ * 2. name, title, description (first available)
+ * 3. First 3 searchable fields (concatenated with " | ")
+ */
+function getSearchResultDisplayName(
+  item: Record<string, unknown>,
+  entityDef?: EntityDefinition
+): string {
+  if (!entityDef) {
+    // Fallback alla logica esistente se entityDef non disponibile
+    const document = item.document as Record<string, unknown> | undefined;
+    return (
+      (item.name as string) ||
+      (item.title as string) ||
+      (item.email as string) ||
+      (document?.name as string) ||
+      (document?.title as string) ||
+      (document?.email as string) ||
+      'Untitled'
+    );
+  }
+
+  // Priorità 1: Campi con show_in_search_results: true
+  const showInResultsFields = entityDef.fields.filter((f) => f.show_in_search_results === true);
+  if (showInResultsFields.length > 0) {
+    const values = showInResultsFields
+      .map((field) => {
+        const value = item[field.name] || (item.document as Record<string, unknown>)?.[field.name];
+        if (value === null || value === undefined) return null;
+        if (Array.isArray(value)) return value.join(', ');
+        return String(value);
+      })
+      .filter((v) => v !== null) as string[];
+    if (values.length > 0) return values.join(' | ');
+  }
+
+  // Priorità 2: name, title, description (in ordine)
+  const fallbackFields = ['name', 'title', 'description'];
+  for (const fieldName of fallbackFields) {
+    const value = item[fieldName] || (item.document as Record<string, unknown>)?.[fieldName];
+    if (value !== null && value !== undefined) {
+      return Array.isArray(value) ? value.join(', ') : String(value);
+    }
+  }
+
+  // Priorità 3: Primi 3 campi searchable (escludendo name, title, description già controllati)
+  const searchableFields = entityDef.fields.filter(
+    (f) =>
+      f.searchable === true && f.name !== 'name' && f.name !== 'title' && f.name !== 'description'
+  );
+  if (searchableFields.length > 0) {
+    const values = searchableFields
+      .slice(0, 3)
+      .map((field) => {
+        const value = item[field.name] || (item.document as Record<string, unknown>)?.[field.name];
+        if (value === null || value === undefined) return null;
+        if (Array.isArray(value)) return value.join(', ');
+        return String(value);
+      })
+      .filter((v) => v !== null) as string[];
+    if (values.length > 0) return values.join(' | ');
+  }
+
+  return 'Untitled';
+}
 
 export default function TopBar() {
   const navigate = useNavigate();
@@ -35,6 +105,25 @@ export default function TopBar() {
     queryFn: () => configApi.getUnits(tenantId || ''),
     enabled: !!tenantId,
   });
+
+  // Load entity definitions for search result display
+  const { data: entityDefs } = useQuery({
+    queryKey: ['config-entities', tenantId],
+    queryFn: () => configApi.getEntities(tenantId || ''),
+    enabled: !!tenantId,
+    staleTime: 60_000,
+    retry: 2,
+  });
+
+  // Create map for quick entity definition lookup
+  const entityDefMap = useMemo(() => {
+    if (!entityDefs) return {};
+    const map: Record<string, EntityDefinition> = {};
+    entityDefs.forEach((def) => {
+      map[def.name] = def;
+    });
+    return map;
+  }, [entityDefs]);
 
   // Close search results when clicking outside
   useEffect(() => {
@@ -178,14 +267,8 @@ export default function TopBar() {
                       </div>
                       {result.items.map((item: any) => {
                         const itemId = item._id || item.id || item.document?.id;
-                        const displayName =
-                          item.name ||
-                          item.title ||
-                          item.email ||
-                          item.document?.name ||
-                          item.document?.title ||
-                          item.document?.email ||
-                          'Untitled';
+                        const entityDef = entityDefMap[result.entity];
+                        const displayName = getSearchResultDisplayName(item, entityDef);
                         const displayEmail = item.email || item.document?.email;
 
                         return (
