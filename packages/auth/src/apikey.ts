@@ -38,20 +38,37 @@ export async function verifyApiKey(hash: string, key: string): Promise<boolean> 
 export function extractPrefix(key: string): string | null {
   // Format is: crm_${prefix}_${secret}
   // Prefix and secret can contain underscores from base64url encoding
+  // We know the secret length is always API_KEY_SECRET_CHAR_LENGTH characters
   if (!key.startsWith('crm_')) {
     return null;
   }
 
-  if (key.length <= 4 + 1 + API_KEY_SECRET_CHAR_LENGTH) {
+  // Minimum key length: "crm_" (4) + prefix (at least 1) + "_" (1) + secret (API_KEY_SECRET_CHAR_LENGTH)
+  const minKeyLength = 4 + 1 + 1 + API_KEY_SECRET_CHAR_LENGTH;
+  if (key.length < minKeyLength) {
     return null;
   }
 
-  const secretStart = key.length - API_KEY_SECRET_CHAR_LENGTH;
-  if (key[secretStart - 1] !== '_') {
+  // The secret is always the last API_KEY_SECRET_CHAR_LENGTH characters
+  // Before the secret, there must be an underscore separator
+  const secretStartIndex = key.length - API_KEY_SECRET_CHAR_LENGTH;
+
+  // Verify there's an underscore before the secret (separator)
+  if (secretStartIndex <= 4 || key[secretStartIndex - 1] !== '_') {
     return null;
   }
 
-  const prefix = key.slice(4, secretStart - 1);
+  // Extract prefix: everything between "crm_" (starts at index 4) and the underscore before secret
+  // prefixStart = 4 (after "crm_")
+  // prefixEnd = secretStartIndex - 1 (before the separator underscore)
+  const prefixStart = 4; // After "crm_"
+  const prefixEnd = secretStartIndex - 1; // Before the separator underscore
+
+  if (prefixEnd <= prefixStart) {
+    return null;
+  }
+
+  const prefix = key.slice(prefixStart, prefixEnd);
   return prefix.length > 0 ? prefix : null;
 }
 
