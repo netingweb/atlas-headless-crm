@@ -11,6 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Plus, Copy, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { getEntityLabel, getFieldLabel, humanizeKey } from '@/lib/utils';
+import { DataTable } from '@/components/ui/data-table';
+import type { ColumnDef } from '@tanstack/react-table';
+import type { Entity } from '@/lib/api/entities';
 
 export default function EntityList() {
   const { entityType } = useParams<{ entityType: string }>();
@@ -47,10 +50,20 @@ export default function EntityList() {
 
   // Update store when settings load
   React.useEffect(() => {
-    if (unitSettings?.entityVisibility) {
-      setEntityVisibility(unitSettings.entityVisibility);
+    if (tenantId && unitId) {
+      // Clear store if switching tenant/unit
+      const store = useEntityVisibilityStore.getState();
+      store.clearForTenantUnit(tenantId, unitId);
+
+      // Update store with loaded settings
+      if (unitSettings?.entityVisibility && Object.keys(unitSettings.entityVisibility).length > 0) {
+        setEntityVisibility(unitSettings.entityVisibility);
+      } else {
+        // If no settings exist, set empty object to mark as loaded
+        setEntityVisibility({});
+      }
     }
-  }, [unitSettings, setEntityVisibility]);
+  }, [unitSettings, setEntityVisibility, tenantId, unitId]);
 
   const { data: permissions } = useQuery({
     queryKey: ['permissions', tenantId],
@@ -111,6 +124,91 @@ export default function EntityList() {
     }
   };
 
+  // Define columns for DataTable
+  const columns = React.useMemo<ColumnDef<Entity>[]>(() => {
+    const cols: ColumnDef<Entity>[] = [
+      {
+        id: '_id',
+        header: 'ID',
+        cell: ({ row }) => {
+          const entity = row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="text-blue-600 hover:underline font-mono"
+                onClick={() => navigate(`/entities/${entityType}/${entity._id}`)}
+              >
+                {entity._id.substring(0, 8)}...
+              </button>
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-gray-100"
+                onClick={() => handleCopyId(entity._id)}
+                aria-label="Copy entity ID"
+              >
+                <Copy className="h-4 w-4 text-gray-500" />
+              </button>
+            </div>
+          );
+        },
+      },
+    ];
+
+    // Add visible fields as columns
+    visibleFields.forEach((field) => {
+      cols.push({
+        id: field.name,
+        header: getFieldLabel(field),
+        accessorKey: field.name,
+        cell: ({ row }) => {
+          const value = (row.original as Record<string, unknown>)[field.name];
+          return (
+            <div className="whitespace-nowrap">
+              {value !== null && value !== undefined ? String(value) : '-'}
+            </div>
+          );
+        },
+      });
+    });
+
+    // Add actions column
+    cols.push({
+      id: 'actions',
+      header: 'Actions',
+      enableSorting: false, // Disable sorting for actions column
+      cell: ({ row }) => {
+        const entity = row.original;
+        return (
+          <div className="flex items-center gap-2">
+            {canUpdate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(`/entities/${entityType}/${entity._id}`)}
+                aria-label="Edit entity"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDelete(entity)}
+                aria-label="Delete entity"
+              >
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </Button>
+            )}
+          </div>
+        );
+      },
+    });
+
+    return cols;
+  }, [visibleFields, entityType, navigate, handleCopyId, handleDelete, canUpdate, canDelete]);
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -130,96 +228,16 @@ export default function EntityList() {
         )}
       </div>
 
-      <div className="border rounded-lg overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                ID
-              </th>
-              {visibleFields.map((field) => (
-                <th
-                  key={field.name}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                >
-                  {getFieldLabel(field)}
-                </th>
-              ))}
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {entities && entities.length > 0 ? (
-              entities.map((entity) => (
-                <tr key={entity._id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="text-blue-600 hover:underline font-mono"
-                        onClick={() => navigate(`/entities/${entityType}/${entity._id}`)}
-                      >
-                        {entity._id.substring(0, 8)}...
-                      </button>
-                      <button
-                        type="button"
-                        className="p-1 rounded hover:bg-gray-100"
-                        onClick={() => handleCopyId(entity._id)}
-                        aria-label="Copy entity ID"
-                      >
-                        <Copy className="h-4 w-4 text-gray-500" />
-                      </button>
-                    </div>
-                  </td>
-                  {visibleFields.map((field: { name: string }) => {
-                    const value = (entity as Record<string, unknown>)[field.name];
-                    return (
-                      <td key={field.name} className="px-6 py-4 whitespace-nowrap text-sm">
-                        {value !== null && value !== undefined ? String(value) : '-'}
-                      </td>
-                    );
-                  })}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="flex items-center gap-2">
-                      {canUpdate && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/entities/${entityType}/${entity._id}`)}
-                          aria-label="Edit entity"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {canDelete && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(entity)}
-                          aria-label="Delete entity"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={visibleFields.length + 2}
-                  className="px-6 py-4 text-center text-gray-500"
-                >
-                  No {entityDisplayName} found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        data={entities || []}
+        columns={columns}
+        entityDef={entityDef || undefined}
+        enableSearch={true}
+        enableExport={true}
+        enablePagination={true}
+        exportFilename={`${entityType}-export`}
+        emptyMessage={`No ${entityDisplayName} found`}
+      />
     </div>
   );
 }

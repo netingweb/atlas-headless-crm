@@ -11,6 +11,8 @@ import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import type { WorkflowExecutionLog } from '@crm-atlas/types';
+import { DataTable } from '@/components/ui/data-table';
+import type { ColumnDef } from '@tanstack/react-table';
 
 export default function WorkflowsList() {
   const navigate = useNavigate();
@@ -215,6 +217,201 @@ export default function WorkflowsList() {
     return <Badge variant="default">Active</Badge>;
   };
 
+  // Define columns for workflows table
+  const workflowColumns = useMemo<ColumnDef<any>[]>(() => {
+    return [
+      {
+        id: 'workflow_id',
+        header: 'ID',
+        cell: ({ row }) => {
+          const workflow = row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="text-blue-600 hover:underline font-mono"
+                onClick={() => navigate(`/workflows/${workflow.workflow_id}`)}
+              >
+                {workflow.workflow_id}
+              </button>
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-gray-100"
+                onClick={() => {
+                  navigator.clipboard.writeText(workflow.workflow_id);
+                  toast({
+                    title: 'Copied',
+                    description: 'Workflow ID copied to clipboard',
+                  });
+                }}
+                aria-label="Copy workflow ID"
+              >
+                <Copy className="h-4 w-4 text-gray-500" />
+              </button>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'name',
+        header: 'Name',
+        accessorKey: 'name',
+        cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
+      },
+      {
+        id: 'type',
+        header: 'Type',
+        accessorKey: 'type',
+        cell: ({ row }) => <div className="capitalize">{row.original.type}</div>,
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        cell: ({ row }) => getStatusBadge(row.original),
+      },
+      {
+        id: 'last_execution',
+        header: 'Last Execution',
+        cell: ({ row }) => {
+          const workflow = row.original;
+          const lastExecution = getLastExecution(workflow.workflow_id);
+          return (
+            <div className="text-gray-500">
+              {isLoadingExecutions ? (
+                <span className="text-gray-400">Loading...</span>
+              ) : lastExecution && lastExecution.started_at ? (
+                format(new Date(lastExecution.started_at), 'PPp')
+              ) : (
+                'Never'
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        enableSorting: false, // Disable sorting for actions column
+        cell: ({ row }) => {
+          const workflow = row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(`/workflows/${workflow.workflow_id}`)}
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+              {workflow.enabled && workflow.status === 'active' ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSuspend(workflow.workflow_id)}
+                >
+                  <Pause className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleActivate(workflow.workflow_id)}
+                >
+                  <Play className="h-4 w-4" />
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => handleDelete(workflow.workflow_id)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [
+    navigate,
+    toast,
+    isLoadingExecutions,
+    getLastExecution,
+    handleSuspend,
+    handleActivate,
+    handleDelete,
+  ]);
+
+  // Define columns for executions table
+  const executionColumns = useMemo<ColumnDef<WorkflowExecutionLog>[]>(() => {
+    return [
+      {
+        id: 'workflow_id',
+        header: 'Workflow',
+        accessorKey: 'workflow_id',
+        cell: ({ row }) => {
+          const execution = row.original;
+          return (
+            <button
+              type="button"
+              className="text-blue-600 hover:underline font-mono"
+              onClick={() => navigate(`/workflows/${execution.workflow_id}`)}
+            >
+              {execution.workflow_id}
+            </button>
+          );
+        },
+      },
+      {
+        id: 'trigger_type',
+        header: 'Trigger',
+        accessorKey: 'trigger_type',
+        cell: ({ row }) => <div className="capitalize">{row.original.trigger_type}</div>,
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        accessorKey: 'status',
+        cell: ({ row }) => {
+          const execution = row.original;
+          return (
+            <Badge
+              variant={
+                execution.status === 'completed'
+                  ? 'default'
+                  : execution.status === 'failed'
+                    ? 'destructive'
+                    : 'secondary'
+              }
+            >
+              {execution.status}
+            </Badge>
+          );
+        },
+      },
+      {
+        id: 'started_at',
+        header: 'Started',
+        accessorKey: 'started_at',
+        cell: ({ row }) => {
+          const execution = row.original;
+          return (
+            <div className="text-gray-500">{format(new Date(execution.started_at), 'PPp')}</div>
+          );
+        },
+      },
+      {
+        id: 'duration_ms',
+        header: 'Duration',
+        accessorKey: 'duration_ms',
+        cell: ({ row }) => {
+          const execution = row.original;
+          return (
+            <div className="text-gray-500">
+              {execution.duration_ms ? `${(execution.duration_ms / 1000).toFixed(2)}s` : '-'}
+            </div>
+          );
+        },
+      },
+    ];
+  }, [navigate]);
+
   if (isLoading) {
     return <div>Loading workflows...</div>;
   }
@@ -239,127 +436,15 @@ export default function WorkflowsList() {
         </TabsList>
 
         <TabsContent value="workflows" className="space-y-4">
-          <div className="border rounded-lg">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Last Execution
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {workflows && workflows.length > 0 ? (
-                  workflows.map((workflow) => {
-                    const lastExecution = getLastExecution(workflow.workflow_id);
-                    return (
-                      <tr key={workflow.workflow_id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              className="text-blue-600 hover:underline font-mono"
-                              onClick={() => navigate(`/workflows/${workflow.workflow_id}`)}
-                            >
-                              {workflow.workflow_id}
-                            </button>
-                            <button
-                              type="button"
-                              className="p-1 rounded hover:bg-gray-100"
-                              onClick={() => {
-                                navigator.clipboard.writeText(workflow.workflow_id);
-                                toast({
-                                  title: 'Copied',
-                                  description: 'Workflow ID copied to clipboard',
-                                });
-                              }}
-                              aria-label="Copy workflow ID"
-                            >
-                              <Copy className="h-4 w-4 text-gray-500" />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          {workflow.name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm capitalize">
-                          {workflow.type}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {getStatusBadge(workflow)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {isLoadingExecutions ? (
-                            <span className="text-gray-400">Loading...</span>
-                          ) : lastExecution && lastExecution.started_at ? (
-                            format(new Date(lastExecution.started_at), 'PPp')
-                          ) : (
-                            'Never'
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => navigate(`/workflows/${workflow.workflow_id}`)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {workflow.enabled && workflow.status === 'active' ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleSuspend(workflow.workflow_id)}
-                              >
-                                <Pause className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleActivate(workflow.workflow_id)}
-                              >
-                                <Play className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(workflow.workflow_id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                      No workflows found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            data={workflows || []}
+            columns={workflowColumns}
+            enableSearch={true}
+            enableExport={true}
+            enablePagination={true}
+            exportFilename="workflows-export"
+            emptyMessage="No workflows found"
+          />
         </TabsContent>
 
         <TabsContent value="executions" className="space-y-4">
@@ -381,76 +466,15 @@ export default function WorkflowsList() {
               </Button>
             )}
           </div>
-          <div className="border rounded-lg">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Workflow
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Trigger
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Started
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Duration
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {executions && executions.length > 0 ? (
-                  executions.map((execution) => (
-                    <tr key={execution.log_id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          type="button"
-                          className="text-blue-600 hover:underline font-mono"
-                          onClick={() => navigate(`/workflows/${execution.workflow_id}`)}
-                        >
-                          {execution.workflow_id}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm capitalize">
-                        {execution.trigger_type}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <Badge
-                          variant={
-                            execution.status === 'completed'
-                              ? 'default'
-                              : execution.status === 'failed'
-                                ? 'destructive'
-                                : 'secondary'
-                          }
-                        >
-                          {execution.status}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(new Date(execution.started_at), 'PPp')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {execution.duration_ms
-                          ? `${(execution.duration_ms / 1000).toFixed(2)}s`
-                          : '-'}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                      No executions found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            data={executions || []}
+            columns={executionColumns}
+            enableSearch={true}
+            enableExport={true}
+            enablePagination={true}
+            exportFilename="workflow-executions-export"
+            emptyMessage="No executions found"
+          />
         </TabsContent>
       </Tabs>
     </div>

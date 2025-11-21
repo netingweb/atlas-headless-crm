@@ -1,9 +1,11 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { FieldVisibility, EntityVisibility } from '@/lib/api/playground-settings';
 
 interface EntityVisibilityState {
   entityVisibility: Record<string, EntityVisibility>;
   isLoading: boolean;
+  lastLoadedTenantUnit?: string; // Track which tenant/unit was last loaded
   setEntityVisibility: (entityVisibility: Record<string, EntityVisibility>) => void;
   getEntityVisibility: (entityName: string) => EntityVisibility | undefined;
   getFieldVisibility: (entityName: string, fieldName: string) => FieldVisibility | undefined;
@@ -12,50 +14,77 @@ interface EntityVisibilityState {
   isFieldVisibleInDetail: (entityName: string, fieldName: string) => boolean;
   isFieldVisibleInReference: (entityName: string, fieldName: string) => boolean;
   setLoading: (loading: boolean) => void;
+  clearForTenantUnit: (tenantId: string, unitId: string) => void;
 }
 
-export const useEntityVisibilityStore = create<EntityVisibilityState>((set, get) => ({
-  entityVisibility: {},
-  isLoading: false,
+const STORAGE_KEY = 'entity-visibility-store';
 
-  setEntityVisibility: (entityVisibility) => {
-    set({ entityVisibility });
-  },
+export const useEntityVisibilityStore = create<EntityVisibilityState>()(
+  persist(
+    (set, get) => ({
+      entityVisibility: {},
+      isLoading: false,
+      lastLoadedTenantUnit: undefined,
 
-  setLoading: (loading) => {
-    set({ isLoading: loading });
-  },
+      setEntityVisibility: (entityVisibility) => {
+        set({ entityVisibility });
+      },
 
-  getEntityVisibility: (entityName: string) => {
-    return get().entityVisibility[entityName];
-  },
+      clearForTenantUnit: (tenantId: string, unitId: string) => {
+        const key = `${tenantId}:${unitId}`;
+        const currentKey = get().lastLoadedTenantUnit;
+        // Only clear if switching to a different tenant/unit
+        if (currentKey && currentKey !== key) {
+          set({ entityVisibility: {}, lastLoadedTenantUnit: key });
+        } else if (!currentKey) {
+          set({ lastLoadedTenantUnit: key });
+        }
+      },
 
-  getFieldVisibility: (entityName: string, fieldName: string) => {
-    const entity = get().entityVisibility[entityName];
-    return entity?.fields[fieldName];
-  },
+      setLoading: (loading) => {
+        set({ isLoading: loading });
+      },
 
-  isEntityVisibleInMenu: (entityName: string) => {
-    const entity = get().entityVisibility[entityName];
-    // Default to true if not configured (backward compatibility)
-    return entity?.visibleInMenu ?? true;
-  },
+      getEntityVisibility: (entityName: string) => {
+        return get().entityVisibility[entityName];
+      },
 
-  isFieldVisibleInList: (entityName: string, fieldName: string) => {
-    const field = get().getFieldVisibility(entityName, fieldName);
-    // Default to true if not configured (backward compatibility)
-    return field?.visibleInList ?? true;
-  },
+      getFieldVisibility: (entityName: string, fieldName: string) => {
+        const entity = get().entityVisibility[entityName];
+        return entity?.fields[fieldName];
+      },
 
-  isFieldVisibleInDetail: (entityName: string, fieldName: string) => {
-    const field = get().getFieldVisibility(entityName, fieldName);
-    // Default to true if not configured (backward compatibility)
-    return field?.visibleInDetail ?? true;
-  },
+      isEntityVisibleInMenu: (entityName: string) => {
+        const entity = get().entityVisibility[entityName];
+        // Default to true if not configured (backward compatibility)
+        return entity?.visibleInMenu ?? true;
+      },
 
-  isFieldVisibleInReference: (entityName: string, fieldName: string) => {
-    const field = get().getFieldVisibility(entityName, fieldName);
-    // Default to true if not configured (backward compatibility)
-    return field?.visibleInReference ?? true;
-  },
-}));
+      isFieldVisibleInList: (entityName: string, fieldName: string) => {
+        const field = get().getFieldVisibility(entityName, fieldName);
+        // Default to true if not configured (backward compatibility)
+        return field?.visibleInList ?? true;
+      },
+
+      isFieldVisibleInDetail: (entityName: string, fieldName: string) => {
+        const field = get().getFieldVisibility(entityName, fieldName);
+        // Default to true if not configured (backward compatibility)
+        return field?.visibleInDetail ?? true;
+      },
+
+      isFieldVisibleInReference: (entityName: string, fieldName: string) => {
+        const field = get().getFieldVisibility(entityName, fieldName);
+        // Default to true if not configured (backward compatibility)
+        return field?.visibleInReference ?? true;
+      },
+    }),
+    {
+      name: STORAGE_KEY,
+      // Only persist entityVisibility, not loading state
+      partialize: (state) => ({
+        entityVisibility: state.entityVisibility,
+        lastLoadedTenantUnit: state.lastLoadedTenantUnit,
+      }),
+    }
+  )
+);

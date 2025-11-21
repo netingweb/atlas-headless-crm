@@ -53,10 +53,20 @@ export default function Sidebar() {
 
   // Update store when settings load
   React.useEffect(() => {
-    if (unitSettings?.entityVisibility) {
-      setEntityVisibility(unitSettings.entityVisibility);
+    if (tenantId && unitId) {
+      // Clear store if switching tenant/unit
+      const store = useEntityVisibilityStore.getState();
+      store.clearForTenantUnit(tenantId, unitId);
+
+      // Update store with loaded settings
+      if (unitSettings?.entityVisibility && Object.keys(unitSettings.entityVisibility).length > 0) {
+        setEntityVisibility(unitSettings.entityVisibility);
+      } else {
+        // If no settings exist, set empty object to mark as loaded
+        setEntityVisibility({});
+      }
     }
-  }, [unitSettings, setEntityVisibility]);
+  }, [unitSettings, setEntityVisibility, tenantId, unitId]);
 
   // Log error for debugging
   if (entitiesError) {

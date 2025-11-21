@@ -52,10 +52,20 @@ export default function EntityVisibilityTab() {
 
   // Update store when settings load
   useEffect(() => {
-    if (unitSettings?.entityVisibility) {
-      setEntityVisibility(unitSettings.entityVisibility);
+    if (tenantId && unitId) {
+      // Clear store if switching tenant/unit
+      const store = useEntityVisibilityStore.getState();
+      store.clearForTenantUnit(tenantId, unitId);
+
+      // Update store with loaded settings (even if empty, to mark as loaded)
+      if (unitSettings?.entityVisibility && Object.keys(unitSettings.entityVisibility).length > 0) {
+        setEntityVisibility(unitSettings.entityVisibility);
+      } else {
+        // If no settings exist, set empty object to mark as loaded
+        setEntityVisibility({});
+      }
     }
-  }, [unitSettings, setEntityVisibility]);
+  }, [unitSettings, setEntityVisibility, tenantId, unitId]);
 
   // Local state for form
   const [localSettings, setLocalSettings] = useState<Record<string, EntityVisibility>>({});
