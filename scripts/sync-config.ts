@@ -196,6 +196,34 @@ async function syncConfig(tenantId: string): Promise<void> {
     }
 
     console.log(`\n✅ Configuration sync completed for tenant: ${tenantId}`);
+
+    // Try to clear API cache if API is running
+    try {
+      const apiUrl = process.env.API_URL || 'http://localhost:3000';
+      const clearCacheUrl = `${apiUrl}/${tenantId}/config/clear-cache`;
+      const response = await fetch(clearCacheUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = (await response.json()) as { message?: string };
+        console.log(`✅ ${result.message || 'API cache cleared'}`);
+      } else {
+        console.log(
+          `ℹ️  Could not clear API cache (API may not be running or requires authentication). Status: ${response.status}`
+        );
+        console.log(`   You may need to manually call: GET ${clearCacheUrl}`);
+        console.log(`   Or restart the API to reload configurations.`);
+      }
+    } catch (error) {
+      console.log(
+        `ℹ️  Could not clear API cache (API may not be running). Error: ${error instanceof Error ? error.message : String(error)}`
+      );
+      console.log(`   You may need to manually call the clear-cache endpoint or restart the API.`);
+    }
   } catch (error) {
     console.error(`❌ Failed to sync configuration:`, error);
     throw error;

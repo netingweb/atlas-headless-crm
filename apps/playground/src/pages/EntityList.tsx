@@ -10,6 +10,7 @@ import { isApiAvailable } from '@/lib/api/permissions';
 import { Button } from '@/components/ui/button';
 import { Plus, Copy, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { getEntityLabel, getFieldLabel, humanizeKey } from '@/lib/utils';
 
 export default function EntityList() {
   const { entityType } = useParams<{ entityType: string }>();
@@ -65,6 +66,8 @@ export default function EntityList() {
     );
   }, [entityDef, entityType, isFieldVisibleInList]);
 
+  const entityDisplayName = entityDef ? getEntityLabel(entityDef) : humanizeKey(entityType || '');
+
   const canCreate = isApiAvailable('entities.create', user || null, permissions || null);
   const canUpdate = isApiAvailable('entities.update', user || null, permissions || null);
   const canDelete = isApiAvailable('entities.delete', user || null, permissions || null);
@@ -87,7 +90,7 @@ export default function EntityList() {
 
   const handleDelete = async (entity: NonNullable<typeof entities>[0]) => {
     const confirmed = window.confirm(
-      `Are you sure you want to delete this ${entityType}?\nThis action cannot be undone.`
+      `Are you sure you want to delete this ${entityDisplayName}?\nThis action cannot be undone.`
     );
 
     if (!confirmed) return;
@@ -116,13 +119,13 @@ export default function EntityList() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold capitalize">{entityType}</h1>
-          <p className="text-gray-500">Manage your {entityType} entities</p>
+          <h1 className="text-3xl font-bold capitalize">{entityDisplayName}</h1>
+          <p className="text-gray-500">Manage your {entityDisplayName} records</p>
         </div>
         {canCreate && (
           <Button onClick={() => navigate(`/entities/${entityType}/new`)}>
             <Plus className="h-4 w-4 mr-2" />
-            Create {entityType}
+            Create {entityDisplayName}
           </Button>
         )}
       </div>
@@ -139,7 +142,7 @@ export default function EntityList() {
                   key={field.name}
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
                 >
-                  {field.name}
+                  {getFieldLabel(field)}
                 </th>
               ))}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -210,7 +213,7 @@ export default function EntityList() {
                   colSpan={visibleFields.length + 2}
                   className="px-6 py-4 text-center text-gray-500"
                 >
-                  No {entityType} found
+                  No {entityDisplayName} found
                 </td>
               </tr>
             )}

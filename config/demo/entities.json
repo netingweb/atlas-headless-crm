@@ -4,9 +4,11 @@
   "entities": [
     {
       "name": "contact",
+      "label": "Contact",
       "fields": [
         {
           "name": "name",
+          "label": "Name",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -15,6 +17,7 @@
         },
         {
           "name": "email",
+          "label": "Email",
           "type": "email",
           "required": true,
           "indexed": true,
@@ -23,6 +26,7 @@
         },
         {
           "name": "phone",
+          "label": "Phone",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -31,6 +35,7 @@
         },
         {
           "name": "source",
+          "label": "Source",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -39,6 +44,7 @@
         },
         {
           "name": "role",
+          "label": "Role",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -47,6 +53,7 @@
         },
         {
           "name": "status",
+          "label": "Status",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -58,6 +65,7 @@
         },
         {
           "name": "labels",
+          "label": "Labels",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -70,6 +78,7 @@
         },
         {
           "name": "company_id",
+          "label": "Company ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -81,9 +90,11 @@
     },
     {
       "name": "company",
+      "label": "Company",
       "fields": [
         {
           "name": "name",
+          "label": "Name",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -92,6 +103,7 @@
         },
         {
           "name": "email",
+          "label": "Email",
           "type": "email",
           "required": true,
           "indexed": true,
@@ -100,6 +112,7 @@
         },
         {
           "name": "phone",
+          "label": "Phone",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -108,6 +121,7 @@
         },
         {
           "name": "phone2",
+          "label": "Phone2",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -116,6 +130,7 @@
         },
         {
           "name": "website",
+          "label": "Website",
           "type": "url",
           "required": false,
           "indexed": true,
@@ -124,6 +139,7 @@
         },
         {
           "name": "size",
+          "label": "Size",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -132,6 +148,7 @@
         },
         {
           "name": "industry",
+          "label": "Industry",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -140,6 +157,7 @@
         },
         {
           "name": "address",
+          "label": "Address",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -148,21 +166,24 @@
         },
         {
           "name": "key_contact_ids",
+          "label": "Key Contact Ids",
           "type": "reference",
           "required": false,
           "indexed": false,
           "searchable": false,
           "embeddable": false,
-          "reference_entity": "contact",
-          "multiple": true
+          "multiple": true,
+          "reference_entity": "contact"
         }
       ]
     },
     {
       "name": "note",
+      "label": "Note",
       "fields": [
         {
           "name": "title",
+          "label": "Title",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -171,6 +192,7 @@
         },
         {
           "name": "content",
+          "label": "Content",
           "type": "text",
           "required": true,
           "indexed": false,
@@ -179,6 +201,7 @@
         },
         {
           "name": "status",
+          "label": "Status",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -191,6 +214,7 @@
         },
         {
           "name": "expiration_date_time",
+          "label": "Expiration Date Time",
           "type": "datetime",
           "required": true,
           "indexed": true,
@@ -199,6 +223,7 @@
         },
         {
           "name": "company_id",
+          "label": "Company ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -208,6 +233,7 @@
         },
         {
           "name": "contact_id",
+          "label": "Contact ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -219,9 +245,11 @@
     },
     {
       "name": "task",
+      "label": "Task",
       "fields": [
         {
           "name": "title",
+          "label": "Title",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -230,6 +258,7 @@
         },
         {
           "name": "description",
+          "label": "Description",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -238,6 +267,7 @@
         },
         {
           "name": "due_date",
+          "label": "Due Date",
           "type": "date",
           "required": false,
           "indexed": true,
@@ -246,6 +276,7 @@
         },
         {
           "name": "type",
+          "label": "Type",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -254,6 +285,7 @@
         },
         {
           "name": "status",
+          "label": "Status",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -262,6 +294,7 @@
         },
         {
           "name": "company_id",
+          "label": "Company ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -271,6 +304,7 @@
         },
         {
           "name": "contact_id",
+          "label": "Contact ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -282,9 +316,11 @@
     },
     {
       "name": "opportunity",
+      "label": "Opportunity",
       "fields": [
         {
           "name": "title",
+          "label": "Title",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -293,6 +329,7 @@
         },
         {
           "name": "value",
+          "label": "Value",
           "type": "number",
           "required": false,
           "indexed": true,
@@ -301,6 +338,7 @@
         },
         {
           "name": "stage",
+          "label": "Stage",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -309,6 +347,7 @@
         },
         {
           "name": "description",
+          "label": "Description",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -317,6 +356,7 @@
         },
         {
           "name": "company_id",
+          "label": "Company ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -326,6 +366,7 @@
         },
         {
           "name": "contact_id",
+          "label": "Contact ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -337,9 +378,11 @@
     },
     {
       "name": "product",
+      "label": "Product",
       "fields": [
         {
           "name": "name",
+          "label": "Name",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -348,6 +391,7 @@
         },
         {
           "name": "sku",
+          "label": "Sku",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -356,6 +400,7 @@
         },
         {
           "name": "description",
+          "label": "Description",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -364,6 +409,7 @@
         },
         {
           "name": "price",
+          "label": "Price",
           "type": "number",
           "required": true,
           "indexed": true,
@@ -372,6 +418,7 @@
         },
         {
           "name": "category",
+          "label": "Category",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -393,9 +440,11 @@
     },
     {
       "name": "document",
+      "label": "Document",
       "fields": [
         {
           "name": "title",
+          "label": "Title",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -404,6 +453,7 @@
         },
         {
           "name": "filename",
+          "label": "Filename",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -412,6 +462,7 @@
         },
         {
           "name": "mime_type",
+          "label": "Mime Type",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -420,6 +471,7 @@
         },
         {
           "name": "file_size",
+          "label": "File Size",
           "type": "number",
           "required": true,
           "indexed": true,
@@ -428,6 +480,7 @@
         },
         {
           "name": "storage_path",
+          "label": "Storage Path",
           "type": "string",
           "required": true,
           "indexed": false,
@@ -436,6 +489,7 @@
         },
         {
           "name": "document_type",
+          "label": "Document Type",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -444,6 +498,7 @@
         },
         {
           "name": "related_entity_type",
+          "label": "Related Entity Type",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -452,6 +507,7 @@
         },
         {
           "name": "related_entity_id",
+          "label": "Related Entity ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -461,6 +517,7 @@
         },
         {
           "name": "processing_status",
+          "label": "Processing Status",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -472,6 +529,7 @@
         },
         {
           "name": "extracted_content",
+          "label": "Extracted Content",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -480,6 +538,7 @@
         },
         {
           "name": "metadata",
+          "label": "Metadata",
           "type": "json",
           "required": false,
           "indexed": false,

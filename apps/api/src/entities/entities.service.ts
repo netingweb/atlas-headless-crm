@@ -43,10 +43,42 @@ export class EntitiesService {
       throw new NotFoundError(`Entity ${entity} not found`);
     }
 
+    // Normalize multiple fields: ensure they are arrays
+    const normalizedData = { ...data };
+    for (const field of entityDef.fields) {
+      if (field.multiple === true && normalizedData[field.name] !== undefined) {
+        const value = normalizedData[field.name];
+        if (!Array.isArray(value)) {
+          // Convert single value to array, or empty array if null/undefined
+          normalizedData[field.name] = value != null ? [value] : [];
+          console.log(
+            `[EntitiesService] Normalized multiple field ${field.name}:`,
+            value,
+            '->',
+            normalizedData[field.name]
+          );
+        }
+      }
+    }
+
     // Clear cache to ensure latest schema is used
     this.validatorCache.clear(ctx.tenant_id);
     const validator = this.validatorCache.getOrCompile(ctx.tenant_id, entity, entityDef);
-    const valid = validator(data);
+
+    // Debug: log data being validated for service_order
+    if (entity === 'service_order' && normalizedData.service_type) {
+      console.log(
+        '[EntitiesService] Validating service_order with service_type:',
+        JSON.stringify(normalizedData.service_type)
+      );
+      console.log(
+        '[EntitiesService] service_type type:',
+        typeof normalizedData.service_type,
+        Array.isArray(normalizedData.service_type)
+      );
+    }
+
+    const valid = validator(normalizedData);
 
     if (!valid) {
       const errors =
@@ -65,9 +97,9 @@ export class EntitiesService {
     }
 
     // Validate referenced entities exist
-    await this.relationsService.validateReferences(ctx, entityDef, data);
+    await this.relationsService.validateReferences(ctx, entityDef, normalizedData);
 
-    const created = await this.repository.create(ctx, entity, data, entityDef);
+    const created = await this.repository.create(ctx, entity, normalizedData, entityDef);
     const createdId = (created as { _id: string })._id;
 
     // Index in Typesense and Qdrant
@@ -121,15 +153,54 @@ export class EntitiesService {
     const entityDef = await this.ensureEntityExists(ctx, entity);
     this.logger.debug(`Entity definition loaded: ${entityDef.name}`);
 
+    // Normalize multiple fields: ensure they are arrays
+    const normalizedData = { ...data };
+    for (const field of entityDef.fields) {
+      if (field.multiple === true && normalizedData[field.name] !== undefined) {
+        const value = normalizedData[field.name];
+        if (!Array.isArray(value)) {
+          // Convert single value to array, or empty array if null/undefined
+          normalizedData[field.name] = value != null ? [value] : [];
+          console.log(
+            `[EntitiesService] Normalized multiple field ${field.name} in update:`,
+            value,
+            '->',
+            normalizedData[field.name]
+          );
+        }
+      }
+    }
+
     // For updates, validate only provided fields (partial updates)
     // Create a schema without required fields for partial validation
     const updateSchema = this.buildPartialUpdateSchema(entityDef);
+
+    // Debug: log data being validated for service_order update
+    if (entity === 'service_order' && normalizedData.service_type) {
+      console.log(
+        '[EntitiesService] Validating UPDATE for service_order with service_type:',
+        JSON.stringify(normalizedData.service_type)
+      );
+      console.log(
+        '[EntitiesService] service_type type:',
+        typeof normalizedData.service_type,
+        Array.isArray(normalizedData.service_type)
+      );
+      if (updateSchema.properties) {
+        const properties = updateSchema.properties as Record<string, unknown>;
+        console.log(
+          '[EntitiesService] Update schema for service_type:',
+          JSON.stringify(properties.service_type, null, 2)
+        );
+      }
+    }
+
     const validator = this.validatorCache.getOrCompileForUpdate(
       ctx.tenant_id,
       entity,
       updateSchema
     );
-    const valid = validator(data);
+    const valid = validator(normalizedData);
 
     if (!valid) {
       this.logger.warn('Validation failed', { errors: validator.errors });
@@ -151,10 +222,10 @@ export class EntitiesService {
     this.logger.debug('Validation passed');
 
     // Validate referenced entities exist
-    await this.relationsService.validateReferences(ctx, entityDef, data);
+    await this.relationsService.validateReferences(ctx, entityDef, normalizedData);
     this.logger.debug('References validated');
 
-    const updated = await this.repository.update(ctx, entity, id, data, entityDef);
+    const updated = await this.repository.update(ctx, entity, id, normalizedData, entityDef);
     const updatedRecord = updated as Record<string, unknown> | null;
     this.logger.debug('Repository update result', {
       success: !!updated,
@@ -283,10 +354,18 @@ export class EntitiesService {
       }
     }
 
+    if (field.label) {
+      baseSchema.title = field.label;
+    }
+
     if (field.multiple === true) {
+      // Extract title separately, keep everything else (including enum) in itemSchema
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { title: itemTitle, ...itemSchema } = baseSchema;
       return {
         type: 'array',
-        items: Object.keys(baseSchema).length > 0 ? baseSchema : {},
+        items: Object.keys(itemSchema).length > 0 ? itemSchema : { type: 'string' },
+        ...(field.label ? { title: field.label } : {}),
       };
     }
 

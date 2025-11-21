@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/accordion';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Eye, Database, Search, Key, CheckCircle } from 'lucide-react';
+import { getEntityLabel, getFieldLabel, humanizeKey } from '@/lib/utils';
 
 export default function EntityVisibilityTab() {
   const { tenantId, unitId } = useAuthStore();
@@ -214,6 +215,7 @@ export default function EntityVisibilityTab() {
               .slice()
               .sort((a, b) => a.name.localeCompare(b.name))
               .map((entity) => {
+                const entityLabel = getEntityLabel(entity);
                 const entitySettings = localSettings[entity.name] || {
                   visibleInMenu: true,
                   fields: {},
@@ -230,7 +232,7 @@ export default function EntityVisibilityTab() {
                           }
                           onClick={(e) => e.stopPropagation()}
                         />
-                        <span className="font-semibold capitalize">{entity.name}</span>
+                        <span className="font-semibold capitalize">{entityLabel}</span>
                         <Badge variant="outline" className="ml-auto">
                           {entity.fields.length} fields
                         </Badge>
@@ -242,6 +244,7 @@ export default function EntityVisibilityTab() {
                           {entity.fields.map(
                             (field: {
                               name: string;
+                              label?: string;
                               type: string;
                               required?: boolean;
                               indexed?: boolean;
@@ -251,6 +254,7 @@ export default function EntityVisibilityTab() {
                               reference_entity?: string;
                               multiple?: boolean;
                             }) => {
+                              const fieldLabel = getFieldLabel(field);
                               const fieldSettings = entitySettings.fields[field.name] || {
                                 visibleInList: true,
                                 visibleInDetail: true,
@@ -268,7 +272,7 @@ export default function EntityVisibilityTab() {
                                   <div className="flex items-start justify-between">
                                     <div className="flex-1">
                                       <div className="flex items-center gap-2 mb-2">
-                                        <span className="font-medium">{field.name}</span>
+                                        <span className="font-medium">{fieldLabel}</span>
                                         <Badge variant="outline">{field.type}</Badge>
                                         {field.required && (
                                           <Badge variant="destructive" className="text-xs">
@@ -342,7 +346,7 @@ export default function EntityVisibilityTab() {
                                             References:{' '}
                                           </span>
                                           <span className="text-blue-600">
-                                            {String(field.reference_entity)}
+                                            {humanizeKey(field.reference_entity)}
                                           </span>
                                           {field.multiple && (
                                             <span className="text-blue-500 ml-1 text-xs">

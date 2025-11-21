@@ -2,6 +2,8 @@
 
 ## Struttura delle Entità
 
+Ogni entità definita nei file `entities.json` ha un `name` (slug univoco) e può avere una `label` opzionale che viene mostrata nelle UI, nella documentazione generata e nelle API. Se la `label` non è specificata il sistema utilizza automaticamente il `name`.
+
 ### 1. Contact (ex Lead)
 
 Rappresenta un contatto/persona nel CRM.
@@ -104,6 +106,7 @@ Opportunità di vendita.
 Il sistema supporta diversi tipi di campo per definire le proprietà delle entità. Ogni campo può avere le seguenti proprietà:
 
 - `name` (string, required) - Nome del campo
+- `label` (string, optional) - Etichetta human-readable mostrata nelle UI e nella documentazione (fallback al `name` se assente)
 - `type` (FieldType, required) - Tipo del campo (vedi tipi supportati sotto)
 - `required` (boolean, default: false) - Se il campo è obbligatorio
 - `indexed` (boolean, default: false) - Se il campo deve essere indicizzato per ricerche/filtri
@@ -113,6 +116,7 @@ Il sistema supporta diversi tipi di campo per definire le proprietà delle entit
 - `validation` (object, optional) - Regole di validazione aggiuntive (es. enum, min, max)
 - `reference_entity` (string, optional) - Per campi di tipo `reference`, specifica l'entità referenziata
 - `multiple` (boolean, default: false) - Se `true`, il campo accetta array di valori (es. enum multipli o reference multiple)
+- `show_in_search_results` (boolean, default: false, optional) - Se `true`, il campo viene mostrato nei risultati di ricerca Typesense. Quando più campi hanno `show_in_search_results: true`, i loro valori vengono concatenati con " | ". Se nessun campo ha questa proprietà, viene usata una logica di fallback: prima `name`, `title`, `description` (primo disponibile), altrimenti i primi 3 campi `searchable: true`
 
 ### Tipi di Campo Disponibili
 
@@ -383,6 +387,167 @@ Per campi `date` e `datetime`, il default può essere una stringa nel formato ap
   "default": "2024-01-01T00:00:00.000Z"
 }
 ```
+
+## Feature Avanzate
+
+### Campi Multiple (`multiple: true`)
+
+I campi possono accettare array di valori quando `multiple: true` è impostato. Questo è particolarmente utile per:
+
+- **Campi enum multipli**: Permette di selezionare più valori da un enum
+- **Reference multiple**: Permette di associare più entità referenziate
+
+**Esempio - Enum multiplo:**
+
+```json
+{
+  "name": "labels",
+  "label": "Labels",
+  "type": "string",
+  "required": false,
+  "indexed": true,
+  "searchable": true,
+  "multiple": true,
+  "validation": {
+    "enum": ["vip", "prospect", "customer", "partner", "supplier"]
+  }
+}
+```
+
+Quando si crea o aggiorna un'entità, il campo accetta un array:
+
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "labels": ["vip", "customer"]
+}
+```
+
+**Esempio - Reference multiplo:**
+
+```json
+{
+  "name": "key_contact_ids",
+  "label": "Key Contacts",
+  "type": "reference",
+  "required": false,
+  "indexed": true,
+  "searchable": false,
+  "multiple": true,
+  "reference_entity": "contact"
+}
+```
+
+Quando si crea o aggiorna un'entità, il campo accetta un array di ID:
+
+```json
+{
+  "name": "Acme Corp",
+  "email": "info@acme.com",
+  "key_contact_ids": ["contact_id_1", "contact_id_2", "contact_id_3"]
+}
+```
+
+**Note importanti:**
+
+- I campi multiple vengono validati come array: ogni elemento deve rispettare lo schema del campo (enum o reference)
+- Nei risultati API, i campi multiple sono sempre restituiti come array (anche se contengono un solo elemento)
+- La UI mostra componenti MultiSelect per i campi multiple
+- I campi multiple sono supportati in Typesense come array types (`string[]`, `int64[]`, etc.)
+
+### Label per Entità e Campi (`label`)
+
+Ogni entità e campo può avere una `label` opzionale che viene utilizzata per la visualizzazione nelle UI, nella documentazione e nelle API. Se la `label` non è specificata, il sistema utilizza automaticamente il `name` (humanizzato).
+
+**Esempio - Entità con label:**
+
+```json
+{
+  "name": "service_order",
+  "label": "Ordini",
+  "fields": [...]
+}
+```
+
+**Esempio - Campo con label:**
+
+```json
+{
+  "name": "service_type",
+  "label": "Tipo di Servizio",
+  "type": "string",
+  "searchable": true
+}
+```
+
+**Utilizzo:**
+
+- La `label` viene mostrata nelle UI del Playground invece del `name`
+- La `label` viene utilizzata nella documentazione Swagger/OpenAPI
+- La `label` viene utilizzata nei tool MCP per descrizioni più leggibili
+- Se `label` non è presente, viene utilizzato `name` con humanizzazione automatica (es. `service_order` → "Service Order")
+
+### Visualizzazione nei Risultati di Ricerca (`show_in_search_results`)
+
+La proprietà `show_in_search_results: true` permette di controllare quali campi vengono mostrati nei risultati della ricerca globale Typesense nella barra di ricerca del Playground.
+
+**Logica di visualizzazione (in ordine di priorità):**
+
+1. **Priorità 1**: Campi con `show_in_search_results: true`
+   - Se più campi hanno questa proprietà, i loro valori vengono concatenati con " | "
+   - Esempio: `"SO-123 | parts, maintenance | 2024-01-15"`
+
+2. **Priorità 2**: Fallback a campi standard
+   - Cerca in ordine: `name`, `title`, `description` (primo disponibile)
+   - Esempio: Se esiste `name`, viene mostrato `name`
+
+3. **Priorità 3**: Primi 3 campi searchable
+   - Se nessuno dei precedenti è disponibile, concatena i primi 3 campi con `searchable: true`
+   - Esempio: `"field1 | field2 | field3"`
+
+**Esempio - Configurazione per service_order:**
+
+```json
+{
+  "name": "service_order",
+  "label": "Ordini",
+  "fields": [
+    {
+      "name": "order_number",
+      "label": "Order Number",
+      "type": "string",
+      "required": true,
+      "indexed": true,
+      "searchable": true,
+      "show_in_search_results": true
+    },
+    {
+      "name": "service_type",
+      "label": "Tipo di Servizio",
+      "type": "string",
+      "searchable": true,
+      "multiple": true,
+      "validation": {
+        "enum": ["parts", "maintenance", "consumable", "warranty", "others"]
+      }
+    }
+  ]
+}
+```
+
+**Risultato nella ricerca:**
+
+Quando si cerca un `service_order`, il risultato mostrerà:
+
+- `"SO-123"` (se solo `order_number` ha `show_in_search_results: true`)
+- `"SO-123 | parts, maintenance"` (se anche `service_type` ha `show_in_search_results: true`)
+
+**Best practices:**
+
+- Usa `show_in_search_results: true` per i campi più identificativi dell'entità
+- Per entità senza campo `name`, configura sempre almeno un campo con `show_in_search_results: true`
+- Evita di impostare troppi campi con `show_in_search_results: true` per mantenere i risultati leggibili
 
 ## Dizionari (Dictionaries)
 

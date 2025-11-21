@@ -17,12 +17,14 @@ export type FieldType = z.infer<typeof FieldTypeSchema>;
 
 export const FieldDefinitionSchema = z.object({
   name: z.string(),
+  label: z.string().optional(),
   type: FieldTypeSchema,
   required: z.boolean().default(false),
   indexed: z.boolean().default(false),
   searchable: z.boolean().default(false),
   embeddable: z.boolean().default(false),
   multiple: z.boolean().default(false).optional(),
+  show_in_search_results: z.boolean().default(false).optional(),
   reference_entity: z.string().optional(),
   default: z.unknown().optional(),
   validation: z.record(z.unknown()).optional(),
@@ -44,6 +46,7 @@ export type DocumentConfig = z.infer<typeof DocumentConfigSchema>;
 
 export const EntityDefinitionSchema = z.object({
   name: z.string(),
+  label: z.string().optional(),
   scope: z.enum(['tenant', 'unit']).default('unit').optional(), // 'tenant' = global, 'unit' = local
   fields: z.array(FieldDefinitionSchema),
   indexes: z.array(z.record(z.unknown())).optional(),

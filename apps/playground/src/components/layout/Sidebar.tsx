@@ -18,7 +18,7 @@ import {
   Settings,
   Workflow,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getEntityLabel } from '@/lib/utils';
 
 const entityIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   contact: Users,
@@ -27,11 +27,6 @@ const entityIconMap: Record<string, React.ComponentType<{ className?: string }>>
   task: CheckSquare,
   opportunity: Target,
 };
-
-function toTitle(text: string): string {
-  if (!text) return '';
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -77,7 +72,7 @@ export default function Sidebar() {
         const Icon = entityIconMap[def.name] || FileText;
         return {
           icon: Icon,
-          label: toTitle(def.name),
+          label: getEntityLabel(def),
           path: `/entities/${def.name}`,
         };
       }) || [];

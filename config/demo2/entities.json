@@ -4,10 +4,12 @@
   "entities": [
     {
       "name": "contact",
+      "label": "Contact",
       "scope": "tenant",
       "fields": [
         {
           "name": "name",
+          "label": "Name",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -16,6 +18,7 @@
         },
         {
           "name": "email",
+          "label": "Email",
           "type": "email",
           "required": true,
           "indexed": true,
@@ -24,6 +27,7 @@
         },
         {
           "name": "phone",
+          "label": "Phone",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -32,6 +36,7 @@
         },
         {
           "name": "gender",
+          "label": "Gender",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -40,6 +45,7 @@
         },
         {
           "name": "address",
+          "label": "Address",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -48,6 +54,7 @@
         },
         {
           "name": "city",
+          "label": "City",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -56,6 +63,7 @@
         },
         {
           "name": "postal_code",
+          "label": "Postal Code",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -64,6 +72,7 @@
         },
         {
           "name": "customer_type",
+          "label": "Customer Type",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -75,6 +84,7 @@
         },
         {
           "name": "sales_source",
+          "label": "Sales Source",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -83,6 +93,7 @@
         },
         {
           "name": "pipeline_stage",
+          "label": "Pipeline Stage",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -91,6 +102,7 @@
         },
         {
           "name": "labels",
+          "label": "Labels",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -103,6 +115,7 @@
         },
         {
           "name": "company_id",
+          "label": "Company ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -114,10 +127,12 @@
     },
     {
       "name": "company",
+      "label": "Company",
       "scope": "tenant",
       "fields": [
         {
           "name": "name",
+          "label": "Name",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -126,6 +141,7 @@
         },
         {
           "name": "email",
+          "label": "Email",
           "type": "email",
           "required": true,
           "indexed": true,
@@ -134,6 +150,7 @@
         },
         {
           "name": "phone",
+          "label": "Phone",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -142,6 +159,7 @@
         },
         {
           "name": "phone2",
+          "label": "Phone2",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -150,6 +168,7 @@
         },
         {
           "name": "website",
+          "label": "Website",
           "type": "url",
           "required": false,
           "indexed": true,
@@ -158,6 +177,7 @@
         },
         {
           "name": "size",
+          "label": "Size",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -166,6 +186,7 @@
         },
         {
           "name": "industry",
+          "label": "Industry",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -174,6 +195,7 @@
         },
         {
           "name": "address",
+          "label": "Address",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -182,21 +204,24 @@
         },
         {
           "name": "key_contact_ids",
+          "label": "Key Contact Ids",
           "type": "reference",
           "required": false,
           "indexed": false,
           "searchable": false,
           "embeddable": false,
-          "reference_entity": "contact",
-          "multiple": true
+          "multiple": true,
+          "reference_entity": "contact"
         }
       ]
     },
     {
       "name": "note",
+      "label": "Note",
       "fields": [
         {
           "name": "title",
+          "label": "Title",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -205,6 +230,7 @@
         },
         {
           "name": "content",
+          "label": "Content",
           "type": "text",
           "required": true,
           "indexed": false,
@@ -213,6 +239,7 @@
         },
         {
           "name": "status",
+          "label": "Status",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -225,6 +252,7 @@
         },
         {
           "name": "expiration_date_time",
+          "label": "Expiration Date Time",
           "type": "datetime",
           "required": true,
           "indexed": true,
@@ -233,6 +261,7 @@
         },
         {
           "name": "company_id",
+          "label": "Company ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -242,6 +271,7 @@
         },
         {
           "name": "contact_id",
+          "label": "Contact ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -253,9 +283,11 @@
     },
     {
       "name": "task",
+      "label": "Task",
       "fields": [
         {
           "name": "title",
+          "label": "Title",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -264,6 +296,7 @@
         },
         {
           "name": "description",
+          "label": "Description",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -272,6 +305,7 @@
         },
         {
           "name": "due_date",
+          "label": "Due Date",
           "type": "date",
           "required": false,
           "indexed": true,
@@ -280,6 +314,7 @@
         },
         {
           "name": "type",
+          "label": "Type",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -288,6 +323,7 @@
         },
         {
           "name": "status",
+          "label": "Status",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -296,6 +332,7 @@
         },
         {
           "name": "company_id",
+          "label": "Company ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -305,6 +342,7 @@
         },
         {
           "name": "contact_id",
+          "label": "Contact ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -316,9 +354,11 @@
     },
     {
       "name": "opportunity",
+      "label": "Opportunity",
       "fields": [
         {
           "name": "title",
+          "label": "Title",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -327,6 +367,7 @@
         },
         {
           "name": "value",
+          "label": "Value",
           "type": "number",
           "required": false,
           "indexed": true,
@@ -335,6 +376,7 @@
         },
         {
           "name": "stage",
+          "label": "Stage",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -343,6 +385,7 @@
         },
         {
           "name": "description",
+          "label": "Description",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -351,6 +394,7 @@
         },
         {
           "name": "company_id",
+          "label": "Company ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -360,6 +404,7 @@
         },
         {
           "name": "contact_id",
+          "label": "Contact ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -371,10 +416,12 @@
     },
     {
       "name": "product",
+      "label": "Product",
       "scope": "tenant",
       "fields": [
         {
           "name": "name",
+          "label": "Name",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -383,6 +430,7 @@
         },
         {
           "name": "brand",
+          "label": "Brand",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -391,6 +439,7 @@
         },
         {
           "name": "model",
+          "label": "Model",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -399,6 +448,7 @@
         },
         {
           "name": "year",
+          "label": "Year",
           "type": "number",
           "required": false,
           "indexed": true,
@@ -407,6 +457,7 @@
         },
         {
           "name": "vehicle_type",
+          "label": "Vehicle Type",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -418,6 +469,7 @@
         },
         {
           "name": "price",
+          "label": "Price",
           "type": "number",
           "required": true,
           "indexed": true,
@@ -426,6 +478,7 @@
         },
         {
           "name": "km",
+          "label": "Km",
           "type": "number",
           "required": false,
           "indexed": true,
@@ -434,6 +487,7 @@
         },
         {
           "name": "color",
+          "label": "Color",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -442,6 +496,7 @@
         },
         {
           "name": "fuel_type",
+          "label": "Fuel Type",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -453,6 +508,7 @@
         },
         {
           "name": "vin",
+          "label": "Vin",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -461,6 +517,7 @@
         },
         {
           "name": "license_plate",
+          "label": "License Plate",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -469,6 +526,7 @@
         },
         {
           "name": "description",
+          "label": "Description",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -479,9 +537,11 @@
     },
     {
       "name": "deal",
+      "label": "Deal",
       "fields": [
         {
           "name": "deal_number",
+          "label": "Deal Number",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -490,6 +550,7 @@
         },
         {
           "name": "title",
+          "label": "Title",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -498,6 +559,7 @@
         },
         {
           "name": "description",
+          "label": "Description",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -506,6 +568,7 @@
         },
         {
           "name": "contact_id",
+          "label": "Contact ID",
           "type": "reference",
           "required": true,
           "indexed": true,
@@ -515,6 +578,7 @@
         },
         {
           "name": "product_id",
+          "label": "Product ID",
           "type": "reference",
           "required": true,
           "indexed": true,
@@ -524,6 +588,7 @@
         },
         {
           "name": "status",
+          "label": "Status",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -532,6 +597,7 @@
         },
         {
           "name": "stage",
+          "label": "Stage",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -540,6 +606,7 @@
         },
         {
           "name": "sale_price",
+          "label": "Sale Price",
           "type": "number",
           "required": false,
           "indexed": true,
@@ -548,6 +615,7 @@
         },
         {
           "name": "start_date",
+          "label": "Start Date",
           "type": "date",
           "required": false,
           "indexed": true,
@@ -556,6 +624,7 @@
         },
         {
           "name": "close_date",
+          "label": "Close Date",
           "type": "date",
           "required": false,
           "indexed": true,
@@ -564,6 +633,7 @@
         },
         {
           "name": "expected_close_date",
+          "label": "Expected Close Date",
           "type": "date",
           "required": false,
           "indexed": true,
@@ -572,6 +642,7 @@
         },
         {
           "name": "sales_rep",
+          "label": "Sales Rep",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -580,6 +651,7 @@
         },
         {
           "name": "notes",
+          "label": "Notes",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -588,6 +660,7 @@
         },
         {
           "name": "probability",
+          "label": "Probability",
           "type": "number",
           "required": false,
           "indexed": true,
@@ -598,25 +671,34 @@
     },
     {
       "name": "service_order",
+      "label": "Ordini",
       "fields": [
         {
           "name": "order_number",
+          "label": "Order Number",
           "type": "string",
           "required": true,
           "indexed": true,
           "searchable": true,
-          "embeddable": false
+          "embeddable": false,
+          "show_in_search_results": true
         },
         {
           "name": "service_type",
+          "label": "Tipo di Servizio",
           "type": "string",
           "required": false,
           "indexed": true,
           "searchable": true,
-          "embeddable": false
+          "embeddable": false,
+          "multiple": true,
+          "validation": {
+            "enum": ["parts", "maintenance", "consumable", "warranty", "others", "tagliando"]
+          }
         },
         {
           "name": "vehicle_id",
+          "label": "Vehicle ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -626,6 +708,7 @@
         },
         {
           "name": "customer_id",
+          "label": "Customer ID",
           "type": "reference",
           "required": true,
           "indexed": true,
@@ -635,6 +718,7 @@
         },
         {
           "name": "appointment_date",
+          "label": "Appointment Date",
           "type": "datetime",
           "required": false,
           "indexed": true,
@@ -643,6 +727,7 @@
         },
         {
           "name": "technician",
+          "label": "Technician",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -651,6 +736,7 @@
         },
         {
           "name": "status",
+          "label": "Status",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -659,6 +745,7 @@
         },
         {
           "name": "description",
+          "label": "Description",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -667,6 +754,7 @@
         },
         {
           "name": "estimated_cost",
+          "label": "Estimated Cost",
           "type": "number",
           "required": false,
           "indexed": true,
@@ -675,6 +763,7 @@
         },
         {
           "name": "final_cost",
+          "label": "Final Cost",
           "type": "number",
           "required": false,
           "indexed": true,
@@ -685,9 +774,11 @@
     },
     {
       "name": "document",
+      "label": "Document",
       "fields": [
         {
           "name": "title",
+          "label": "Title",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -696,6 +787,7 @@
         },
         {
           "name": "filename",
+          "label": "Filename",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -704,6 +796,7 @@
         },
         {
           "name": "mime_type",
+          "label": "Mime Type",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -712,6 +805,7 @@
         },
         {
           "name": "file_size",
+          "label": "File Size",
           "type": "number",
           "required": true,
           "indexed": true,
@@ -720,6 +814,7 @@
         },
         {
           "name": "storage_path",
+          "label": "Storage Path",
           "type": "string",
           "required": true,
           "indexed": false,
@@ -728,6 +823,7 @@
         },
         {
           "name": "document_type",
+          "label": "Document Type",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -736,6 +832,7 @@
         },
         {
           "name": "related_entity_type",
+          "label": "Related Entity Type",
           "type": "string",
           "required": false,
           "indexed": true,
@@ -744,6 +841,7 @@
         },
         {
           "name": "related_entity_id",
+          "label": "Related Entity ID",
           "type": "reference",
           "required": false,
           "indexed": true,
@@ -753,6 +851,7 @@
         },
         {
           "name": "processing_status",
+          "label": "Processing Status",
           "type": "string",
           "required": true,
           "indexed": true,
@@ -764,6 +863,7 @@
         },
         {
           "name": "extracted_content",
+          "label": "Extracted Content",
           "type": "text",
           "required": false,
           "indexed": false,
@@ -772,6 +872,7 @@
         },
         {
           "name": "metadata",
+          "label": "Metadata",
           "type": "json",
           "required": false,
           "indexed": false,

@@ -14,6 +14,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
 import { DocumentsModule } from './documents/documents.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CorsInterceptor } from './common/interceptors/cors.interceptor';
+import { ValidatorCache } from '@crm-atlas/core';
 
 @Module({
   imports: [
@@ -43,6 +44,11 @@ import { CorsInterceptor } from './common/interceptors/cors.interceptor';
       provide: APP_INTERCEPTOR,
       useClass: CorsInterceptor,
     },
+    {
+      provide: ValidatorCache,
+      useValue: new ValidatorCache(),
+    },
   ],
+  exports: [ValidatorCache],
 })
 export class AppModule {}

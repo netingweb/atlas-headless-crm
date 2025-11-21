@@ -91,10 +91,11 @@ class MCPServer {
       });
 
       for (const entity of entities) {
+        const entityLabel = entity.label || entity.name;
         // Create entity tool
         tools.push({
           name: `create_${entity.name}`,
-          description: `Create a new ${entity.name} in CRM`,
+          description: `Create a new ${entityLabel} in CRM`,
           inputSchema: {
             type: 'object',
             properties: this.buildEntityProperties(entity),
@@ -107,7 +108,7 @@ class MCPServer {
         // Search entity tool
         tools.push({
           name: `search_${entity.name}`,
-          description: `Search for ${entity.name} using text or semantic search. Use '*' as query for generic search (all results). Set count_only to true to get only the count without results.`,
+          description: `Search for ${entityLabel} using text or semantic search. Use '*' as query for generic search (all results). Set count_only to true to get only the count without results.`,
           inputSchema: {
             type: 'object',
             properties: {
@@ -136,7 +137,7 @@ class MCPServer {
         // Get entity by ID tool
         tools.push({
           name: `get_${entity.name}`,
-          description: `Get a ${entity.name} by ID`,
+          description: `Get a ${entityLabel} by ID`,
           inputSchema: {
             type: 'object',
             properties: {
@@ -149,13 +150,13 @@ class MCPServer {
         // Update entity tool
         tools.push({
           name: `update_${entity.name}`,
-          description: `Update an existing ${entity.name} in CRM by ID. This is a destructive action that requires explicit confirmation. First call will return a preview of the action - call again with confirmed=true to execute. IMPORTANT: If you don't know the entity ID, first use search_${entity.name} to find it, or use global_search if the entity type is unknown.`,
+          description: `Update an existing ${entityLabel} in CRM by ID. This is a destructive action that requires explicit confirmation. First call will return a preview of the action - call again with confirmed=true to execute. IMPORTANT: If you don't know the entity ID, first use search_${entity.name} to find it, or use global_search if the entity type is unknown.`,
           inputSchema: {
             type: 'object',
             properties: {
               id: {
                 type: 'string',
-                description: `Entity ID to update (REQUIRED). If ID is unknown, first search using search_${entity.name} with a descriptive query, or use global_search if entity type is unknown.`,
+                description: `${entityLabel} ID to update (REQUIRED). If ID is unknown, first search using search_${entity.name} with a descriptive query, or use global_search if entity type is unknown.`,
               },
               confirmed: {
                 type: 'boolean',
@@ -172,13 +173,13 @@ class MCPServer {
         // Delete entity tool
         tools.push({
           name: `delete_${entity.name}`,
-          description: `Delete a ${entity.name} from CRM by ID. This is a destructive action that requires explicit confirmation. First call will return a preview of the action - call again with confirmed=true to execute. IMPORTANT: If you don't know the entity ID, first use search_${entity.name} to find it, or use global_search if the entity type is unknown.`,
+          description: `Delete a ${entityLabel} from CRM by ID. This is a destructive action that requires explicit confirmation. First call will return a preview of the action - call again with confirmed=true to execute. IMPORTANT: If you don't know the entity ID, first use search_${entity.name} to find it, or use global_search if the entity type is unknown.`,
           inputSchema: {
             type: 'object',
             properties: {
               id: {
                 type: 'string',
-                description: `Entity ID to delete (REQUIRED). If ID is unknown, first search using search_${entity.name} with a descriptive query, or use global_search if entity type is unknown.`,
+                description: `${entityLabel} ID to delete (REQUIRED). If ID is unknown, first search using search_${entity.name} with a descriptive query, or use global_search if entity type is unknown.`,
               },
               confirmed: {
                 type: 'boolean',
@@ -359,6 +360,7 @@ class MCPServer {
   private buildEntityProperties(entity: {
     fields: Array<{
       name: string;
+      label?: string;
       type: string;
       required: boolean;
       validation?: { enum?: unknown[]; [key: string]: unknown };
@@ -372,6 +374,7 @@ class MCPServer {
 
     for (const field of entity.fields) {
       const schema: Record<string, unknown> = {};
+      const fieldLabel = field.label || field.name;
 
       // Set type based on field type
       switch (field.type) {
@@ -433,6 +436,8 @@ class MCPServer {
         schema.description = field.description;
       }
 
+      schema.title = fieldLabel;
+
       if (field.multiple === true) {
         const { enum: enumValues, description, ...rest } = schema;
         const itemSchema: Record<string, unknown> = { ...rest };
@@ -443,6 +448,7 @@ class MCPServer {
         const arraySchema: Record<string, unknown> = {
           type: 'array',
           items: Object.keys(itemSchema).length > 0 ? itemSchema : {},
+          title: fieldLabel,
         };
 
         if (description) {

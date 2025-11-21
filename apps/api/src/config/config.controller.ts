@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Param, Body, UseGuards, Inject, Optional } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -10,6 +10,7 @@ import {
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { getDb } from '@crm-atlas/db';
 import { JwtAuthGuard } from '@crm-atlas/auth';
+import { ValidatorCache } from '@crm-atlas/core';
 import type {
   UnitConfig,
   EntityDefinition,
@@ -29,7 +30,10 @@ import {
 export class ConfigController {
   private readonly configLoader = new MongoConfigLoader(getDb());
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    @Optional() @Inject(ValidatorCache) private readonly validatorCache?: ValidatorCache
+  ) {}
 
   @Get(':tenant/units')
   @ApiOperation({
@@ -62,12 +66,14 @@ export class ConfigController {
         type: 'object',
         properties: {
           name: { type: 'string', example: 'contact' },
+          label: { type: 'string', example: 'Contacts', nullable: true },
           fields: {
             type: 'array',
             items: {
               type: 'object',
               properties: {
                 name: { type: 'string', example: 'name' },
+                label: { type: 'string', example: 'Full Name', nullable: true },
                 type: {
                   type: 'string',
                   enum: [
@@ -169,21 +175,35 @@ export class ConfigController {
   @Get(':tenant/config/clear-cache')
   @ApiOperation({
     summary: 'Clear configuration cache',
-    description: 'Clears the configuration cache for a tenant to force reload from database.',
+    description:
+      'Clears the configuration cache and validator cache for a tenant to force reload from database.',
   })
   @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
   @ApiOkResponse({ description: 'Cache cleared successfully' })
   async clearCache(@Param('tenant') tenant: string): Promise<{ message: string }> {
-    // Clear cache for the tenant
+    // Clear config cache for the tenant
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cacheInstance = (this.configLoader as any).cache as {
       clear?: (tenantId?: string) => void;
+      clearEntities?: (tenantId?: string) => void;
     };
-    if (cacheInstance && typeof cacheInstance.clear === 'function') {
-      cacheInstance.clear(tenant);
-      return { message: `Cache cleared for tenant: ${tenant}` };
+    if (cacheInstance) {
+      if (typeof cacheInstance.clear === 'function') {
+        cacheInstance.clear(tenant);
+      }
+      if (typeof cacheInstance.clearEntities === 'function') {
+        cacheInstance.clearEntities(tenant);
+      }
     }
-    return { message: 'Cache clear requested. Please restart API to fully clear cache.' };
+
+    // Clear validator cache
+    if (this.validatorCache) {
+      this.validatorCache.clear(tenant);
+    }
+
+    return {
+      message: `Configuration and validator cache cleared for tenant: ${tenant}`,
+    };
   }
 
   @Get(':tenant/config/playground-settings/tenant')

@@ -28,6 +28,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import DocumentUpload from '@/components/documents/DocumentUpload';
 import { documentsApi } from '@/lib/api/documents';
+import { getEntityLabel, getFieldLabel, humanizeKey } from '@/lib/utils';
 
 // Readonly fields that should not be editable
 // Note: visible_to is kept in the codebase for future sharing policy implementation but hidden from UI
@@ -288,6 +289,8 @@ export default function EntityDetail() {
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [responseData, setResponseData] = useState<Entity | null>(null);
 
+  const entityDisplayName = entityDef ? getEntityLabel(entityDef) : humanizeKey(entityType || '');
+
   // Initialize form data
   useEffect(() => {
     if (isNew) {
@@ -302,7 +305,26 @@ export default function EntityDetail() {
       }
       setFormData(defaults);
     } else if (entity) {
-      setFormData(entity);
+      // Normalize multiple fields: if a field is multiple but value is not an array, convert it
+      const normalizedData: Record<string, unknown> = { ...entity };
+      if (entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)) {
+        entityDef.fields.forEach((field: { name: string; multiple?: boolean }) => {
+          if (field.multiple === true && normalizedData[field.name] !== undefined) {
+            const value = normalizedData[field.name];
+            // If value is not an array, convert it to array (or empty array if null/undefined)
+            if (!Array.isArray(value)) {
+              normalizedData[field.name] = value != null ? [value] : [];
+              console.log(
+                `[EntityDetail] Normalized multiple field ${field.name}:`,
+                value,
+                '->',
+                normalizedData[field.name]
+              );
+            }
+          }
+        });
+      }
+      setFormData(normalizedData);
     }
   }, [entity, isNew, entityDef]);
 
@@ -314,7 +336,7 @@ export default function EntityDetail() {
       setResponseData(data);
       toast({
         title: 'Success',
-        description: `${entityType} created successfully and indexed in Typesense/Qdrant`,
+        description: `${entityDisplayName} created successfully and indexed in Typesense/Qdrant`,
       });
       // Invalidate queries to refresh the list and current entity
       queryClient.invalidateQueries({ queryKey: ['entity', tenantId, unitId, entityType] });
@@ -361,7 +383,7 @@ export default function EntityDetail() {
       setResponseData(data);
       toast({
         title: 'Success',
-        description: `${entityType} updated successfully and re-indexed in Typesense/Qdrant`,
+        description: `${entityDisplayName} updated successfully and re-indexed in Typesense/Qdrant`,
       });
       // Invalidate queries to refresh the list and current entity
       queryClient.invalidateQueries({ queryKey: ['entity', tenantId, unitId, entityType, id] });
@@ -453,12 +475,13 @@ export default function EntityDetail() {
       ? DOCUMENT_READONLY_FIELDS.includes(field.name)
       : READONLY_FIELDS.includes(field.name);
     const fieldValue = formData[field.name];
+    const fieldLabel = getFieldLabel(field);
 
     if (isReadonly) {
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name} className="text-gray-500">
-            {field.name} (readonly)
+            {fieldLabel} (readonly)
           </Label>
           <Input id={field.name} value={String(fieldValue ?? '')} readOnly className="bg-gray-50" />
         </div>
@@ -485,7 +508,7 @@ export default function EntityDetail() {
         return (
           <div key={field.name} className="space-y-2">
             <Label htmlFor={field.name}>
-              {field.name}
+              {fieldLabel}
               {field.required && <span className="text-red-500 ml-1">*</span>}
             </Label>
             <MultiSelect
@@ -495,7 +518,7 @@ export default function EntityDetail() {
                 value: enumValue,
                 label: enumValue.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
               }))}
-              placeholder={`Select ${field.name}${field.required ? '' : ' (optional)'}`}
+              placeholder={`Select ${fieldLabel}${field.required ? '' : ' (optional)'}`}
             />
           </div>
         );
@@ -511,7 +534,7 @@ export default function EntityDetail() {
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
-            {field.name}
+            {fieldLabel}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Select
@@ -520,7 +543,7 @@ export default function EntityDetail() {
           >
             <SelectTrigger>
               <SelectValue
-                placeholder={`Select ${field.name}${field.required ? '' : ' (optional)'}`}
+                placeholder={`Select ${fieldLabel}${field.required ? '' : ' (optional)'}`}
               />
             </SelectTrigger>
             <SelectContent>
@@ -556,7 +579,7 @@ export default function EntityDetail() {
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name} className="text-gray-500">
-            {field.name} (readonly)
+            {fieldLabel} (readonly)
           </Label>
           {relatedEntityType &&
           relatedEntityId &&
@@ -576,7 +599,7 @@ export default function EntityDetail() {
                 size="sm"
                 onClick={() => navigate(`/entities/${relatedEntityType}/${relatedEntityId}`)}
               >
-                View {relatedEntityType}
+                View {humanizeKey(relatedEntityType)}
               </Button>
             </div>
           ) : (
@@ -598,7 +621,7 @@ export default function EntityDetail() {
         return (
           <div key={field.name} className="space-y-2">
             <Label htmlFor={field.name} className="text-gray-500">
-              {field.name} (readonly)
+              {fieldLabel} (readonly)
             </Label>
             <Input
               id={field.name}
@@ -613,7 +636,7 @@ export default function EntityDetail() {
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
-            {field.name}
+            {fieldLabel}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Select
@@ -623,7 +646,7 @@ export default function EntityDetail() {
           >
             <SelectTrigger className={isReadonly ? 'bg-gray-50' : ''}>
               <SelectValue
-                placeholder={`Select ${field.reference_entity}${field.required ? '' : ' (optional)'}`}
+                placeholder={`Select ${fieldLabel}${field.required ? '' : ' (optional)'}`}
               />
             </SelectTrigger>
             <SelectContent>
@@ -651,7 +674,7 @@ export default function EntityDetail() {
         return (
           <div key={field.name} className="space-y-2 col-span-full">
             <Label htmlFor={field.name} className="text-gray-500 text-sm font-semibold">
-              {field.name} (readonly)
+              {fieldLabel} (readonly)
             </Label>
             <Textarea
               id={field.name}
@@ -668,7 +691,7 @@ export default function EntityDetail() {
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
-            {field.name}
+            {fieldLabel}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Textarea
@@ -695,7 +718,7 @@ export default function EntityDetail() {
               onChange={(e) => handleFieldChange(field.name, e.target.checked)}
               className="w-4 h-4"
             />
-            {field.name}
+            {fieldLabel}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
         </div>
@@ -732,7 +755,7 @@ export default function EntityDetail() {
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
-            {field.name}
+            {fieldLabel}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Input
@@ -777,7 +800,7 @@ export default function EntityDetail() {
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
-            {field.name}
+            {fieldLabel}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Input
@@ -814,7 +837,7 @@ export default function EntityDetail() {
       return (
         <div key={field.name} className="space-y-2">
           <Label htmlFor={field.name}>
-            {field.name}
+            {fieldLabel}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Input
@@ -845,7 +868,7 @@ export default function EntityDetail() {
       return (
         <div key={field.name} className="space-y-2 col-span-full">
           <Label htmlFor={field.name} className="text-gray-500 text-sm font-semibold">
-            {field.name} (readonly)
+            {fieldLabel} (readonly)
           </Label>
           <Textarea
             id={field.name}
@@ -863,7 +886,7 @@ export default function EntityDetail() {
     return (
       <div key={field.name} className="space-y-2">
         <Label htmlFor={field.name} className={isReadonly ? 'text-gray-500' : ''}>
-          {field.name}
+          {fieldLabel}
           {field.required && !isReadonly && <span className="text-red-500 ml-1">*</span>}
           {isReadonly && <span className="text-gray-400 ml-1">(readonly)</span>}
         </Label>
@@ -954,12 +977,12 @@ export default function EntityDetail() {
         </Button>
         <div className="flex-1">
           <h1 className="text-3xl font-bold capitalize">
-            {isNew ? `Create ${entityType}` : `${entityType} Detail`}
+            {isNew ? `Create ${entityDisplayName}` : `${entityDisplayName} Detail`}
           </h1>
           {!isNew && id && (
             <div className="flex items-center gap-2 mt-1">
               <p className="text-gray-500">
-                Edit {entityType} detail - id: <span className="font-mono">{id}</span>
+                Edit {entityDisplayName} detail - id: <span className="font-mono">{id}</span>
               </p>
               <Button
                 variant="ghost"
@@ -972,7 +995,7 @@ export default function EntityDetail() {
               </Button>
             </div>
           )}
-          {isNew && <p className="text-gray-500 mt-1">Create a new {entityType}</p>}
+          {isNew && <p className="text-gray-500 mt-1">Create a new {entityDisplayName}</p>}
         </div>
       </div>
 
@@ -1290,6 +1313,7 @@ function ReferenceField({
     enabled: !!tenantId && !!unitId,
   });
 
+  const fieldLabel = getFieldLabel(field);
   const isReadonly = READONLY_FIELDS.includes(field.name);
   const isMultiple = field.multiple === true;
 
@@ -1312,7 +1336,7 @@ function ReferenceField({
     return (
       <div className="space-y-2">
         <Label htmlFor={field.name} className="text-gray-500">
-          {field.name} (readonly)
+          {fieldLabel} (readonly)
         </Label>
         <Input id={field.name} value={String(value ?? '')} readOnly className="bg-gray-50" />
       </div>
@@ -1342,7 +1366,7 @@ function ReferenceField({
     return (
       <div className="space-y-2">
         <Label htmlFor={field.name}>
-          {field.name}
+          {fieldLabel}
           {field.required && <span className="text-red-500 ml-1">*</span>}
         </Label>
         <MultiSelect
@@ -1350,7 +1374,7 @@ function ReferenceField({
           onValueChange={(values) => onChange(values)}
           options={normalizedOptions}
           disabled={isLoading}
-          placeholder={`Select ${referenceEntity}${field.required ? '' : ' (optional)'}`}
+          placeholder={`Select ${fieldLabel}${field.required ? '' : ' (optional)'}`}
         />
       </div>
     );
@@ -1359,7 +1383,7 @@ function ReferenceField({
   return (
     <div className="space-y-2">
       <Label htmlFor={field.name}>
-        {field.name}
+        {fieldLabel}
         {field.required && <span className="text-red-500 ml-1">*</span>}
       </Label>
       <Select
@@ -1372,9 +1396,7 @@ function ReferenceField({
         disabled={isLoading}
       >
         <SelectTrigger>
-          <SelectValue
-            placeholder={isLoading ? 'Loading...' : `Select ${referenceEntity} (optional)`}
-          />
+          <SelectValue placeholder={isLoading ? 'Loading...' : `Select ${fieldLabel} (optional)`} />
         </SelectTrigger>
         <SelectContent>
           {!field.required && <SelectItem value={NONE_VALUE}>None</SelectItem>}

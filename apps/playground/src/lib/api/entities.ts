@@ -66,6 +66,16 @@ export const entitiesApi = {
       dataKeys: Object.keys(data),
       data,
     });
+    // Debug: log service_type specifically if present
+    if (entity === 'service_order' && 'service_type' in data) {
+      console.log('[Client API] service_type value:', data.service_type);
+      console.log(
+        '[Client API] service_type type:',
+        typeof data.service_type,
+        Array.isArray(data.service_type)
+      );
+      console.log('[Client API] service_type JSON:', JSON.stringify(data.service_type));
+    }
 
     try {
       const response = await apiClient.put<Entity>(`/${tenant}/${unit}/${entity}/${id}`, data);

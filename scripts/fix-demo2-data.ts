@@ -5,7 +5,6 @@ const dbName = process.env.MONGODB_DB_NAME || 'crm_atlas';
 const tenantId = 'demo2';
 
 type PrimitiveDate = string | number | Date | null | undefined;
-
 function parseDateValue(value: PrimitiveDate): Date | null {
   if (!value) {
     return null;
@@ -118,7 +117,7 @@ async function fixDemo2Data(): Promise<void> {
     const contactByName = new Map<string, string>();
     for (const contact of normalizedContacts) {
       if (typeof contact.name === 'string') {
-        contactByName.set(contact.name.toLowerCase().trim(), contact._id);
+        contactByName.set(contact.name.toLowerCase().trim(), String(contact._id));
       }
     }
     const fallbackContactId = normalizedContacts[0]?._id;
