@@ -143,4 +143,4 @@ jobs:
       - name: Install Spectral CLI
         run: npm install -g @stoplight/spectral-cli
       - name: Validate OpenAPI spec
-        run: spectral lint openapi.json
+        run: spectral lint openapi.json --ruleset .spectral.yml

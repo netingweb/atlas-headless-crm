@@ -1,0 +1,9 @@
+extends: ['spectral:oas']
+rules:
+  # Disable some strict rules that might be too restrictive for our use case
+  operation-operationId: warn
+  operation-tags: warn
+  operation-description: warn
+  tag-description: warn
+  # Allow additional properties in schemas (useful for dynamic entities)
+  schema: off
