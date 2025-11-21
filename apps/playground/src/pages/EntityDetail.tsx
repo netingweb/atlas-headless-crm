@@ -256,7 +256,7 @@ export default function EntityDetail() {
       const def = await configApi.getEntity(tenantId || '', entityType || '');
       // Debug log for contact entity
       if (def && entityType === 'contact') {
-        const statusField = def.fields.find((f) => f.name === 'status');
+        const statusField = def.fields.find((f: FieldDefinition) => f.name === 'status');
         console.log('🔍 Contact entity definition loaded:', def);
         console.log('🔍 Status field:', statusField);
         console.log('🔍 Has validation:', !!statusField?.validation);
@@ -408,7 +408,7 @@ export default function EntityDetail() {
     // Get list of valid field names from entity definition
     const validFieldNames = new Set<string>();
     if (entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)) {
-      entityDef.fields.forEach((field) => {
+      entityDef.fields.forEach((field: FieldDefinition) => {
         validFieldNames.add(field.name);
       });
     }
@@ -1060,7 +1060,7 @@ export default function EntityDetail() {
                       // Check if this field is already in entity definition
                       const isInEntityDef =
                         entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)
-                          ? entityDef.fields.some((f) => f.name === fieldName)
+                          ? entityDef.fields.some((f: FieldDefinition) => f.name === fieldName)
                           : false;
 
                       if (!isInEntityDef) {

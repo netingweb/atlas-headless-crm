@@ -807,7 +807,30 @@ export default function WorkflowDetail() {
                                             </h4>
                                             <div className="space-y-2">
                                               {execution.conditions_evaluated.map(
-                                                (condition, idx) => (
+                                                (
+                                                  condition: {
+                                                    result: boolean;
+                                                    condition: {
+                                                      field: string;
+                                                      operator:
+                                                        | 'in'
+                                                        | 'endsWith'
+                                                        | 'startsWith'
+                                                        | '=='
+                                                        | '!='
+                                                        | '>'
+                                                        | '<'
+                                                        | '>='
+                                                        | '<='
+                                                        | 'contains'
+                                                        | 'isEmpty'
+                                                        | 'isNotEmpty';
+                                                      value?: unknown;
+                                                    };
+                                                    field_value?: unknown;
+                                                  },
+                                                  idx: number
+                                                ) => (
                                                   <div
                                                     key={idx}
                                                     className="bg-white p-3 rounded border text-sm"
@@ -849,60 +872,74 @@ export default function WorkflowDetail() {
                                               Actions Executed
                                             </h4>
                                             <div className="space-y-2">
-                                              {execution.actions_executed.map((action, idx) => (
-                                                <div
-                                                  key={idx}
-                                                  className="bg-white p-3 rounded border text-sm"
-                                                >
-                                                  <div className="flex items-center justify-between mb-2">
-                                                    <div className="flex items-center gap-2">
-                                                      <Badge
-                                                        variant={
-                                                          action.status === 'completed'
-                                                            ? 'success'
-                                                            : action.status === 'failed'
-                                                              ? 'destructive'
-                                                              : 'secondary'
-                                                        }
-                                                      >
-                                                        Action {action.action_index + 1}:{' '}
-                                                        {action.action_type} - {action.status}
-                                                      </Badge>
+                                              {execution.actions_executed.map(
+                                                (
+                                                  action: {
+                                                    status: string;
+                                                    action_index: number;
+                                                    action_type: string;
+                                                    duration_ms?: number;
+                                                    result?: unknown;
+                                                    error?: string;
+                                                    started_at: string;
+                                                    completed_at?: string;
+                                                  },
+                                                  idx: number
+                                                ) => (
+                                                  <div
+                                                    key={idx}
+                                                    className="bg-white p-3 rounded border text-sm"
+                                                  >
+                                                    <div className="flex items-center justify-between mb-2">
+                                                      <div className="flex items-center gap-2">
+                                                        <Badge
+                                                          variant={
+                                                            action.status === 'completed'
+                                                              ? 'success'
+                                                              : action.status === 'failed'
+                                                                ? 'destructive'
+                                                                : 'secondary'
+                                                          }
+                                                        >
+                                                          Action {action.action_index + 1}:{' '}
+                                                          {action.action_type} - {action.status}
+                                                        </Badge>
+                                                      </div>
+                                                      <div className="text-xs text-gray-500">
+                                                        {action.duration_ms
+                                                          ? `${(action.duration_ms / 1000).toFixed(2)}s`
+                                                          : '-'}
+                                                      </div>
                                                     </div>
-                                                    <div className="text-xs text-gray-500">
-                                                      {action.duration_ms
-                                                        ? `${(action.duration_ms / 1000).toFixed(2)}s`
-                                                        : '-'}
+                                                    {action.result != null && (
+                                                      <div className="mt-2">
+                                                        <p className="text-xs font-medium mb-1">
+                                                          Result:
+                                                        </p>
+                                                        <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto">
+                                                          {JSON.stringify(action.result, null, 2)}
+                                                        </pre>
+                                                      </div>
+                                                    )}
+                                                    {action.error && (
+                                                      <div className="mt-2">
+                                                        <p className="text-xs font-medium text-red-600 mb-1">
+                                                          Error:
+                                                        </p>
+                                                        <p className="text-xs text-red-600">
+                                                          {action.error}
+                                                        </p>
+                                                      </div>
+                                                    )}
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                      Started:{' '}
+                                                      {format(new Date(action.started_at), 'PPp')}
+                                                      {action.completed_at &&
+                                                        ` | Completed: ${format(new Date(action.completed_at), 'PPp')}`}
                                                     </div>
                                                   </div>
-                                                  {action.result != null && (
-                                                    <div className="mt-2">
-                                                      <p className="text-xs font-medium mb-1">
-                                                        Result:
-                                                      </p>
-                                                      <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto">
-                                                        {JSON.stringify(action.result, null, 2)}
-                                                      </pre>
-                                                    </div>
-                                                  )}
-                                                  {action.error && (
-                                                    <div className="mt-2">
-                                                      <p className="text-xs font-medium text-red-600 mb-1">
-                                                        Error:
-                                                      </p>
-                                                      <p className="text-xs text-red-600">
-                                                        {action.error}
-                                                      </p>
-                                                    </div>
-                                                  )}
-                                                  <div className="text-xs text-gray-500 mt-1">
-                                                    Started:{' '}
-                                                    {format(new Date(action.started_at), 'PPp')}
-                                                    {action.completed_at &&
-                                                      ` | Completed: ${format(new Date(action.completed_at), 'PPp')}`}
-                                                  </div>
-                                                </div>
-                                              ))}
+                                                )
+                                              )}
                                             </div>
                                           </div>
                                         )}

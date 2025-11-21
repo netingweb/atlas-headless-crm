@@ -60,7 +60,9 @@ export default function EntityList() {
   // Get visible fields for the table columns
   const visibleFields = React.useMemo(() => {
     if (!entityDef || !entityType) return [];
-    return entityDef.fields.filter((field) => isFieldVisibleInList(entityType, field.name));
+    return entityDef.fields.filter((field: { name: string }) =>
+      isFieldVisibleInList(entityType, field.name)
+    );
   }, [entityDef, entityType, isFieldVisibleInList]);
 
   const canCreate = isApiAvailable('entities.create', user || null, permissions || null);
@@ -168,8 +170,8 @@ export default function EntityList() {
                       </button>
                     </div>
                   </td>
-                  {visibleFields.map((field) => {
-                    const value = (entity as any)[field.name];
+                  {visibleFields.map((field: { name: string }) => {
+                    const value = (entity as Record<string, unknown>)[field.name];
                     return (
                       <td key={field.name} className="px-6 py-4 whitespace-nowrap text-sm">
                         {value !== null && value !== undefined ? String(value) : '-'}
