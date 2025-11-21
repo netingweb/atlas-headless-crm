@@ -35,9 +35,26 @@ export async function verifyApiKey(hash: string, key: string): Promise<boolean> 
 }
 
 export function extractPrefix(key: string): string | null {
-  const parts = key.split('_');
-  if (parts.length >= 3 && parts[0] === 'crm') {
-    return parts[1];
+  // Format is: crm_${prefix}_${secret}
+  // Prefix and secret can contain underscores from base64url encoding
+  // So we need to find the first underscore after 'crm' and the last underscore
+  if (!key.startsWith('crm_')) {
+    return null;
   }
-  return null;
+
+  // Find the first underscore (after 'crm')
+  const firstUnderscore = key.indexOf('_', 0);
+  if (firstUnderscore === -1) {
+    return null;
+  }
+
+  // Find the last underscore (before secret)
+  const lastUnderscore = key.lastIndexOf('_');
+  if (lastUnderscore === firstUnderscore || lastUnderscore === -1) {
+    return null;
+  }
+
+  // Extract prefix: everything between first and last underscore
+  const prefix = key.substring(firstUnderscore + 1, lastUnderscore);
+  return prefix || null;
 }
