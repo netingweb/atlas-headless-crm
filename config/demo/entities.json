@@ -5,6 +5,7 @@
     {
       "name": "contact",
       "label": "Contact",
+      "scope": "tenant",
       "fields": [
         {
           "name": "name",
@@ -91,6 +92,7 @@
     {
       "name": "company",
       "label": "Company",
+      "scope": "tenant",
       "fields": [
         {
           "name": "name",
@@ -180,6 +182,7 @@
     {
       "name": "note",
       "label": "Note",
+      "scope": "tenant",
       "fields": [
         {
           "name": "title",
@@ -246,6 +249,7 @@
     {
       "name": "task",
       "label": "Task",
+      "scope": "unit",
       "fields": [
         {
           "name": "title",
@@ -317,6 +321,7 @@
     {
       "name": "opportunity",
       "label": "Opportunity",
+      "scope": "tenant",
       "fields": [
         {
           "name": "title",
@@ -379,6 +384,7 @@
     {
       "name": "product",
       "label": "Product",
+      "scope": "tenant",
       "fields": [
         {
           "name": "name",
@@ -441,6 +447,7 @@
     {
       "name": "document",
       "label": "Document",
+      "scope": "tenant",
       "fields": [
         {
           "name": "title",
