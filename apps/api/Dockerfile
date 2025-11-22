@@ -74,7 +74,8 @@ COPY apps/api/package.json ./apps/api/
 
 # Install production dependencies only
 # Use --no-frozen-lockfile if lockfile is outdated (will update it)
-RUN pnpm install --frozen-lockfile --prod || pnpm install --no-frozen-lockfile --prod
+# Ignore scripts to avoid running prepare hooks that require devDependencies (e.g., husky)
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts || pnpm install --no-frozen-lockfile --prod --ignore-scripts
 
 # Copy built files
 COPY --from=base /app/packages ./packages
