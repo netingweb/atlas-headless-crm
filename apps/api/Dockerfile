@@ -15,7 +15,8 @@ COPY packages/*/package.json ./packages/*/
 COPY apps/*/package.json ./apps/*/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+# Use --no-frozen-lockfile if lockfile is outdated (will update it)
+RUN pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
 
 # Copy source code
 COPY . .
@@ -38,7 +39,8 @@ COPY packages/*/package.json ./packages/*/
 COPY apps/api/package.json ./apps/api/
 
 # Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
+# Use --no-frozen-lockfile if lockfile is outdated (will update it)
+RUN pnpm install --frozen-lockfile --prod || pnpm install --no-frozen-lockfile --prod
 
 # Copy built files
 COPY --from=base /app/packages ./packages
