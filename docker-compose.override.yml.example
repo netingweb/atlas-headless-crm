@@ -32,3 +32,7 @@ services:
       - '9000:9000'  # Accesso locale a MinIO API
       - '9001:9001'  # Accesso locale a MinIO Console
 
+  # Nota: L'API è già esposta su porta 3000 e include endpoint MCP
+  # Per usare l'API come server MCP remoto, usa:
+  # http://localhost:3000/api/{tenant}/{unit}/mcp
+
