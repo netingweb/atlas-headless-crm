@@ -1,0 +1,43 @@
+# CRM Atlas - Cursor Rules
+
+## Lockfile Best Practices (pnpm-lock.yaml)
+
+### Critical Rules:
+1. **ALWAYS commit pnpm-lock.yaml** - The lockfile MUST be committed to ensure reproducible builds across all environments (local, CI/CD, Docker, production)
+2. **Keep lockfile in sync** - After ANY change to package.json files (adding/removing/updating dependencies), ALWAYS run `pnpm install` to update the lockfile
+3. **Never ignore lockfile** - The lockfile is tracked in git (see .gitignore comment: "MUST be committed for reproducible builds")
+4. **Update lockfile before committing** - Before committing changes that modify dependencies:
+   - Run `pnpm install` to update the lockfile
+   - Review the lockfile changes in git diff
+   - Commit both package.json and pnpm-lock.yaml together
+
+### When to Update Lockfile:
+- After adding a new dependency: `pnpm add <package>`
+- After removing a dependency: `pnpm remove <package>`
+- After updating a dependency version in package.json manually
+- After moving dependencies between `dependencies` and `devDependencies`
+- When Docker build fails with "lockfile is not up to date" error
+
+### Docker Build Considerations:
+- The Dockerfile includes a fallback mechanism: if `--frozen-lockfile` fails, it uses `--no-frozen-lockfile`
+- However, this is a safety net - the lockfile SHOULD always be up to date in the repository
+- If you see lockfile errors in Docker builds, update the lockfile locally and commit it
+
+### Workflow:
+1. Make changes to package.json files
+2. Run `pnpm install` to update lockfile
+3. Test locally to ensure everything works
+4. Commit both package.json changes AND pnpm-lock.yaml together
+5. Push to trigger CI/CD
+
+### Never:
+- ❌ Commit package.json changes without updating lockfile
+- ❌ Ignore lockfile errors in CI/CD
+- ❌ Use `--no-frozen-lockfile` in production builds without updating the lockfile first
+- ❌ Manually edit pnpm-lock.yaml (let pnpm manage it)
+
+### Verification:
+- Before committing: Run `pnpm install --frozen-lockfile` to verify lockfile is in sync
+- In CI/CD: The build should use `--frozen-lockfile` flag
+- If lockfile is out of sync, you'll see: "ERR_PNPM_OUTDATED_LOCKFILE"
+
