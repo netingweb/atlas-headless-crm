@@ -35,7 +35,23 @@ RUN npm install -g pnpm@8.15.0
 # Copy workspace files
 COPY pnpm-workspace.yaml package.json ./
 COPY pnpm-lock.yaml ./
-COPY packages/*/package.json ./packages/*/
+
+# Create package directories and copy package.json files
+# This ensures pnpm can resolve workspace dependencies
+RUN mkdir -p packages/auth packages/config packages/core packages/db \
+    packages/documents packages/embeddings packages/search packages/storage \
+    packages/types packages/utils apps/api
+
+COPY packages/auth/package.json ./packages/auth/
+COPY packages/config/package.json ./packages/config/
+COPY packages/core/package.json ./packages/core/
+COPY packages/db/package.json ./packages/db/
+COPY packages/documents/package.json ./packages/documents/
+COPY packages/embeddings/package.json ./packages/embeddings/
+COPY packages/search/package.json ./packages/search/
+COPY packages/storage/package.json ./packages/storage/
+COPY packages/types/package.json ./packages/types/
+COPY packages/utils/package.json ./packages/utils/
 COPY apps/api/package.json ./apps/api/
 
 # Install production dependencies only
