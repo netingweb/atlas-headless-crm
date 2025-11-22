@@ -69,7 +69,7 @@ export class EntityVisibilityDto {
 
   @ApiProperty({
     type: 'object',
-    additionalProperties: { $ref: '#/components/schemas/FieldVisibilityDto' },
+    additionalProperties: { type: 'object' },
   })
   @IsObject()
   fields!: Record<string, FieldVisibilityDto>;
@@ -90,7 +90,7 @@ export class TenantPlaygroundSettingsDto {
 export class UnitPlaygroundSettingsDto {
   @ApiPropertyOptional({
     type: 'object',
-    additionalProperties: { $ref: '#/components/schemas/EntityVisibilityDto' },
+    additionalProperties: { type: 'object' },
   })
   @IsOptional()
   @IsObject()

@@ -151,12 +151,17 @@ export class EntitiesController {
   @UseGuards(JwtAuthGuard, ScopesGuard)
   @AuthScopes('crm:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete entity document' })
-  @ApiParam({ name: 'tenant', description: 'Tenant ID' })
-  @ApiParam({ name: 'unit', description: 'Unit ID' })
-  @ApiParam({ name: 'entity', description: 'Entity name' })
-  @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiOperation({
+    summary: 'Delete entity document',
+    description: 'Permanently delete an entity document by ID.',
+  })
+  @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
+  @ApiParam({ name: 'unit', description: 'Unit ID', example: 'sales' })
+  @ApiParam({ name: 'entity', description: 'Entity name', example: 'contact' })
+  @ApiParam({ name: 'id', description: 'Document ID', example: '507f1f77bcf86cd799439011' })
+  @ApiResponse({ status: 204, description: 'Entity deleted successfully' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Entity not found' })
   @ApiBearerAuth()
   async delete(
     @Param('tenant') tenant: string,

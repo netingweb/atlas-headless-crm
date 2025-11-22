@@ -116,6 +116,8 @@ async function bootstrap(): Promise<void> {
         },
         'bearer'
       )
+      .addServer('http://localhost:3000', 'Local development')
+      .addServer('https://api.example.com', 'Production')
       .addTag('health', 'Health check endpoints')
       .addTag('auth', 'Authentication endpoints')
       .addTag(
@@ -126,6 +128,9 @@ async function bootstrap(): Promise<void> {
       .addTag('mcp', 'MCP tools endpoints for AI integration')
       .addTag('config', 'Configuration endpoints')
       .addTag('stats', 'Statistics and dashboard endpoints')
+      .addTag('workflows', 'Workflow automation endpoints')
+      .addTag('documents', 'Document management endpoints')
+      .addTag('indexing', 'Indexing and search optimization endpoints')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);

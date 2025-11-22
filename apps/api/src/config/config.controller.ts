@@ -43,7 +43,19 @@ export class ConfigController {
   @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
   @ApiOkResponse({
     description: 'List of units',
-    type: Array<UnitConfig>,
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          unit_id: { type: 'string', example: 'sales' },
+          name: { type: 'string', example: 'Sales Team' },
+          tenant_id: { type: 'string', example: 'demo' },
+          settings: { type: 'object', additionalProperties: true },
+        },
+        required: ['unit_id', 'name', 'tenant_id'],
+      },
+    },
   })
   async getUnits(@Param('tenant') tenant: string): Promise<UnitConfig[]> {
     return this.configLoader.getUnits(tenant);
@@ -94,7 +106,10 @@ export class ConfigController {
                 searchable: { type: 'boolean', example: true },
                 embeddable: { type: 'boolean', example: false },
                 reference_entity: { type: 'string', example: 'company', nullable: true },
-                default: { type: 'unknown', nullable: true },
+                default: {
+                  oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }],
+                  nullable: true,
+                },
                 validation: { type: 'object', nullable: true },
               },
             },

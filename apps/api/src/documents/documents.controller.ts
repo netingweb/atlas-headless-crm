@@ -203,10 +203,14 @@ export class DocumentsController {
   @UseGuards(JwtAuthGuard, ScopesGuard)
   @AuthScopes('documents:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete document' })
-  @ApiParam({ name: 'tenant', description: 'Tenant ID' })
-  @ApiParam({ name: 'unit', description: 'Unit ID' })
-  @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiOperation({
+    summary: 'Delete document',
+    description: 'Permanently delete a document by ID.',
+  })
+  @ApiParam({ name: 'tenant', description: 'Tenant ID', example: 'demo' })
+  @ApiParam({ name: 'unit', description: 'Unit ID', example: 'sales' })
+  @ApiParam({ name: 'id', description: 'Document ID', example: '507f1f77bcf86cd799439011' })
+  @ApiResponse({ status: 204, description: 'Document deleted successfully' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Document not found' })
   @ApiBearerAuth()
