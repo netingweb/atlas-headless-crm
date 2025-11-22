@@ -47,6 +47,9 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
+# Install build tools needed for native modules (like argon2)
+RUN apk add --no-cache python3 make g++
+
 # Install pnpm
 RUN npm install -g pnpm@8.15.0
 
@@ -72,19 +75,32 @@ COPY packages/types/package.json ./packages/types/
 COPY packages/utils/package.json ./packages/utils/
 COPY apps/api/package.json ./apps/api/
 
-# Install production dependencies only
+# Install production dependencies only for the API and its workspace deps
 # Use --no-frozen-lockfile if lockfile is outdated (will update it)
-# Ignore scripts to avoid running prepare hooks that require devDependencies (e.g., husky)
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts || pnpm install --no-frozen-lockfile --prod --ignore-scripts
+# Temporarily remove prepare script to avoid husky, but allow native module compilation
+ENV HUSKY=0
+ENV CI=true
+RUN if [ -f /app/package.json ]; then \
+      sed -i.bak '/"prepare":/d' /app/package.json || true; \
+    fi && \
+    pnpm install --filter ./apps/api... --frozen-lockfile --prod || \
+    pnpm install --filter ./apps/api... --no-frozen-lockfile --prod && \
+    if [ -f /app/package.json.bak ]; then \
+      mv /app/package.json.bak /app/package.json; \
+    fi
 
 # Copy built files
 COPY --from=base /app/packages ./packages
 COPY --from=base /app/apps/api/dist ./apps/api/dist
 
-WORKDIR /app/apps/api
-
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+# Set NODE_PATH to help Node.js resolve pnpm modules correctly
+# Include both root node_modules and package-specific node_modules
+ENV NODE_PATH=/app/node_modules:/app/packages/auth/node_modules:/app/packages/config/node_modules:/app/packages/core/node_modules:/app/packages/db/node_modules:/app/packages/documents/node_modules:/app/packages/embeddings/node_modules:/app/packages/search/node_modules:/app/packages/storage/node_modules:/app/packages/types/node_modules:/app/packages/utils/node_modules:/app/apps/api/node_modules
+
+# Run from workspace root
+WORKDIR /app
+CMD ["node", "apps/api/dist/apps/api/src/main.js"]
 
 

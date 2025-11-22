@@ -1,6 +1,6 @@
-import { ChatOpenAI } from '@langchain/openai';
+import { ChatOpenAI, type ChatOpenAIFields } from '@langchain/openai';
 import { DynamicStructuredTool } from '@langchain/core/tools';
-import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
+// Message classes no longer needed - using literal objects instead
 import { z } from 'zod';
 import type { AIConfig } from '@/stores/ai-store';
 import { mcpApi } from '@/lib/api/mcp';
@@ -15,6 +15,12 @@ export interface TenantContext {
  * Create LLM instance based on AI configuration
  */
 function createLLM(config: AIConfig): ChatOpenAI {
+  const sharedConfig: ChatOpenAIFields = {
+    model: config.model,
+    temperature: config.temperature ?? 0.7,
+    maxTokens: config.maxTokens ?? 2000,
+  };
+
   const apiKey = config.apiKey?.trim();
 
   if (!apiKey || apiKey === '') {
@@ -32,26 +38,25 @@ function createLLM(config: AIConfig): ChatOpenAI {
   if (config.provider === 'azure') {
     // Azure OpenAI configuration
     return new ChatOpenAI({
-      model: config.model,
-      temperature: config.temperature ?? 0.7,
-      maxTokens: config.maxTokens ?? 2000,
+      ...sharedConfig,
       openAIApiKey: apiKey,
       // Note: Azure-specific fields may need to be configured via environment variables
       // or through the ChatOpenAI constructor options if supported by LangChain version
-    } as any);
+    });
   }
 
   // Default to OpenAI
   // LangChain v1.0: Pass both apiKey and openAIApiKey for maximum compatibility
   console.log('[Agent] Creating ChatOpenAI with both apiKey and openAIApiKey parameters');
 
-  const llmConfig = {
-    model: config.model,
-    temperature: config.temperature ?? 0.7,
-    maxTokens: config.maxTokens ?? 2000,
+  const llmConfig: ChatOpenAIFields = {
+    ...sharedConfig,
     apiKey: apiKey,
     openAIApiKey: apiKey, // Explicit parameter name
   };
+
+  const apiKeyPreview =
+    typeof llmConfig.apiKey === 'string' ? `${llmConfig.apiKey.substring(0, 7)}...` : 'setter';
 
   console.log('[Agent] LLM Config:', {
     model: llmConfig.model,
@@ -59,7 +64,7 @@ function createLLM(config: AIConfig): ChatOpenAI {
     maxTokens: llmConfig.maxTokens,
     hasApiKey: !!llmConfig.apiKey,
     hasOpenAIApiKey: !!llmConfig.openAIApiKey,
-    apiKeyPrefix: llmConfig.apiKey?.substring(0, 7) + '...',
+    apiKeyPrefix: apiKeyPreview,
   });
 
   return new ChatOpenAI(llmConfig);
@@ -450,7 +455,7 @@ Return a JSON object with this structure:
 
 Be concise and focus on actionable improvements. ${isItalian ? 'Rispondi sempre in italiano, inclusi tutti i campi delle actionable_questions.' : 'Always respond in English, including all actionable_questions fields.'}`;
 
-        const response = await evaluatorLLM.invoke([new HumanMessage(evaluationPrompt)]);
+        const response = await evaluatorLLM.invoke([{ role: 'user', content: evaluationPrompt }]);
         const content =
           typeof response.content === 'string' ? response.content : String(response.content);
 
@@ -1067,50 +1072,71 @@ export async function runAgent(
   userMessage: string,
   chatHistory: Array<{ role: string; content: string }> = []
 ): Promise<string> {
+  type LLMInvokeInput = Parameters<ChatOpenAI['invoke']>[0];
+  type MessagePayload = {
+    role: 'system' | 'user' | 'assistant' | 'tool';
+    content: string;
+    tool_call_id?: string;
+    tool_calls?: unknown;
+  };
+
   // Build messages array (can include ToolMessage)
-  const messages: Array<SystemMessage | HumanMessage | AIMessage | ToolMessage> = [
-    new SystemMessage(agent.systemPrompt),
-    ...chatHistory.map((msg) => {
-      if (msg.role === 'user') {
-        return new HumanMessage(msg.content);
-      }
-      return new AIMessage(msg.content);
-    }),
-    new HumanMessage(userMessage),
+  const messages: MessagePayload[] = [
+    { role: 'system', content: agent.systemPrompt },
+    ...chatHistory.map(
+      (msg): MessagePayload => ({
+        role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: msg.content,
+      })
+    ),
+    { role: 'user', content: userMessage },
   ];
 
   // Invoke LLM
-  const response = await agent.llm.invoke(messages);
+  const response = await agent.llm.invoke(messages as LLMInvokeInput);
 
   // Check if LLM wants to call tools
-  if (response.tool_calls && response.tool_calls.length > 0) {
+  if (response.tool_calls && Array.isArray(response.tool_calls) && response.tool_calls.length > 0) {
     // Add the AI message with tool_calls to the conversation
-    messages.push(response);
+    messages.push({
+      role: 'assistant',
+      content:
+        typeof response.content === 'string' ? response.content : JSON.stringify(response.content),
+      ...(response.tool_calls ? { tool_calls: response.tool_calls } : {}),
+    });
 
     // Execute tool calls and create ToolMessages
-    const toolMessages = await Promise.all(
-      response.tool_calls.map(async (toolCall) => {
+    const toolCallsArray = response.tool_calls as Array<{
+      id?: string;
+      name: string;
+      args: Record<string, unknown>;
+    }>;
+    const toolMessages: MessagePayload[] = await Promise.all(
+      toolCallsArray.map(async (toolCall) => {
         const tool = agent.tools.find((t) => t.name === toolCall.name);
         if (!tool) {
-          return new ToolMessage({
+          return {
+            role: 'tool',
             content: `Tool ${toolCall.name} not found`,
             tool_call_id: toolCall.id || '',
-          });
+          } satisfies MessagePayload;
         }
 
         try {
           const result = await tool.invoke(toolCall.args as Record<string, unknown>);
           const resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-          return new ToolMessage({
+          return {
+            role: 'tool',
             content: resultStr,
             tool_call_id: toolCall.id || '',
-          });
+          } satisfies MessagePayload;
         } catch (error) {
           const errorMsg = `Error calling tool ${toolCall.name}: ${error instanceof Error ? error.message : String(error)}`;
-          return new ToolMessage({
+          return {
+            role: 'tool',
             content: errorMsg,
             tool_call_id: toolCall.id || '',
-          });
+          } satisfies MessagePayload;
         }
       })
     );
@@ -1118,7 +1144,7 @@ export async function runAgent(
     // Call LLM again with tool results
     const finalMessages = [...messages, ...toolMessages];
 
-    const finalResponse = await agent.llm.invoke(finalMessages);
+    const finalResponse = await agent.llm.invoke(finalMessages as LLMInvokeInput);
     return finalResponse.content as string;
   }
 
@@ -1191,16 +1217,24 @@ export async function* runAgentStream(
   chatHistory: Array<{ role: string; content: string }> = [],
   ctx?: TenantContext
 ): AsyncGenerator<StreamEvent, void, unknown> {
+  type LLMInvokeInput = Parameters<ChatOpenAI['invoke']>[0];
+  type MessagePayload = {
+    role: 'system' | 'user' | 'assistant' | 'tool';
+    content: string;
+    tool_call_id?: string;
+    tool_calls?: unknown;
+  };
+
   // Build messages array (can include ToolMessage)
-  const messages: Array<SystemMessage | HumanMessage | AIMessage | ToolMessage> = [
-    new SystemMessage(agent.systemPrompt),
-    ...chatHistory.map((msg) => {
-      if (msg.role === 'user') {
-        return new HumanMessage(msg.content);
-      }
-      return new AIMessage(msg.content);
-    }),
-    new HumanMessage(userMessage),
+  const messages: MessagePayload[] = [
+    { role: 'system', content: agent.systemPrompt },
+    ...chatHistory.map(
+      (msg): MessagePayload => ({
+        role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: msg.content,
+      })
+    ),
+    { role: 'user', content: userMessage },
   ];
 
   // Track executed tools for actionable questions generation
@@ -1212,7 +1246,7 @@ export async function* runAgentStream(
 
   try {
     // Stream LLM response
-    const stream = await agent.llm.stream(messages);
+    const stream = await agent.llm.stream(messages as LLMInvokeInput);
 
     const toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }> = [];
 
@@ -1254,7 +1288,7 @@ export async function* runAgentStream(
     // If we have tool calls, execute them in a loop to support multiple rounds
     const maxIterations = 10; // Prevent infinite loops
     let iteration = 0;
-    let pendingResponse: AIMessage | null = null;
+    let pendingResponse: MessagePayload | null = null;
 
     // If we have tool calls from the stream, construct the AIMessage properly
     if (toolCalls.length > 0) {
@@ -1265,12 +1299,13 @@ export async function* runAgentStream(
         args: tc.args,
       }));
 
-      // Construct AIMessage with the tool calls from the stream
+      // Construct AIMessage payload with the tool calls from the stream
       // This ensures the tool_call_ids match what we'll use in ToolMessages
-      pendingResponse = new AIMessage({
+      pendingResponse = {
+        role: 'assistant',
         content: streamedContent || '',
         tool_calls: validToolCalls,
-      });
+      };
     } else {
       // No tool calls - if we have content, it's already been streamed
       // If we don't have content, the stream was empty (shouldn't happen)
@@ -1278,7 +1313,7 @@ export async function* runAgentStream(
         // Stream was empty - this might indicate an error or the LLM didn't respond
         // Try to get a response using invoke as fallback
         try {
-          const fallbackResponse = await agent.llm.invoke(messages);
+          const fallbackResponse = await agent.llm.invoke(messages as LLMInvokeInput);
           if (fallbackResponse.content) {
             const content =
               typeof fallbackResponse.content === 'string'
@@ -1305,12 +1340,28 @@ export async function* runAgentStream(
       const response = pendingResponse;
       pendingResponse = null; // Clear pending response
 
-      if (response.tool_calls && response.tool_calls.length > 0) {
+      if (
+        response.tool_calls &&
+        Array.isArray(response.tool_calls) &&
+        response.tool_calls.length > 0
+      ) {
         // Add the AI message with tool_calls to the conversation
-        messages.push(response);
+        messages.push({
+          role: 'assistant',
+          content:
+            typeof response.content === 'string'
+              ? response.content
+              : String(response.content || ''),
+          tool_calls: response.tool_calls,
+        });
 
         // Execute each tool call and create ToolMessages
-        for (const toolCall of response.tool_calls) {
+        const toolCallsArray = response.tool_calls as Array<{
+          id?: string;
+          name: string;
+          args: Record<string, unknown>;
+        }>;
+        for (const toolCall of toolCallsArray) {
           const tool = agent.tools.find((t) => t.name === toolCall.name);
           if (!tool) {
             const errorMsg = `Tool ${toolCall.name} not found`;
@@ -1321,12 +1372,11 @@ export async function* runAgentStream(
               error: 'Tool not found',
             };
             // Add ToolMessage with error
-            messages.push(
-              new ToolMessage({
-                content: errorMsg,
-                tool_call_id: toolCall.id || '',
-              })
-            );
+            messages.push({
+              role: 'tool',
+              content: errorMsg,
+              tool_call_id: toolCall.id || '',
+            });
             continue;
           }
 
@@ -1429,12 +1479,11 @@ export async function* runAgentStream(
             };
 
             // Add ToolMessage with the result (CRITICAL: must match tool_call_id)
-            messages.push(
-              new ToolMessage({
-                content: resultStr,
-                tool_call_id: toolCall.id || '',
-              })
-            );
+            messages.push({
+              role: 'tool',
+              content: resultStr,
+              tool_call_id: toolCall.id || '',
+            });
           } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
             const errorDetails = error instanceof Error ? error.stack : String(error);
@@ -1453,12 +1502,11 @@ export async function* runAgentStream(
               error: errorMsg,
             };
             // Add ToolMessage with error
-            messages.push(
-              new ToolMessage({
-                content: `Error: ${errorMsg}. Details: ${errorDetails}`,
-                tool_call_id: toolCall.id || '',
-              })
-            );
+            messages.push({
+              role: 'tool',
+              content: `Error: ${errorMsg}. Details: ${errorDetails}`,
+              tool_call_id: toolCall.id || '',
+            });
           }
         }
 
@@ -1467,11 +1515,22 @@ export async function* runAgentStream(
         yield { type: 'thinking', content: 'Processing tool results...' };
 
         // Check if there are more tool calls needed by invoking again
-        const nextResponse = await agent.llm.invoke(messages);
+        const nextResponse = await agent.llm.invoke(messages as LLMInvokeInput);
 
-        if (nextResponse.tool_calls && nextResponse.tool_calls.length > 0) {
+        if (
+          nextResponse.tool_calls &&
+          Array.isArray(nextResponse.tool_calls) &&
+          nextResponse.tool_calls.length > 0
+        ) {
           // There are more tool calls, process them in the next iteration
-          pendingResponse = nextResponse;
+          pendingResponse = {
+            role: 'assistant',
+            content:
+              typeof nextResponse.content === 'string'
+                ? nextResponse.content
+                : String(nextResponse.content || ''),
+            tool_calls: nextResponse.tool_calls,
+          };
           continue;
         } else {
           // No more tool calls, generate the final response
@@ -1485,15 +1544,23 @@ export async function* runAgentStream(
                 ? nextResponse.content
                 : String(nextResponse.content);
             finalResponseContent = content;
-            messages.push(nextResponse);
+            messages.push({
+              role: 'assistant',
+              content,
+              tool_calls: nextResponse.tool_calls,
+            });
             yield { type: 'content', content };
           } else {
             // No content in nextResponse, need to generate it
             // Add nextResponse to messages first (it might have tool_calls metadata)
-            messages.push(nextResponse);
+            messages.push({
+              role: 'assistant',
+              content: '',
+              tool_calls: nextResponse.tool_calls,
+            });
 
             // Then stream the final response
-            const finalStream = await agent.llm.stream(messages);
+            const finalStream = await agent.llm.stream(messages as LLMInvokeInput);
             for await (const chunk of finalStream) {
               if (chunk.content) {
                 const content = Array.isArray(chunk.content)
@@ -1512,7 +1579,7 @@ export async function* runAgentStream(
           // If we still don't have content, try one more time with a direct invoke
           if (!finalResponseContent || finalResponseContent.trim() === '') {
             console.warn('[Agent] No content from streaming, trying direct invoke');
-            const directResponse = await agent.llm.invoke(messages);
+            const directResponse = await agent.llm.invoke(messages as LLMInvokeInput);
             if (directResponse.content) {
               const content =
                 typeof directResponse.content === 'string'
@@ -1617,9 +1684,16 @@ export async function* runAgentStream(
                       Never say "not found" if the tool results for the specific search contain data.
                       Present ONLY the data found that matches the requested search.`;
 
-                    messages.push(new HumanMessage(correctionPrompt));
-                    const correctedResponse = await agent.llm.invoke(messages);
-                    messages.push(correctedResponse);
+                    messages.push({ role: 'user', content: correctionPrompt });
+                    const correctedResponse = await agent.llm.invoke(messages as LLMInvokeInput);
+                    messages.push({
+                      role: 'assistant',
+                      content:
+                        typeof correctedResponse.content === 'string'
+                          ? correctedResponse.content
+                          : String(correctedResponse.content || ''),
+                      tool_calls: correctedResponse.tool_calls,
+                    });
 
                     // Stream the corrected response
                     if (correctedResponse.content) {
@@ -1755,8 +1829,15 @@ export async function* runAgentStream(
         }
       } else {
         // No tool calls in response, stream the final response
-        messages.push(response);
-        const finalStream = await agent.llm.stream(messages);
+        messages.push({
+          role: 'assistant',
+          content:
+            typeof response.content === 'string'
+              ? response.content
+              : String(response.content || ''),
+          tool_calls: response.tool_calls,
+        });
+        const finalStream = await agent.llm.stream(messages as LLMInvokeInput);
 
         let finalResponseContent = '';
         for await (const chunk of finalStream) {

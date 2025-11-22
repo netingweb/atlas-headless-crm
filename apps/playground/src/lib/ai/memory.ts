@@ -1,6 +1,6 @@
 import type { AIConfig } from '@/stores/ai-store';
 import { ChatOpenAI } from '@langchain/openai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import type { BaseMessageLike } from '@langchain/core/messages';
 
 export interface MessageMemory {
   role: 'user' | 'assistant';
@@ -213,11 +213,15 @@ export class MemoryManager {
 
       const prompt = SUMMARY_PROMPT.replace('{history}', historyText);
       const response = await llm.invoke([
-        new SystemMessage(
-          'You are a helpful assistant that creates concise summaries of conversations.'
-        ),
-        new HumanMessage(prompt),
-      ]);
+        {
+          role: 'system',
+          content: 'You are a helpful assistant that creates concise summaries of conversations.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ] satisfies BaseMessageLike[]);
 
       const summary =
         typeof response.content === 'string' ? response.content : String(response.content);
