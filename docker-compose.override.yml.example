@@ -1,0 +1,34 @@
+# Docker Compose Override per Sviluppo Locale
+# 
+# Copia questo file come docker-compose.override.yml per esporre le porte
+# dei servizi in ambiente di sviluppo locale.
+#
+# Questo file viene automaticamente caricato da Docker Compose quando presente
+# e non viene committato nel repository (è in .gitignore).
+#
+# Per usarlo:
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+
+services:
+  mongo:
+    ports:
+      - '27017:27017'  # Accesso locale a MongoDB
+
+  redis:
+    ports:
+      - '6379:6379'  # Accesso locale a Redis
+
+  typesense:
+    ports:
+      - '8108:8108'  # Accesso locale a Typesense
+
+  qdrant:
+    ports:
+      - '6333:6333'  # Accesso locale a Qdrant
+      - '6334:6334'  # Accesso locale a Qdrant gRPC
+
+  minio:
+    ports:
+      - '9000:9000'  # Accesso locale a MinIO API
+      - '9001:9001'  # Accesso locale a MinIO Console
+
