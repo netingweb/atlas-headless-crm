@@ -10,9 +10,27 @@ COPY pnpm-workspace.yaml package.json ./
 COPY .npmrc* ./
 COPY pnpm-lock.yaml ./
 
-# Copy all package.json files
-COPY packages/*/package.json ./packages/*/
-COPY apps/*/package.json ./apps/*/
+# Create package directories and copy package.json files
+# This ensures pnpm can resolve workspace dependencies
+RUN mkdir -p packages/auth packages/config packages/core packages/db \
+    packages/documents packages/embeddings packages/search packages/storage \
+    packages/types packages/utils apps/api apps/workflow apps/indexer apps/mcp-server apps/playground
+
+COPY packages/auth/package.json ./packages/auth/
+COPY packages/config/package.json ./packages/config/
+COPY packages/core/package.json ./packages/core/
+COPY packages/db/package.json ./packages/db/
+COPY packages/documents/package.json ./packages/documents/
+COPY packages/embeddings/package.json ./packages/embeddings/
+COPY packages/search/package.json ./packages/search/
+COPY packages/storage/package.json ./packages/storage/
+COPY packages/types/package.json ./packages/types/
+COPY packages/utils/package.json ./packages/utils/
+COPY apps/api/package.json ./apps/api/
+COPY apps/workflow/package.json ./apps/workflow/
+COPY apps/indexer/package.json ./apps/indexer/
+COPY apps/mcp-server/package.json ./apps/mcp-server/
+COPY apps/playground/package.json ./apps/playground/
 
 # Install dependencies
 # Use --no-frozen-lockfile if lockfile is outdated (will update it)
