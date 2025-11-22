@@ -45,3 +45,6 @@ Thumbs.db
 tmp
 temp
 *.tmp
+
+# Docker Compose override for local development
+docker-compose.override.yml

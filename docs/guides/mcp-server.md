@@ -74,3 +74,14 @@ Il server espone anche resources per accedere alle configurazioni:
 - Il server usa il primo tenant/unit disponibile come default
 - In produzione, considera di aggiungere autenticazione/authorization
 - I tools sono generati dinamicamente basati sulle configurazioni JSON
+
+## Accesso Remoto
+
+Per esporre il server MCP all'esterno e collegarlo ad applicazioni AI come Claude Desktop, vedi la [guida al server MCP remoto](./mcp-remote-server.md).
+
+L'API già espone endpoint MCP che possono essere usati come server MCP remoto:
+
+- `GET /api/{tenant}/{unit}/mcp/tools` - Lista tools
+- `POST /api/{tenant}/{unit}/mcp/call-tool` - Esegue un tool
+
+Questo permette di connettere Claude Desktop e altre applicazioni AI al tuo CRM senza dover eseguire il server MCP localmente.
