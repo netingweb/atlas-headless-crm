@@ -108,29 +108,60 @@ class MCPServer {
         // Search entity tool
         tools.push({
           name: `search_${entity.name}`,
-          description: `Search for ${entityLabel} using text or semantic search. Use '*' as query for generic search (all results). Set count_only to true to get only the count without results.`,
+          description: `Search for ${entityLabel} using text or semantic search.
+
+REQUIRED PARAMETERS:
+- query (string): MANDATORY - The search term to look for. You MUST ALWAYS provide this parameter.
+
+HOW TO USE:
+1. When user asks about a specific ${entityLabel} by name/term:
+   - Extract the name/term from user's question
+   - Call with: {"query": "extracted_term", "limit": 10}
+   - Examples:
+     * User: "cerca se ho un contatto che si chiama Bianchi" → {"query": "Bianchi", "limit": 10}
+     * User: "hai un cliente bianchi?" → {"query": "bianchi", "limit": 10}
+     * User: "trova Mario Rossi" → {"query": "Mario Rossi", "limit": 10}
+     * User: "dammi i dati di aleksandra" → {"query": "aleksandra", "limit": 10}
+
+2. When user asks for count or all items:
+   - Use: {"query": "*", "count_only": true} for count
+   - Use: {"query": "*", "limit": 50} for all items
+
+CRITICAL RULES:
+- NEVER call this tool with empty arguments {} or without query parameter
+- ALWAYS extract search terms from user's question and pass as "query"
+- If user mentions a name/term, extract it and use it as query value
+- Default query "*" returns ALL results - only use when user asks for "all" or "count"
+
+OPTIONAL PARAMETERS:
+- type: 'text' | 'semantic' | 'hybrid' (default: 'hybrid')
+- limit: number (default: 10)
+- count_only: boolean (default: false)`,
           inputSchema: {
             type: 'object',
             properties: {
               query: {
                 type: 'string',
-                description: 'Search query. Use "*" for generic search (all results)',
-                default: '*',
+                description: `REQUIRED: Search query string. Extract this from user's question. Examples: If user says "cerca Bianchi" → use "Bianchi". If user says "trova Mario Rossi" → use "Mario Rossi" or "Mario" or "Rossi". Use "*" ONLY when user asks for all items or count.`,
               },
               type: {
                 type: 'string',
                 enum: ['text', 'semantic', 'hybrid'],
-                description: 'Search type',
+                description: 'Search type: text (fast), semantic (meaning-based), hybrid (both). Default: hybrid',
                 default: 'hybrid',
               },
-              limit: { type: 'number', description: 'Result limit', default: 10 },
+              limit: {
+                type: 'number',
+                description: 'Maximum number of results to return. Default: 10',
+                default: 10,
+              },
               count_only: {
                 type: 'boolean',
-                description: 'If true, return only the count without results',
+                description: 'If true, return only the count without results. Default: false',
                 default: false,
               },
             },
-            required: [],
+            required: ['query'],
           },
         });
 
@@ -285,14 +316,40 @@ class MCPServer {
     // Global search tool - search across all entities
     tools.push({
       name: 'global_search',
-      description:
-        'Search across all entity types simultaneously using hybrid search (text + semantic). Returns results grouped by entity type.',
+      description: `Search across all entity types simultaneously using hybrid search (text + semantic). Returns results grouped by entity type.
+
+REQUIRED PARAMETERS:
+- query (string): MANDATORY - The search term to look for across all entities. You MUST ALWAYS provide this parameter.
+
+HOW TO USE:
+1. When user asks about a specific entity by name/term (entity type unknown):
+   - Extract the name/term from user's question
+   - Call with: {"query": "extracted_term", "limit": 10}
+   - Examples:
+     * User: "cerca se ho un contatto che si chiama Bianchi" → {"query": "Bianchi", "limit": 10}
+     * User: "trova Mario Rossi" → {"query": "Mario Rossi", "limit": 10}
+     * User: "dammi i dati di aleksandra" → {"query": "aleksandra", "limit": 10}
+
+2. When user asks for count or all items:
+   - Use: {"query": "*", "count_only": true} for count
+   - Use: {"query": "*", "limit": 50} for all items
+
+CRITICAL RULES:
+- NEVER call this tool with empty arguments {} or without query parameter
+- ALWAYS extract search terms from user's question and pass as "query"
+- If user mentions a name/term, extract it and use it as query value
+- Use this tool when entity type is unknown, otherwise use specific search_<entity> tool
+
+OPTIONAL PARAMETERS:
+- type: 'text' | 'semantic' | 'hybrid' (default: 'hybrid')
+- limit: number (default: 10) - results per entity type
+- count_only: boolean (default: false)`,
       inputSchema: {
         type: 'object',
         properties: {
           query: {
             type: 'string',
-            description: 'Search query to find across all entities',
+            description: `REQUIRED: Search query string. Extract this from user's question. Examples: If user says "cerca Bianchi" → use "Bianchi". If user says "trova Mario Rossi" → use "Mario Rossi" or "Mario" or "Rossi". Use "*" ONLY when user asks for all items or count.`,
           },
           type: {
             type: 'string',

@@ -1,0 +1,39 @@
+{
+  "name": "crm-atlas-demo3-pinupstars",
+  "version": "0.1.0",
+  "description": "Atlas Headless CRM MCP tools for the Pin-Up Stars fashion beachwear demo (contacts, products, orders, tickets, stock, loyalty).",
+  "tools": [
+    {
+      "name": "search_contact",
+      "description": "Search for contacts/customers by name, email, labels or preferences. Always pass the search query extracted from the user request (e.g. {\"query\": \"Maria Rossi\"})."
+    },
+    {
+      "name": "get_contact",
+      "description": "Retrieve a specific contact by ID with related orders, tickets, tasks and fidelity information."
+    },
+    {
+      "name": "search_product",
+      "description": "Search the swimwear catalog (bikini, one piece, accessories). Use specific terms like SKU, collection or category."
+    },
+    {
+      "name": "search_order_header",
+      "description": "Find customer orders (online, retail, wholesale) and inspect payment/shipping status."
+    },
+    {
+      "name": "search_support_ticket",
+      "description": "Search hierarchical support tickets (returns, exchanges, complaints). Use ticket number or customer name as query."
+    },
+    {
+      "name": "search_stock_item",
+      "description": "Check product availability across warehouses, stores and resellers. Query using SKU or warehouse name."
+    },
+    {
+      "name": "create_support_ticket",
+      "description": "Create a new support ticket referencing an existing contact/order. Collect reason, priority and description before calling."
+    },
+    {
+      "name": "create_task",
+      "description": "Create internal tasks (follow-up, order processing, inventory check) linked to contacts or tickets."
+    }
+  ]
+}

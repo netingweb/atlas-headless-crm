@@ -5,7 +5,11 @@ import { Send, Loader2, AlertCircle, Copy } from 'lucide-react';
 import { useAIStore } from '@/stores/ai-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCurrentContext } from '@/stores/context-store';
-import { createAgent, runAgentStream, type Agent } from '@/lib/ai/agent';
+import { startAgentSession, subscribeToAgentStream } from '@/lib/ai/agent';
+import {
+  generateActionableQuestions,
+  type ToolExecution,
+} from '@/lib/ai/actionable-questions';
 import { ActionableQuestions, type ActionableQuestion } from '@/components/ai/ActionableQuestions';
 import {
   ConfirmationDialog,
@@ -14,7 +18,6 @@ import {
 } from '@/components/ai/ConfirmationDialog';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
-import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { MemoryManager } from '@/lib/ai/memory';
 import ReactMarkdown from 'react-markdown';
@@ -45,26 +48,26 @@ interface Message {
     missing_answers?: string[];
     suggested_improvements?: string[];
   };
+  tracingUrl?: string;
 }
 
 const createConversationId = () =>
   `session-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 
 const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
-  const { config, disabledTools, maxContextTokens, showChainOfThought } = useAIStore();
-  const { tenantId, unitId } = useAuthStore();
+  const { config, maxContextTokens, showChainOfThought } = useAIStore();
+  const { tenantId, unitId, token, user } = useAuthStore();
   const viewContext = useCurrentContext();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const agentRef = useRef<Agent | null>(null);
   const [agentReady, setAgentReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const memoryManagerRef = useRef<MemoryManager | null>(null);
   const conversationIdRef = useRef<string>(createConversationId());
+  const streamCleanupRef = useRef<(() => void) | null>(null);
   // State for interrupt confirmation
   const [interruptState, setInterruptState] = useState<{
     tool_call: InterruptToolCall;
@@ -95,98 +98,29 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
     }
   }, [config, createMemoryManager, maxContextTokens]);
 
-  // Initialize agent when config is available
   useEffect(() => {
-    const initAgent = async () => {
-      if (!config || !tenantId || !unitId) {
-        setAgentReady(false);
-        setError(null);
-        return;
-      }
-
-      if (!config.apiKey || config.apiKey.trim() === '') {
-        setError('Please configure your AI engine API key in Settings > AI Engine');
-        setAgentReady(false);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setError(null);
-        setLoading(true);
-
-        // Verify API key is present and not empty
-        const apiKey = config.apiKey?.trim();
-        if (!apiKey || apiKey === '') {
-          throw new Error('API key is required. Please configure it in Settings > AI Engine.');
-        }
-
-        console.log('[ChatInterface] Initializing agent with config:', {
-          provider: config.provider,
-          model: config.model,
-          hasApiKey: !!apiKey,
-          apiKeyLength: apiKey.length,
-          apiKeyPrefix: apiKey.substring(0, 7) + '...',
-          tenantId,
-          unitId,
-        });
-        const agent = await createAgent(
-          config,
-          {
-            tenant_id: tenantId,
-            unit_id: unitId,
-          },
-          disabledTools,
-          {
-            entityType: viewContext.entityType,
-            entityId: viewContext.entityId,
-            route: viewContext.route,
-          },
-          memoryManagerRef.current || undefined
-        );
-        agentRef.current = agent;
-        setAgentReady(true);
-        setLoading(false);
-      } catch (err) {
-        console.error('Failed to initialize agent:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Failed to initialize AI agent';
-        setError(errorMessage);
-        setAgentReady(false);
-        setLoading(false);
-        toast({
-          title: 'Agent initialization failed',
-          description: errorMessage,
-          variant: 'destructive',
-          action: (
-            <ToastAction
-              altText="Copy error message"
-              onClick={() => {
-                navigator.clipboard.writeText(errorMessage).then(() => {
-                  toast({
-                    title: 'Copied',
-                    description: 'Error message copied to clipboard',
-                  });
-                });
-              }}
-            >
-              <Copy className="h-4 w-4" />
-            </ToastAction>
-          ),
-        });
-      }
+    return () => {
+      streamCleanupRef.current?.();
     };
+  }, []);
 
-    initAgent();
-  }, [
-    config,
-    tenantId,
-    unitId,
-    disabledTools,
-    viewContext.entityType,
-    viewContext.entityId,
-    viewContext.route,
-    toast,
-  ]);
+  // Validate agent service configuration
+  useEffect(() => {
+    if (!config || !tenantId || !unitId) {
+      setAgentReady(false);
+      setError(null);
+      return;
+    }
+
+    if (!config.agentId || config.agentId.trim() === '') {
+      setAgentReady(false);
+      setError('Configura Agent ID in Settings > AI Engine');
+      return;
+    }
+
+    setAgentReady(true);
+    setError(null);
+  }, [config, tenantId, unitId]);
 
   const handleSend = async () => {
     // If there's an active interrupt, don't allow new messages
@@ -199,7 +133,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
       return;
     }
 
-    if (!input.trim() || loading || !agentReady || !agentRef.current) {
+    if (!input.trim() || loading || !agentReady) {
       if (!agentReady) {
         toast({
           title: 'Agent not ready',
@@ -257,6 +191,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
     let assistantResponse = '';
     const thinkingLogs: ThinkingLog[] = [];
     const toolCallLogs: Map<string, { startTime: number; toolCall: ToolCallLog }> = new Map();
+    const toolExecutions: ToolExecution[] = [];
 
     try {
       // Add user message to memory
@@ -265,238 +200,201 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
       }
 
       // Prepare chat history from memory (or fallback to current messages)
-      const chatHistory = memoryManagerRef.current
-        ? memoryManagerRef.current.getChatHistory()
-        : messages.map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          }));
+      const fallbackHistory = [...messages, userMessage].map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+      const chatHistory = memoryManagerRef.current?.getChatHistory() ?? fallbackHistory;
 
-      // Stream agent response
-      const { tenantId, unitId } = useAuthStore.getState();
-      const ctx = tenantId && unitId ? { tenant_id: tenantId, unit_id: unitId } : undefined;
+      if (!tenantId || !unitId || !config?.agentId) {
+        throw new Error('Configurazione agente incompleta. Verifica tenant, unit e agentId.');
+      }
 
-      for await (const event of runAgentStream(agentRef.current, userInput, chatHistory, ctx)) {
+      const sessionInfo = await startAgentSession({
+        agentId: config.agentId,
+        tenantId,
+        unitId,
+        messages: chatHistory,
+        viewContext,
+        metadata: {
+          userId: user?._id,
+          locale: navigator.language,
+        },
+        baseUrl: config.agentServiceUrl,
+        authToken: token,
+      });
+
+      const serialize = (value: unknown): string => {
+        if (typeof value === 'string') return value;
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch {
+          return String(value);
+        }
+      };
+
+      const appendToAssistantMessage = (mutator: (msg: Message) => void) => {
         setMessages((prev) => {
           const updated = [...prev];
           const msgIndex = updated.findIndex((m) => m.id === assistantMessageId);
           if (msgIndex === -1) return updated;
-
           const currentMsg = { ...updated[msgIndex] };
-
-          switch (event.type) {
-            case 'thinking':
-              if (event.content) {
-                currentMsg.thinking = [...(currentMsg.thinking || []), event.content];
-                thinkingLogs.push({
-                  content: event.content,
-                  timestamp: Date.now(),
-                });
-              }
-              break;
-            case 'content':
-              if (event.content) {
-                currentMsg.content += event.content;
-                assistantResponse += event.content;
-              }
-              break;
-            case 'tool_call':
-              if (event.toolName) {
-                const toolCallId = `${event.toolName}-${Date.now()}`;
-                const toolCallStartTime = Date.now();
-                currentMsg.toolCalls = [
-                  ...(currentMsg.toolCalls || []),
-                  {
-                    name: event.toolName,
-                    args: event.toolArgs || {},
-                  },
-                ];
-                // Track tool call start
-                toolCallLogs.set(toolCallId, {
-                  startTime: toolCallStartTime,
-                  toolCall: {
-                    toolName: event.toolName,
-                    args: event.toolArgs || {},
-                    timestamp: toolCallStartTime,
-                  },
-                });
-              }
-              break;
-            case 'tool_result':
-              if (event.toolName) {
-                const toolCalls = currentMsg.toolCalls || [];
-                const toolIndex = toolCalls.findIndex((tc) => tc.name === event.toolName);
-                if (toolIndex !== -1) {
-                  toolCalls[toolIndex] = {
-                    ...toolCalls[toolIndex],
-                    result: event.toolResult,
-                    error: event.error,
-                  };
-                  currentMsg.toolCalls = toolCalls;
-                }
-                // Update tool call log with result
-                const toolCallEntry = Array.from(toolCallLogs.values()).find(
-                  (entry) => entry.toolCall.toolName === event.toolName && !entry.toolCall.result
-                );
-                if (toolCallEntry) {
-                  const durationMs = Date.now() - toolCallEntry.startTime;
-                  toolCallEntry.toolCall.result = event.toolResult;
-                  toolCallEntry.toolCall.error = event.error;
-                  toolCallEntry.toolCall.durationMs = durationMs;
-                }
-              }
-              break;
-            case 'error':
-              currentMsg.content = event.content || 'An error occurred';
-              break;
-            case 'entity_updated':
-              // Invalidate React Query cache for the updated entity
-              if (event.entityType && event.entityId && tenantId && unitId) {
-                // Invalidate specific entity query
-                queryClient.invalidateQueries({
-                  queryKey: ['entity', tenantId, unitId, event.entityType, event.entityId],
-                });
-                // Invalidate entity list query
-                queryClient.invalidateQueries({
-                  queryKey: ['entity', tenantId, unitId, event.entityType],
-                });
-                // Invalidate entity documents if applicable
-                queryClient.invalidateQueries({
-                  queryKey: [
-                    'entity-documents',
-                    tenantId,
-                    unitId,
-                    event.entityType,
-                    event.entityId,
-                  ],
-                });
-
-                // Show notification if entity is different from current view
-                if (
-                  viewContext.entityType !== event.entityType ||
-                  viewContext.entityId !== event.entityId
-                ) {
-                  toast({
-                    title: 'Entity updated',
-                    description: `The ${event.entityType} has been updated by the AI agent`,
-                    action: (
-                      <ToastAction
-                        altText="View entity"
-                        onClick={() => {
-                          navigate(`/entities/${event.entityType}/${event.entityId}`);
-                        }}
-                      >
-                        View
-                      </ToastAction>
-                    ),
-                  });
-                } else {
-                  // If viewing the same entity, show a simple notification
-                  toast({
-                    title: 'Entity updated',
-                    description: 'The entity has been updated. Refreshing...',
-                  });
-                }
-              }
-              break;
-            case 'interrupt_confirmation':
-              // Pause execution and show confirmation dialog
-              if (event.interrupt_tool_call && event.interrupt_preview) {
-                const toolCall = event.interrupt_tool_call;
-                const preview = event.interrupt_preview;
-                const resumeExecution = async () => {
-                  // Resume execution by calling the tool with confirmed=true
-                  if (!agentRef.current || !ctx) return;
-
-                  const tool = agentRef.current.tools.find((t) => t.name === toolCall.name);
-                  if (!tool) {
-                    toast({
-                      title: 'Error',
-                      description: `Tool ${toolCall.name} not found`,
-                      variant: 'destructive',
-                    });
-                    return;
-                  }
-
-                  try {
-                    // Execute tool call with confirmed=true
-                    await tool.invoke({
-                      ...toolCall.args,
-                      confirmed: true,
-                    });
-
-                    // Continue agent execution with the result
-                    // For now, show a success message
-                    toast({
-                      title: 'Operation confirmed',
-                      description: `The ${preview.entity_type} has been ${preview.action_type === 'delete' ? 'deleted' : 'updated'}`,
-                    });
-
-                    // Invalidate queries to refresh data
-                    if (preview.action_type === 'update') {
-                      queryClient.invalidateQueries({
-                        queryKey: [
-                          'entity',
-                          ctx.tenant_id,
-                          ctx.unit_id,
-                          preview.entity_type,
-                          preview.entity_id,
-                        ],
-                      });
-                    }
-                  } catch (error) {
-                    toast({
-                      title: 'Error',
-                      description:
-                        error instanceof Error ? error.message : 'Failed to execute operation',
-                      variant: 'destructive',
-                    });
-                  }
-                };
-
-                setInterruptState({
-                  tool_call: toolCall,
-                  preview: preview,
-                  resumeFunction: resumeExecution,
-                });
-              }
-              break;
-            case 'actionable_questions':
-              // Save actionable questions to the message
-              if (event.questions && event.questions.length > 0) {
-                currentMsg.actionableQuestions = event.questions;
-              }
-              break;
-            case 'supervisor_evaluation':
-              // Store evaluation in message (optional, for debugging)
-              if (event.evaluation) {
-                currentMsg.supervisorEvaluation = event.evaluation;
-              }
-              break;
-            case 'clarification_request':
-              // Show clarification request to user
-              if (event.content) {
-                currentMsg.content += `\n\n⚠️ ${event.content}`;
-                toast({
-                  title: 'Clarification needed',
-                  description: event.content,
-                  variant: 'default',
-                });
-              }
-              break;
-          }
-
+          mutator(currentMsg);
           updated[msgIndex] = currentMsg;
           return updated;
         });
-      }
+      };
 
-      // Add assistant response to memory after streaming completes
+      const pushThinking = (content: string) => {
+        appendToAssistantMessage((msg) => {
+          msg.thinking = [...(msg.thinking || []), content];
+        });
+        thinkingLogs.push({
+          content,
+          timestamp: Date.now(),
+        });
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = subscribeToAgentStream({
+          streamUrl: sessionInfo.streamUrl,
+          onEvent: (event) => {
+            switch (event.type) {
+              case 'message': {
+                const chunk =
+                  typeof event.data?.content === 'string'
+                    ? event.data.content
+                    : serialize(event.data?.content);
+                if (event.data?.role === 'assistant' && chunk) {
+                  assistantResponse += chunk;
+                  appendToAssistantMessage((msg) => {
+                    msg.content += chunk;
+                  });
+                }
+                break;
+              }
+              case 'plan_step': {
+                if (event.data?.detail) {
+                  const detail =
+                    (event.data.status === 'completed' ? '✅' : '🧭') + ' ' + event.data.detail;
+                  pushThinking(detail);
+                }
+                break;
+              }
+              case 'subagent_call': {
+                if (event.data?.agent) {
+                  pushThinking(`🤝 Subagent: ${event.data.agent}`);
+                }
+                break;
+              }
+              case 'tool_call': {
+                if (event.data?.toolName) {
+                  const args = (event.data.input as Record<string, unknown>) || {};
+                  const callId = `${event.data.toolName}-${Date.now()}`;
+                  const execution: ToolExecution = { name: event.data.toolName, args };
+                  toolExecutions.push(execution);
+                  const tracker = {
+                    id: callId,
+                    toolName: event.data.toolName,
+                    startTime: Date.now(),
+                    log: {
+                      toolName: event.data.toolName,
+                      args,
+                      timestamp: Date.now(),
+                    } as ToolCallLog,
+                    execution,
+                  };
+                  toolCallLogs.set(callId, { startTime: tracker.startTime, toolCall: tracker.log });
+                  appendToAssistantMessage((msg) => {
+                    const currentCalls = msg.toolCalls ? [...msg.toolCalls] : [];
+                    currentCalls.push({
+                      name: event.data.toolName,
+                      args,
+                    });
+                    msg.toolCalls = currentCalls;
+                  });
+                }
+                break;
+              }
+              case 'tool_result': {
+                if (event.data?.toolName) {
+                  const resultText = serialize(event.data.output);
+                  appendToAssistantMessage((msg) => {
+                    const updatedCalls = msg.toolCalls ? [...msg.toolCalls] : [];
+                    for (let i = updatedCalls.length - 1; i >= 0; i -= 1) {
+                      if (updatedCalls[i].name === event.data.toolName && !updatedCalls[i].result) {
+                        updatedCalls[i] = {
+                          ...updatedCalls[i],
+                          result: resultText,
+                        };
+                        break;
+                      }
+                    }
+                    msg.toolCalls = updatedCalls;
+                  });
+
+                  const trackerEntry = Array.from(toolCallLogs.entries())
+                    .reverse()
+                    .find(([, entry]) => entry.toolCall.toolName === event.data.toolName);
+                  if (trackerEntry) {
+                    const [, entry] = trackerEntry;
+                    entry.toolCall.result = resultText;
+                    entry.toolCall.durationMs = Date.now() - entry.startTime;
+                  }
+                  const exec = toolExecutions
+                    .slice()
+                    .reverse()
+                    .find((execution) => execution.name === event.data.toolName && !execution.result);
+                  if (exec) {
+                    exec.result = event.data.output;
+                  }
+                }
+                break;
+              }
+              case 'tracing': {
+                if (event.data?.runUrl) {
+                  appendToAssistantMessage((msg) => {
+                    msg.tracingUrl = event.data.runUrl;
+                  });
+                }
+                break;
+              }
+              case 'error': {
+                const message = event.data?.message || 'Errore durante l’esecuzione dell’agente';
+                appendToAssistantMessage((msg) => {
+                  msg.content = message;
+                });
+                cleanup();
+                reject(new Error(message));
+                break;
+              }
+              case 'done': {
+                const actionable = generateActionableQuestions(toolExecutions, userInput);
+                if (actionable.length > 0) {
+                  appendToAssistantMessage((msg) => {
+                    msg.actionableQuestions = actionable;
+                  });
+                }
+                cleanup();
+                resolve();
+                break;
+              }
+              default:
+                break;
+            }
+          },
+          onError: (error) => {
+            cleanup();
+            reject(error);
+          },
+        });
+        streamCleanupRef.current = cleanup;
+      });
+
       if (memoryManagerRef.current && assistantResponse.trim()) {
         await memoryManagerRef.current.addMessage('assistant', assistantResponse);
       }
 
-      // Log execution
       const executionDurationMs = Date.now() - executionStartTime;
       agentLogger.logExecution({
         conversationId: conversationIdRef.current,
@@ -508,8 +406,6 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
         timestamp: executionStartTime,
         durationMs: executionDurationMs,
       });
-
-      setLoading(false);
     } catch (err) {
       console.error('Failed to run agent:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to process message';
@@ -550,6 +446,8 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
         ),
       });
     } finally {
+      streamCleanupRef.current?.();
+      streamCleanupRef.current = null;
       setLoading(false);
     }
   };
@@ -589,6 +487,8 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
   }, [messages, toast]);
 
   const handleResetChat = useCallback(async () => {
+    streamCleanupRef.current?.();
+    streamCleanupRef.current = null;
     if (memoryManagerRef.current) {
       memoryManagerRef.current.clearMemory();
     }

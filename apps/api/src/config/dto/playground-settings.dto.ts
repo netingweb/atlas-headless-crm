@@ -37,6 +37,16 @@ export class AIConfigDto {
   @Min(1)
   @Max(8000)
   maxTokens?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  agentServiceUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  agentId?: string;
 }
 
 export class MCPToolsConfigDto {

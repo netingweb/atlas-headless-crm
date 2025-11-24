@@ -9,6 +9,8 @@ export interface AIConfig {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  agentServiceUrl?: string;
+  agentId?: string;
 }
 
 interface AIState {

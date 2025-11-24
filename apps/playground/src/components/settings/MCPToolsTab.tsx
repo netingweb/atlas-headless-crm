@@ -1,9 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { mcpApi, type MCPTool } from '@/lib/api/mcp';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAIStore } from '@/stores/ai-store';
-import { Loader2, Code, FileText, CheckCircle2, CheckSquare, Square } from 'lucide-react';
+import { Loader2, Code, FileText, CheckCircle2, CheckSquare, Square, RefreshCw, Copy, Check } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -21,16 +21,35 @@ export default function MCPToolsTab() {
   const { tenantId, unitId } = useAuthStore();
   const { disabledTools, setToolEnabled, disableAllTools } = useAIStore();
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
+  const [copiedTool, setCopiedTool] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const {
     data: tools,
     isLoading,
     error,
+    refetch,
   } = useQuery<MCPTool[]>({
     queryKey: ['mcpTools', tenantId, unitId],
     queryFn: () => mcpApi.listTools(tenantId || '', unitId || ''),
     enabled: !!tenantId && !!unitId,
   });
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['mcpTools', tenantId, unitId] });
+    refetch();
+  };
+
+  const handleCopySchema = async (toolName: string, schema: Record<string, unknown>) => {
+    try {
+      const schemaJson = formatSchema(schema);
+      await navigator.clipboard.writeText(schemaJson);
+      setCopiedTool(toolName);
+      setTimeout(() => setCopiedTool(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy schema:', error);
+    }
+  };
 
   const isToolEnabled = (toolName: string): boolean => {
     // Tool is enabled if it's NOT in the disabled set
@@ -115,14 +134,28 @@ export default function MCPToolsTab() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Code className="h-5 w-5" />
-            MCP Tools Available
-          </CardTitle>
-          <CardDescription>
-            All MCP tools exposed by the server for tenant <strong>{tenantId}</strong> and unit{' '}
-            <strong>{unitId}</strong>. These tools can be used by AI agents.
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Code className="h-5 w-5" />
+                MCP Tools Available
+              </CardTitle>
+              <CardDescription>
+                All MCP tools exposed by the server for tenant <strong>{tenantId}</strong> and unit{' '}
+                <strong>{unitId}</strong>. These tools can be used by AI agents.
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4 flex items-center justify-between">
@@ -249,10 +282,30 @@ export default function MCPToolsTab() {
                                 </p>
                               </div>
                               <div>
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                                  <Code className="h-4 w-4" />
-                                  Schema JSON
-                                </h4>
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                    <Code className="h-4 w-4" />
+                                    Schema JSON
+                                  </h4>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleCopySchema(tool.name, schema)}
+                                    className="h-7 text-xs"
+                                  >
+                                    {copiedTool === tool.name ? (
+                                      <>
+                                        <Check className="h-3 w-3 mr-1" />
+                                        Copied!
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="h-3 w-3 mr-1" />
+                                        Copy
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
                                 <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
                                   <pre className="text-xs font-mono whitespace-pre-wrap break-words">
                                     <code>{formatSchema(schema)}</code>

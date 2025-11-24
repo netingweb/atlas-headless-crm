@@ -1,0 +1,27 @@
+[
+  {
+    "unit_id": "ecommerce",
+    "name": "E-commerce Online",
+    "tenant_id": "demo3",
+    "settings": {}
+  },
+  {
+    "unit_id": "retail",
+    "name": "Punti Vendita Retail",
+    "tenant_id": "demo3",
+    "settings": {}
+  },
+  {
+    "unit_id": "wholesale",
+    "name": "Vendita all'Ingrosso",
+    "tenant_id": "demo3",
+    "settings": {}
+  },
+  {
+    "unit_id": "customer_service",
+    "name": "Servizio Clienti e Supporto",
+    "tenant_id": "demo3",
+    "settings": {}
+  }
+]
+

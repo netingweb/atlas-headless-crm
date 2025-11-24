@@ -22,12 +22,20 @@ import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { Save, Eye, EyeOff, Copy } from 'lucide-react';
 
+const DEFAULT_AGENT_SERVICE_URL =
+  import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:4100';
+
 const aiConfigSchema = z.object({
   provider: z.enum(['openai', 'azure']),
   apiKey: z.string().min(1, 'API key is required'),
   model: z.string().min(1, 'Model is required'),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).max(8000).optional(),
+  agentServiceUrl: z
+    .string()
+    .url('Agent Service URL must be a valid URL')
+    .default(DEFAULT_AGENT_SERVICE_URL),
+  agentId: z.string().min(1, 'Agent ID is required'),
 });
 
 type AIConfigForm = z.infer<typeof aiConfigSchema>;
@@ -41,12 +49,14 @@ export default function AIEngineTab() {
     (config?.provider as AIProvider) || 'openai'
   );
 
-  const defaultFormValues: AIConfigForm = config || {
-    provider: 'openai',
-    apiKey: '',
-    model: 'gpt-4o-mini',
-    temperature: 0.7,
-    maxTokens: 2000,
+  const defaultFormValues: AIConfigForm = {
+    provider: config?.provider || 'openai',
+    apiKey: config?.apiKey || '',
+    model: config?.model || 'gpt-4o-mini',
+    temperature: config?.temperature ?? 0.7,
+    maxTokens: config?.maxTokens ?? 2000,
+    agentServiceUrl: config?.agentServiceUrl || DEFAULT_AGENT_SERVICE_URL,
+    agentId: config?.agentId || 'crm_orchestrator',
   };
 
   const {
@@ -82,6 +92,9 @@ export default function AIEngineTab() {
         model: tenantSettingsQuery.data.ai.model || 'gpt-4o-mini',
         temperature: tenantSettingsQuery.data.ai.temperature ?? 0.7,
         maxTokens: tenantSettingsQuery.data.ai.maxTokens ?? 2000,
+        agentServiceUrl:
+          tenantSettingsQuery.data.ai.agentServiceUrl || DEFAULT_AGENT_SERVICE_URL,
+        agentId: tenantSettingsQuery.data.ai.agentId || 'crm_orchestrator',
       };
       reset(apiValues);
       setSelectedProvider(apiValues.provider);
@@ -270,6 +283,39 @@ export default function AIEngineTab() {
               <p className="text-xs text-gray-500">Maximum number of tokens in the response</p>
             </div>
 
+            {/* Agent Service URL */}
+            <div className="space-y-2">
+              <Label htmlFor="agentServiceUrl">Agent Service URL</Label>
+              <Input
+                id="agentServiceUrl"
+                type="url"
+                placeholder="http://localhost:4100"
+                {...register('agentServiceUrl')}
+              />
+              {errors.agentServiceUrl && (
+                <p className="text-sm text-red-500">{errors.agentServiceUrl.message}</p>
+              )}
+              <p className="text-xs text-gray-500">
+                Base URL of the standalone agent-service (defaults to{' '}
+                {DEFAULT_AGENT_SERVICE_URL}).
+              </p>
+            </div>
+
+            {/* Agent ID */}
+            <div className="space-y-2">
+              <Label htmlFor="agentId">Agent ID</Label>
+              <Input
+                id="agentId"
+                type="text"
+                placeholder="crm_orchestrator"
+                {...register('agentId')}
+              />
+              {errors.agentId && <p className="text-sm text-red-500">{errors.agentId.message}</p>}
+              <p className="text-xs text-gray-500">
+                Identifier defined in `config/&lt;tenant&gt;/agents.json` (e.g. crm_orchestrator).
+              </p>
+            </div>
+
             {/* UI Preferences */}
             <div className="border-t pt-6 space-y-4">
               <div className="space-y-2">
@@ -345,6 +391,16 @@ export default function AIEngineTab() {
                   <span className="font-medium">{config.maxTokens}</span>
                 </div>
               )}
+              <div className="flex justify-between">
+                <span className="text-gray-500">Agent Service URL:</span>
+                <span className="font-medium">
+                  {config.agentServiceUrl || DEFAULT_AGENT_SERVICE_URL}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Agent ID:</span>
+                <span className="font-medium">{config.agentId || 'crm_orchestrator'}</span>
+              </div>
               <div className="flex justify-between border-t pt-2 mt-2">
                 <span className="text-gray-500">Chain of Thought:</span>
                 <span className="font-medium">{showChainOfThought ? 'Enabled' : 'Disabled'}</span>

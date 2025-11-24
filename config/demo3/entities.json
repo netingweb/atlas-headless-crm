@@ -1,0 +1,1613 @@
+{
+  "_comment": "⚠️ IMPORTANT: After modifying this file, you MUST run 'pnpm config:sync demo3' to sync changes to MongoDB. Changes are NOT applied automatically!",
+  "tenant_id": "demo3",
+  "entities": [
+    {
+      "name": "contact",
+      "label": "Contact",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "name",
+          "label": "Name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "email",
+          "label": "Email",
+          "type": "email",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "phone",
+          "label": "Phone",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "age",
+          "label": "Age",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "gender",
+          "label": "Gender",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["male", "female", "other"]
+          }
+        },
+        {
+          "name": "birth_date",
+          "label": "Birth Date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "country",
+          "label": "Country",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "city",
+          "label": "City",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "postal_code",
+          "label": "Postal Code",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "address",
+          "label": "Address",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "preferences",
+          "label": "Preferences",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "multiple": true,
+          "validation": {
+            "enum": ["bikini", "one_piece", "accessories", "curvy", "man", "thongs", "clothing"]
+          }
+        },
+        {
+          "name": "purchase_count",
+          "label": "Purchase Count",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "total_spent",
+          "label": "Total Spent",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "last_purchase_date",
+          "label": "Last Purchase Date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "fidelity_points",
+          "label": "Fidelity Points",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "newsletter_subscribed",
+          "label": "Newsletter Subscribed",
+          "type": "boolean",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "brevo_contact_id",
+          "label": "Brevo Contact ID",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "labels",
+          "label": "Labels",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "multiple": true,
+          "validation": {
+            "enum": ["vip", "vip_plus", "regular_customer", "new_customer", "prospect", "newsletter_subscriber"]
+          }
+        },
+        {
+          "name": "company_id",
+          "label": "Company ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        }
+      ]
+    },
+    {
+      "name": "company",
+      "label": "Company",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "name",
+          "label": "Name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "email",
+          "label": "Email",
+          "type": "email",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "phone",
+          "label": "Phone",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "phone2",
+          "label": "Phone2",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "website",
+          "label": "Website",
+          "type": "url",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "size",
+          "label": "Size",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "industry",
+          "label": "Industry",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "address",
+          "label": "Address",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "key_contact_ids",
+          "label": "Key Contact Ids",
+          "type": "reference",
+          "required": false,
+          "indexed": false,
+          "searchable": false,
+          "embeddable": false,
+          "multiple": true,
+          "reference_entity": "contact"
+        }
+      ]
+    },
+    {
+      "name": "product",
+      "label": "Product",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "name",
+          "label": "Name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "sku",
+          "label": "SKU",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "show_in_search_results": true
+        },
+        {
+          "name": "brand",
+          "label": "Brand",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "category",
+          "label": "Category",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "validation": {
+            "enum": ["bikini", "one_piece", "clothing", "accessories", "man", "curvy", "thongs"]
+          }
+        },
+        {
+          "name": "collection",
+          "label": "Collection",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "validation": {
+            "enum": ["SS2025", "SS2026", "Outlet", "Limited"]
+          }
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "price",
+          "label": "Price",
+          "type": "number",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "sale_price",
+          "label": "Sale Price",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "colors",
+          "label": "Colors",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "multiple": true
+        },
+        {
+          "name": "sizes",
+          "label": "Sizes",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "multiple": true
+        },
+        {
+          "name": "materials",
+          "label": "Materials",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "multiple": true
+        },
+        {
+          "name": "images",
+          "label": "Images",
+          "type": "string",
+          "required": false,
+          "indexed": false,
+          "searchable": false,
+          "embeddable": false,
+          "multiple": true
+        },
+        {
+          "name": "stock_quantity",
+          "label": "Stock Quantity",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "is_active",
+          "label": "Is Active",
+          "type": "boolean",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "is_featured",
+          "label": "Is Featured",
+          "type": "boolean",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "tags",
+          "label": "Tags",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "multiple": true
+        }
+      ]
+    },
+    {
+      "name": "order_header",
+      "label": "Order",
+      "scope": "unit",
+      "fields": [
+        {
+          "name": "order_number",
+          "label": "Order Number",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "show_in_search_results": true
+        },
+        {
+          "name": "order_date",
+          "label": "Order Date",
+          "type": "datetime",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "customer_id",
+          "label": "Customer ID",
+          "type": "reference",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        },
+        {
+          "name": "store_id",
+          "label": "Store ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "store"
+        },
+        {
+          "name": "reseller_id",
+          "label": "Reseller ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "reseller"
+        },
+        {
+          "name": "order_type",
+          "label": "Order Type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "validation": {
+            "enum": ["online", "retail", "wholesale"]
+          }
+        },
+        {
+          "name": "status",
+          "label": "Status",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "returned"]
+          }
+        },
+        {
+          "name": "payment_status",
+          "label": "Payment Status",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["pending", "partial", "paid", "refunded", "failed"]
+          }
+        },
+        {
+          "name": "payment_method",
+          "label": "Payment Method",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["credit_card", "paypal", "bank_transfer", "cash", "other"]
+          }
+        },
+        {
+          "name": "subtotal",
+          "label": "Subtotal",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "discount",
+          "label": "Discount",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "shipping_cost",
+          "label": "Shipping Cost",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "total",
+          "label": "Total",
+          "type": "number",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "currency",
+          "label": "Currency",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "shipping_address",
+          "label": "Shipping Address",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "billing_address",
+          "label": "Billing Address",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "fidelity_points_earned",
+          "label": "Fidelity Points Earned",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "fidelity_points_used",
+          "label": "Fidelity Points Used",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        }
+      ]
+    },
+    {
+      "name": "order_line",
+      "label": "Order Line",
+      "scope": "unit",
+      "fields": [
+        {
+          "name": "order_id",
+          "label": "Order ID",
+          "type": "reference",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "order_header"
+        },
+        {
+          "name": "product_id",
+          "label": "Product ID",
+          "type": "reference",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "product"
+        },
+        {
+          "name": "quantity",
+          "label": "Quantity",
+          "type": "number",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "unit_price",
+          "label": "Unit Price",
+          "type": "number",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "discount",
+          "label": "Discount",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "total",
+          "label": "Total",
+          "type": "number",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "size",
+          "label": "Size",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "color",
+          "label": "Color",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "status",
+          "label": "Status",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["pending", "confirmed", "shipped", "delivered", "returned", "cancelled"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "support_ticket",
+      "label": "Support Ticket",
+      "scope": "unit",
+      "fields": [
+        {
+          "name": "ticket_number",
+          "label": "Ticket Number",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "show_in_search_results": true
+        },
+        {
+          "name": "customer_id",
+          "label": "Customer ID",
+          "type": "reference",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        },
+        {
+          "name": "order_id",
+          "label": "Order ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "order_header"
+        },
+        {
+          "name": "parent_ticket_id",
+          "label": "Parent Ticket ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "support_ticket"
+        },
+        {
+          "name": "is_thread_root",
+          "label": "Is Thread Root",
+          "type": "boolean",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "type",
+          "label": "Type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false,
+          "validation": {
+            "enum": ["return", "exchange", "warranty", "information", "complaint", "other"]
+          }
+        },
+        {
+          "name": "status",
+          "label": "Status",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["open", "in_progress", "waiting_customer", "resolved", "closed"]
+          }
+        },
+        {
+          "name": "priority",
+          "label": "Priority",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["low", "medium", "high", "urgent"]
+          }
+        },
+        {
+          "name": "subject",
+          "label": "Subject",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "text",
+          "required": true,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "author_type",
+          "label": "Author Type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["customer", "agent", "system"]
+          }
+        },
+        {
+          "name": "assigned_to",
+          "label": "Assigned To",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "created_date",
+          "label": "Created Date",
+          "type": "datetime",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "resolved_date",
+          "label": "Resolved Date",
+          "type": "datetime",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "resolution",
+          "label": "Resolution",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "attachments",
+          "label": "Attachments",
+          "type": "string",
+          "required": false,
+          "indexed": false,
+          "searchable": false,
+          "embeddable": false,
+          "multiple": true
+        }
+      ]
+    },
+    {
+      "name": "fidelity_program",
+      "label": "Fidelity Program",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "customer_id",
+          "label": "Customer ID",
+          "type": "reference",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        },
+        {
+          "name": "total_points",
+          "label": "Total Points",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "available_points",
+          "label": "Available Points",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "used_points",
+          "label": "Used Points",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "expired_points",
+          "label": "Expired Points",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "tier",
+          "label": "Tier",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["bronze", "silver", "gold", "platinum"]
+          }
+        },
+        {
+          "name": "last_activity_date",
+          "label": "Last Activity Date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "expiry_date",
+          "label": "Expiry Date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        }
+      ]
+    },
+    {
+      "name": "store",
+      "label": "Store",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "name",
+          "label": "Name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "code",
+          "label": "Code",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "type",
+          "label": "Type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["flagship", "retail", "outlet"]
+          }
+        },
+        {
+          "name": "address",
+          "label": "Address",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "city",
+          "label": "City",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "country",
+          "label": "Country",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "phone",
+          "label": "Phone",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "email",
+          "label": "Email",
+          "type": "email",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "manager",
+          "label": "Manager",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "is_active",
+          "label": "Is Active",
+          "type": "boolean",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        }
+      ]
+    },
+    {
+      "name": "reseller",
+      "label": "Reseller",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "name",
+          "label": "Name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "code",
+          "label": "Code",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "type",
+          "label": "Type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["mono_brand", "multi_brand"]
+          }
+        },
+        {
+          "name": "company_id",
+          "label": "Company ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        },
+        {
+          "name": "contact_id",
+          "label": "Contact ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        },
+        {
+          "name": "address",
+          "label": "Address",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "city",
+          "label": "City",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "country",
+          "label": "Country",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "phone",
+          "label": "Phone",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "email",
+          "label": "Email",
+          "type": "email",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "website",
+          "label": "Website",
+          "type": "url",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "discount_tier",
+          "label": "Discount Tier",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "payment_terms",
+          "label": "Payment Terms",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "is_active",
+          "label": "Is Active",
+          "type": "boolean",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        }
+      ]
+    },
+    {
+      "name": "warehouse",
+      "label": "Warehouse",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "name",
+          "label": "Name",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "code",
+          "label": "Code",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "type",
+          "label": "Type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["manufacturer", "store", "distribution_center", "third_party"]
+          }
+        },
+        {
+          "name": "store_id",
+          "label": "Store ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "store"
+        },
+        {
+          "name": "address",
+          "label": "Address",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "city",
+          "label": "City",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "country",
+          "label": "Country",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "postal_code",
+          "label": "Postal Code",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "phone",
+          "label": "Phone",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "email",
+          "label": "Email",
+          "type": "email",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "manager",
+          "label": "Manager",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "is_active",
+          "label": "Is Active",
+          "type": "boolean",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        }
+      ]
+    },
+    {
+      "name": "inventory",
+      "label": "Inventory",
+      "scope": "tenant",
+      "fields": [
+        {
+          "name": "product_id",
+          "label": "Product ID",
+          "type": "reference",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "product"
+        },
+        {
+          "name": "warehouse_id",
+          "label": "Warehouse ID",
+          "type": "reference",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "warehouse"
+        },
+        {
+          "name": "quantity",
+          "label": "Quantity",
+          "type": "number",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "reserved_quantity",
+          "label": "Reserved Quantity",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "available_quantity",
+          "label": "Available Quantity",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "reorder_point",
+          "label": "Reorder Point",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "max_stock",
+          "label": "Max Stock",
+          "type": "number",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "last_updated",
+          "label": "Last Updated",
+          "type": "datetime",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "location",
+          "label": "Location",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "batch_number",
+          "label": "Batch Number",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": false
+        },
+        {
+          "name": "expiry_date",
+          "label": "Expiry Date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        }
+      ]
+    },
+    {
+      "name": "task",
+      "label": "Task",
+      "scope": "unit",
+      "fields": [
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "text",
+          "required": false,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "due_date",
+          "label": "Due Date",
+          "type": "date",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "type",
+          "label": "Type",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "validation": {
+            "enum": ["customer_follow_up", "order_processing", "support_ticket", "inventory_check", "marketing", "other"]
+          }
+        },
+        {
+          "name": "status",
+          "label": "Status",
+          "type": "string",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "company_id",
+          "label": "Company ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        },
+        {
+          "name": "contact_id",
+          "label": "Contact ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        }
+      ]
+    },
+    {
+      "name": "note",
+      "label": "Note",
+      "scope": "unit",
+      "fields": [
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "content",
+          "label": "Content",
+          "type": "text",
+          "required": true,
+          "indexed": false,
+          "searchable": true,
+          "embeddable": true
+        },
+        {
+          "name": "status",
+          "label": "Status",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "default": "to do",
+          "validation": {
+            "enum": ["to do", "pending", "on going", "done", "canceled", "archived"]
+          }
+        },
+        {
+          "name": "expiration_date_time",
+          "label": "Expiration Date Time",
+          "type": "datetime",
+          "required": true,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false
+        },
+        {
+          "name": "company_id",
+          "label": "Company ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "company"
+        },
+        {
+          "name": "contact_id",
+          "label": "Contact ID",
+          "type": "reference",
+          "required": false,
+          "indexed": true,
+          "searchable": false,
+          "embeddable": false,
+          "reference_entity": "contact"
+        }
+      ]
+    }
+  ]
+}
+

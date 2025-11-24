@@ -14,6 +14,7 @@ config/
     dictionary.json      # Dizionari di valori
     sharing_policy.json  # Regole di condivisione
     workflows.json       # Regole di automazione
+    agents.json          # Configurazione agenti AI (orchestrator e sub-agent)
     mcp.manifest.json    # Strumenti MCP per agenti AI
 ```
 

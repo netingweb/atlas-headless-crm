@@ -1,0 +1,50 @@
+{
+  "name": "@crm-atlas/agent-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/apps/agent-service/src/main.js",
+  "scripts": {
+    "build": "tsc -b tsconfig.json",
+    "start": "node dist/apps/agent-service/src/main.js",
+    "dev": "tsx watch src/main.ts",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@crm-atlas/config": "workspace:*",
+    "@crm-atlas/core": "workspace:*",
+    "@crm-atlas/types": "workspace:*",
+    "@crm-atlas/utils": "workspace:*",
+    "@fastify/cors": "^10.0.1",
+    "@langchain/core": "^1.0.5",
+    "@langchain/langgraph": "^1.0.2",
+    "@langchain/openai": "^1.1.2",
+    "@types/node": "^20.11.0",
+    "axios": "^1.7.7",
+    "deepagents": "^1.1.1",
+    "dotenv": "^16.4.7",
+    "fastify": "^4.28.1",
+    "langchain": "^1.0.6",
+    "langsmith": "^0.1.48",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^9.4.0",
+    "uuid": "^11.0.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@jest/test-sequencer": "^29.7.0",
+    "eslint": "^8.57.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "@types/jsonwebtoken": "^9.0.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.6.2"
+  }
+}
+

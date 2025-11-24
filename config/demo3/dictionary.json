@@ -1,0 +1,129 @@
+{
+  "tenant_id": "demo3",
+  "dictionaries": {
+    "contact_gender": [
+      { "value": "male", "label": "Maschio" },
+      { "value": "female", "label": "Femmina" },
+      { "value": "other", "label": "Altro" }
+    ],
+    "contact_preferences": [
+      { "value": "bikini", "label": "Bikini" },
+      { "value": "one_piece", "label": "One Piece" },
+      { "value": "accessories", "label": "Accessori" },
+      { "value": "curvy", "label": "Curvy" },
+      { "value": "man", "label": "Uomo" },
+      { "value": "thongs", "label": "Thongs" },
+      { "value": "clothing", "label": "Abbigliamento" }
+    ],
+    "contact_labels": [
+      { "value": "vip", "label": "VIP" },
+      { "value": "vip_plus", "label": "VIP Plus" },
+      { "value": "regular_customer", "label": "Cliente Regolare" },
+      { "value": "new_customer", "label": "Nuovo Cliente" },
+      { "value": "prospect", "label": "Prospect" },
+      { "value": "newsletter_subscriber", "label": "Iscritto Newsletter" }
+    ],
+    "product_category": [
+      { "value": "bikini", "label": "Bikini" },
+      { "value": "one_piece", "label": "One Piece" },
+      { "value": "clothing", "label": "Abbigliamento" },
+      { "value": "accessories", "label": "Accessori" },
+      { "value": "man", "label": "Uomo" },
+      { "value": "curvy", "label": "Curvy" },
+      { "value": "thongs", "label": "Thongs" }
+    ],
+    "product_collection": [
+      { "value": "SS2025", "label": "Spring Summer 2025" },
+      { "value": "SS2026", "label": "Spring Summer 2026" },
+      { "value": "Outlet", "label": "Outlet" },
+      { "value": "Limited", "label": "Edizione Limitata" }
+    ],
+    "order_type": [
+      { "value": "online", "label": "Online" },
+      { "value": "retail", "label": "Retail" },
+      { "value": "wholesale", "label": "Wholesale" }
+    ],
+    "order_status": [
+      { "value": "pending", "label": "In Attesa" },
+      { "value": "confirmed", "label": "Confermato" },
+      { "value": "processing", "label": "In Elaborazione" },
+      { "value": "shipped", "label": "Spedito" },
+      { "value": "delivered", "label": "Consegnato" },
+      { "value": "cancelled", "label": "Cancellato" },
+      { "value": "returned", "label": "Reso" }
+    ],
+    "payment_status": [
+      { "value": "pending", "label": "In Attesa" },
+      { "value": "partial", "label": "Parziale" },
+      { "value": "paid", "label": "Pagato" },
+      { "value": "refunded", "label": "Rimborsato" },
+      { "value": "failed", "label": "Fallito" }
+    ],
+    "payment_method": [
+      { "value": "credit_card", "label": "Carta di Credito" },
+      { "value": "paypal", "label": "PayPal" },
+      { "value": "bank_transfer", "label": "Bonifico Bancario" },
+      { "value": "cash", "label": "Contanti" },
+      { "value": "other", "label": "Altro" }
+    ],
+    "order_line_status": [
+      { "value": "pending", "label": "In Attesa" },
+      { "value": "confirmed", "label": "Confermato" },
+      { "value": "shipped", "label": "Spedito" },
+      { "value": "delivered", "label": "Consegnato" },
+      { "value": "returned", "label": "Reso" },
+      { "value": "cancelled", "label": "Cancellato" }
+    ],
+    "ticket_type": [
+      { "value": "return", "label": "Reso" },
+      { "value": "exchange", "label": "Cambio" },
+      { "value": "warranty", "label": "Garanzia" },
+      { "value": "information", "label": "Informazioni" },
+      { "value": "complaint", "label": "Reclamo" },
+      { "value": "other", "label": "Altro" }
+    ],
+    "ticket_status": [
+      { "value": "open", "label": "Aperto" },
+      { "value": "in_progress", "label": "In Corso" },
+      { "value": "waiting_customer", "label": "In Attesa Cliente" },
+      { "value": "resolved", "label": "Risolto" },
+      { "value": "closed", "label": "Chiuso" }
+    ],
+    "ticket_priority": [
+      { "value": "low", "label": "Bassa" },
+      { "value": "medium", "label": "Media" },
+      { "value": "high", "label": "Alta" },
+      { "value": "urgent", "label": "Urgente" }
+    ],
+    "fidelity_tier": [
+      { "value": "bronze", "label": "Bronze" },
+      { "value": "silver", "label": "Silver" },
+      { "value": "gold", "label": "Gold" },
+      { "value": "platinum", "label": "Platinum" }
+    ],
+    "store_type": [
+      { "value": "flagship", "label": "Flagship Store" },
+      { "value": "retail", "label": "Retail Store" },
+      { "value": "outlet", "label": "Outlet Store" }
+    ],
+    "reseller_type": [
+      { "value": "mono_brand", "label": "Mono Brand" },
+      { "value": "multi_brand", "label": "Multi Brand" }
+    ],
+    "warehouse_type": [
+      { "value": "manufacturer", "label": "Magazzino Produttore" },
+      { "value": "store", "label": "Magazzino Negozio" },
+      { "value": "distribution_center", "label": "Centro Distribuzione" },
+      { "value": "third_party", "label": "Magazzino Terzi" }
+    ],
+    "task_type": [
+      { "value": "customer_follow_up", "label": "Follow-up Cliente" },
+      { "value": "order_processing", "label": "Elaborazione Ordine" },
+      { "value": "support_ticket", "label": "Gestione Ticket" },
+      { "value": "inventory_check", "label": "Controllo Inventario" },
+      { "value": "marketing", "label": "Marketing" },
+      { "value": "other", "label": "Altro" }
+    ]
+  }
+}
+

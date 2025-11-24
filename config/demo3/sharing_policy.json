@@ -1,0 +1,44 @@
+{
+  "tenant_id": "demo3",
+  "policies": [
+    {
+      "entity": "order_header",
+      "rules": [
+        {
+          "source_unit": "ecommerce",
+          "visible_to": ["customer_service"],
+          "conditions": {
+            "status": "shipped"
+          }
+        },
+        {
+          "source_unit": "retail",
+          "visible_to": ["customer_service"],
+          "conditions": {
+            "status": "delivered"
+          }
+        },
+        {
+          "source_unit": "wholesale",
+          "visible_to": ["customer_service"],
+          "conditions": {
+            "status": "delivered"
+          }
+        }
+      ]
+    },
+    {
+      "entity": "support_ticket",
+      "rules": [
+        {
+          "source_unit": "customer_service",
+          "visible_to": ["ecommerce", "retail", "wholesale"],
+          "conditions": {
+            "status": "resolved"
+          }
+        }
+      ]
+    }
+  ]
+}
+

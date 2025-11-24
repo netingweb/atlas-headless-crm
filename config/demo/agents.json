@@ -1,0 +1,61 @@
+{
+  "agents": {
+    "crm_orchestrator": {
+      "type": "orchestrator",
+      "description": "Assistenti principali per il tenant demo. Coordina sub-agent e utilizza gli strumenti MCP per cercare, creare e aggiornare i dati CRM.",
+      "systemPrompt": "You are the orchestrator agent for the Demo tenant. Prefer Italian responses, always double-check tool outputs, and keep answers concise with actionable next steps.",
+      "llm": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "temperature": 0.2,
+        "apiKey": "${env:OPENAI_API_KEY}"
+      },
+      "tools": {
+        "allow": ["*"]
+      },
+      "subagents": [
+        {
+          "agentId": "contact_specialist",
+          "description": "Use for contact centric tasks (search, updates, notes)."
+        }
+      ],
+      "tracing": {
+        "provider": "langsmith",
+        "enabled": false,
+        "variables": {
+          "LANGCHAIN_API_KEY": "${env:LANGCHAIN_API_KEY}",
+          "LANGCHAIN_PROJECT": "crm-atlas-demo",
+          "LANGSMITH_API_URL": "${env:LANGSMITH_API_URL}",
+          "LANGSMITH_WEB_URL": "${env:LANGSMITH_WEB_URL}"
+        },
+        "defaultTags": ["tenant:demo", "env:local"],
+        "metadata": {
+          "environment": "demo"
+        }
+      }
+    },
+    "contact_specialist": {
+      "type": "standard",
+      "description": "Focalizzato su contatti e note correlate. Utilizza esclusivamente strumenti dei contatti.",
+      "systemPrompt": "You specialize in contact level operations. Never modify other entities and keep outputs short.",
+      "llm": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "temperature": 0.1,
+        "apiKey": "${env:OPENAI_API_KEY}"
+      },
+      "tools": {
+        "allow": [
+          "search_contact",
+          "get_contact",
+          "create_contact",
+          "update_contact",
+          "delete_contact",
+          "search_note",
+          "create_note"
+        ]
+      }
+    }
+  }
+}
+

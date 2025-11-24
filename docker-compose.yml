@@ -126,6 +126,28 @@ services:
       retries: 3
     restart: unless-stopped
 
+  agent-service:
+    build:
+      context: .
+      dockerfile: apps/agent-service/Dockerfile
+    container_name: crm-atlas-agent-service
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      AGENT_SERVICE_PORT: ${AGENT_SERVICE_PORT:-4100}
+      AGENT_SERVICE_HOST: 0.0.0.0
+      MCP_API_BASE_URL: ${MCP_API_BASE_URL:-http://api:3000/api}
+      MCP_SERVICE_TOKEN: ${MCP_SERVICE_TOKEN:-}
+      AGENT_CONFIG_ROOT: /app/config
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY:-}
+      LANGSMITH_API_URL: ${LANGSMITH_API_URL:-}
+      LANGSMITH_WEB_URL: ${LANGSMITH_WEB_URL:-}
+    ports:
+      - '${AGENT_SERVICE_PORT:-4100}:4100'
+    restart: unless-stopped
+
 volumes:
   mongo_data:
   redis_data:

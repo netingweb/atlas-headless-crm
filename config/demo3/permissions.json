@@ -1,0 +1,99 @@
+{
+  "tenant_id": "demo3",
+  "roles": [
+    {
+      "role": "admin",
+      "scopes": [
+        "crm:read",
+        "crm:write",
+        "crm:delete",
+        "documents:read",
+        "documents:write",
+        "documents:delete",
+        "workflows:manage",
+        "workflows:execute"
+      ]
+    },
+    {
+      "role": "ecommerce_manager",
+      "scopes": [
+        "crm:read",
+        "crm:write",
+        "documents:read",
+        "documents:write"
+      ]
+    },
+    {
+      "role": "retail_manager",
+      "scopes": [
+        "crm:read",
+        "crm:write",
+        "documents:read",
+        "documents:write"
+      ]
+    },
+    {
+      "role": "wholesale_manager",
+      "scopes": [
+        "crm:read",
+        "crm:write",
+        "documents:read",
+        "documents:write"
+      ]
+    },
+    {
+      "role": "customer_service",
+      "scopes": [
+        "crm:read",
+        "crm:write",
+        "documents:read",
+        "documents:write"
+      ]
+    },
+    {
+      "role": "store_manager",
+      "scopes": [
+        "crm:read",
+        "crm:write",
+        "documents:read"
+      ]
+    },
+    {
+      "role": "reseller_manager",
+      "scopes": [
+        "crm:read",
+        "crm:write",
+        "documents:read"
+      ]
+    },
+    {
+      "role": "ecommerce_rep",
+      "scopes": [
+        "crm:read",
+        "crm:write"
+      ]
+    },
+    {
+      "role": "retail_rep",
+      "scopes": [
+        "crm:read",
+        "crm:write"
+      ]
+    },
+    {
+      "role": "wholesale_rep",
+      "scopes": [
+        "crm:read",
+        "crm:write"
+      ]
+    },
+    {
+      "role": "cs_agent",
+      "scopes": [
+        "crm:read",
+        "crm:write"
+      ]
+    }
+  ]
+}
+

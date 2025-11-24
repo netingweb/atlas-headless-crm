@@ -1,0 +1,89 @@
+{
+  "agents": {
+    "crm_orchestrator": {
+      "type": "orchestrator",
+      "description": "Agente principale per il tenant demo2 automotive. Coordina gli agenti locali per vendite e service.",
+      "systemPrompt": "You orchestrate automotive workflows. Use sub-agents when a task is focused on a specific entity type. Prefer Italian, cite view links when present.",
+      "llm": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "temperature": 0.15,
+        "apiKey": "${env:OPENAI_API_KEY}"
+      },
+      "tools": {
+        "allow": ["*"],
+        "deny": ["delete_contact", "delete_company", "delete_opportunity"]
+      },
+      "subagents": [
+        {
+          "agentId": "opportunity_manager",
+          "description": "Gestisce pipeline e opportunità."
+        },
+        {
+          "agentId": "service_specialist",
+          "description": "Opera su ticket e ordini di service."
+        }
+      ],
+      "tracing": {
+        "provider": "langsmith",
+        "enabled": true,
+        "variables": {
+          "LANGCHAIN_API_KEY": "${env:LANGCHAIN_API_KEY}",
+          "LANGCHAIN_PROJECT": "crm-atlas-demo2",
+          "LANGSMITH_API_URL": "${env:LANGSMITH_API_URL}",
+          "LANGSMITH_WEB_URL": "${env:LANGSMITH_WEB_URL}"
+        },
+        "defaultTags": ["tenant:demo2", "env:local"],
+        "metadata": {
+          "environment": "demo2",
+          "sector": "automotive"
+        }
+      }
+    },
+    "opportunity_manager": {
+      "type": "standard",
+      "description": "Ottimizza attività su opportunità e deals.",
+      "systemPrompt": "Focus only on opportunities and sales tasks. Always surface pipeline stage and value in summaries.",
+      "llm": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "temperature": 0.1,
+        "apiKey": "${env:OPENAI_API_KEY}"
+      },
+      "tools": {
+        "allow": [
+          "search_opportunity",
+          "get_opportunity",
+          "update_opportunity",
+          "create_opportunity",
+          "search_company",
+          "get_company",
+          "search_contact"
+        ]
+      }
+    },
+    "service_specialist": {
+      "type": "standard",
+      "description": "Gestisce ticket service, documentazione e note tecniche.",
+      "systemPrompt": "Operate on service orders, documents and tasks for workshops. Highlight due dates and unit details.",
+      "llm": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "temperature": 0.25,
+        "apiKey": "${env:OPENAI_API_KEY}"
+      },
+      "tools": {
+        "allow": [
+          "search_task",
+          "update_task",
+          "create_task",
+          "search_document",
+          "search_document_content",
+          "get_documents_for_entity",
+          "find_document_by_context"
+        ]
+      }
+    }
+  }
+}
+

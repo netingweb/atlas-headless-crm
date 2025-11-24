@@ -1,0 +1,84 @@
+{
+  "agents": {
+    "crm_orchestrator": {
+      "type": "orchestrator",
+      "description": "Agente principale demo3 (multi country).",
+      "systemPrompt": "Coordinate multi-tenant workflows. Use sub-agents per language or business line. Always confirm tenant + unit before executing destructive tools.",
+      "llm": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "temperature": 0.2,
+        "apiKey": "${env:OPENAI_API_KEY}"
+      },
+      "tools": {
+        "allow": ["*"]
+      },
+      "subagents": [
+        {
+          "agentId": "sales_specialist",
+          "description": "Handles sales interactions."
+        },
+        {
+          "agentId": "support_specialist",
+          "description": "Handles support/service tasks."
+        }
+      ],
+      "tracing": {
+        "provider": "langsmith",
+        "enabled": true,
+        "variables": {
+          "LANGCHAIN_API_KEY": "${env:LANGCHAIN_API_KEY}",
+          "LANGCHAIN_PROJECT": "crm-atlas-demo3"
+        },
+        "defaultTags": ["tenant:demo3"],
+        "metadata": {
+          "environment": "demo3"
+        }
+      }
+    },
+    "sales_specialist": {
+      "type": "standard",
+      "description": "Sales-focused agent.",
+      "systemPrompt": "Limit yourself to entities relevant to sales (contacts, companies, opportunities, notes).",
+      "llm": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "temperature": 0.2,
+        "apiKey": "${env:OPENAI_API_KEY}"
+      },
+      "tools": {
+        "allow": [
+          "search_contact",
+          "search_company",
+          "search_opportunity",
+          "get_opportunity",
+          "create_note",
+          "create_task"
+        ]
+      }
+    },
+    "support_specialist": {
+      "type": "standard",
+      "description": "Support/service agent.",
+      "systemPrompt": "Focus on post-sales support: tasks, documents, notes. Escalate anything outside this scope.",
+      "llm": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "temperature": 0.25,
+        "apiKey": "${env:OPENAI_API_KEY}"
+      },
+      "tools": {
+        "allow": [
+          "search_task",
+          "update_task",
+          "create_task",
+          "search_document",
+          "get_documents_for_entity",
+          "search_note",
+          "create_note"
+        ]
+      }
+    }
+  }
+}
+
