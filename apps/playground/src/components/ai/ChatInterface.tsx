@@ -5,7 +5,12 @@ import { Send, Loader2, AlertCircle, Copy } from 'lucide-react';
 import { useAIStore } from '@/stores/ai-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCurrentContext } from '@/stores/context-store';
-import { startAgentSession, subscribeToAgentStream } from '@/lib/ai/agent';
+import {
+  startAgentSession,
+  subscribeToAgentStream,
+  type AgentServiceEvent,
+  type AgentServiceMessage,
+} from '@/lib/ai/agent';
 import {
   generateActionableQuestions,
   type ToolExecution,
@@ -200,11 +205,34 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
       }
 
       // Prepare chat history from memory (or fallback to current messages)
-      const fallbackHistory = [...messages, userMessage].map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-      const chatHistory = memoryManagerRef.current?.getChatHistory() ?? fallbackHistory;
+      const fallbackHistory = [...messages, userMessage].reduce<AgentServiceMessage[]>(
+        (history, msg) => {
+          const role: AgentServiceMessage['role'] =
+            msg.role === 'assistant' ? 'assistant' : 'user';
+          history.push({
+            role,
+            content: msg.content,
+          });
+          return history;
+        },
+        []
+      );
+      const savedHistory =
+        memoryManagerRef.current
+          ?.getChatHistory()
+          ?.map((msg) => {
+            const normalizedRole: AgentServiceMessage['role'] =
+              msg.role === 'assistant'
+                ? 'assistant'
+                : msg.role === 'system'
+                  ? 'system'
+                  : 'user';
+            return {
+              role: normalizedRole,
+              content: msg.content,
+            };
+          }) ?? null;
+      const chatHistory = savedHistory ?? fallbackHistory;
 
       if (!tenantId || !unitId || !config?.agentId) {
         throw new Error('Configurazione agente incompleta. Verifica tenant, unit e agentId.');
@@ -258,14 +286,13 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
       await new Promise<void>((resolve, reject) => {
         const cleanup = subscribeToAgentStream({
           streamUrl: sessionInfo.streamUrl,
-          onEvent: (event) => {
+          onEvent: (event: AgentServiceEvent) => {
             switch (event.type) {
               case 'message': {
+                const data = event.data as { role?: 'assistant' | 'tool'; content?: unknown };
                 const chunk =
-                  typeof event.data?.content === 'string'
-                    ? event.data.content
-                    : serialize(event.data?.content);
-                if (event.data?.role === 'assistant' && chunk) {
+                  typeof data?.content === 'string' ? data.content : serialize(data?.content);
+                if (data?.role === 'assistant' && chunk) {
                   assistantResponse += chunk;
                   appendToAssistantMessage((msg) => {
                     msg.content += chunk;
@@ -274,31 +301,37 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                 break;
               }
               case 'plan_step': {
-                if (event.data?.detail) {
-                  const detail =
-                    (event.data.status === 'completed' ? '✅' : '🧭') + ' ' + event.data.detail;
+                const data = event.data as { detail?: string; status?: 'started' | 'completed' };
+                if (data?.detail) {
+                  const detail = (data.status === 'completed' ? '✅' : '🧭') + ' ' + data.detail;
                   pushThinking(detail);
                 }
                 break;
               }
               case 'subagent_call': {
-                if (event.data?.agent) {
-                  pushThinking(`🤝 Subagent: ${event.data.agent}`);
+                const data = event.data as { agent?: string };
+                if (data?.agent) {
+                  pushThinking(`🤝 Subagent: ${data.agent}`);
                 }
                 break;
               }
               case 'tool_call': {
-                if (event.data?.toolName) {
-                  const args = (event.data.input as Record<string, unknown>) || {};
-                  const callId = `${event.data.toolName}-${Date.now()}`;
-                  const execution: ToolExecution = { name: event.data.toolName, args };
+                const data = event.data as {
+                  toolName?: string;
+                  input?: Record<string, unknown>;
+                };
+                if (data && data.toolName) {
+                  const toolName = data.toolName;
+                  const args = data.input || {};
+                  const callId = `${toolName}-${Date.now()}`;
+                  const execution: ToolExecution = { name: toolName, args };
                   toolExecutions.push(execution);
                   const tracker = {
                     id: callId,
-                    toolName: event.data.toolName,
+                    toolName,
                     startTime: Date.now(),
                     log: {
-                      toolName: event.data.toolName,
+                      toolName,
                       args,
                       timestamp: Date.now(),
                     } as ToolCallLog,
@@ -308,7 +341,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                   appendToAssistantMessage((msg) => {
                     const currentCalls = msg.toolCalls ? [...msg.toolCalls] : [];
                     currentCalls.push({
-                      name: event.data.toolName,
+                        name: toolName,
                       args,
                     });
                     msg.toolCalls = currentCalls;
@@ -317,12 +350,14 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                 break;
               }
               case 'tool_result': {
-                if (event.data?.toolName) {
-                  const resultText = serialize(event.data.output);
+                const data = event.data as { toolName?: string; output?: unknown };
+                if (data && data.toolName) {
+                  const toolName = data.toolName;
+                  const resultText = serialize(data.output);
                   appendToAssistantMessage((msg) => {
                     const updatedCalls = msg.toolCalls ? [...msg.toolCalls] : [];
                     for (let i = updatedCalls.length - 1; i >= 0; i -= 1) {
-                      if (updatedCalls[i].name === event.data.toolName && !updatedCalls[i].result) {
+                      if (updatedCalls[i].name === toolName && !updatedCalls[i].result) {
                         updatedCalls[i] = {
                           ...updatedCalls[i],
                           result: resultText,
@@ -335,7 +370,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
 
                   const trackerEntry = Array.from(toolCallLogs.entries())
                     .reverse()
-                    .find(([, entry]) => entry.toolCall.toolName === event.data.toolName);
+                    .find(([, entry]) => entry.toolCall.toolName === toolName);
                   if (trackerEntry) {
                     const [, entry] = trackerEntry;
                     entry.toolCall.result = resultText;
@@ -344,23 +379,25 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                   const exec = toolExecutions
                     .slice()
                     .reverse()
-                    .find((execution) => execution.name === event.data.toolName && !execution.result);
+                    .find((execution) => execution.name === toolName && !execution.result);
                   if (exec) {
-                    exec.result = event.data.output;
+                    exec.result = data.output;
                   }
                 }
                 break;
               }
               case 'tracing': {
-                if (event.data?.runUrl) {
+                const data = event.data as { runUrl?: string };
+                if (data?.runUrl) {
                   appendToAssistantMessage((msg) => {
-                    msg.tracingUrl = event.data.runUrl;
+                    msg.tracingUrl = data.runUrl;
                   });
                 }
                 break;
               }
               case 'error': {
-                const message = event.data?.message || 'Errore durante l’esecuzione dell’agente';
+                const data = event.data as { message?: string };
+                const message = data?.message || 'Errore durante l’esecuzione dell’agente';
                 appendToAssistantMessage((msg) => {
                   msg.content = message;
                 });

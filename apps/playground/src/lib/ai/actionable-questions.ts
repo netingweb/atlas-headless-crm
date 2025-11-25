@@ -146,7 +146,7 @@ export function generateActionableQuestions(
 
     if (toolName === 'create_opportunity') {
       actionable.push({
-        question: t.linkOpportunity('opportunity'),
+        question: t.linkOpportunity,
         action: t.linkOpportunityAction(
           String(
             execution.args?.id ||
