@@ -2,8 +2,9 @@ FROM node:20-alpine AS base
 
 WORKDIR /app
 
-# Install pnpm and tsx (needed for seed script inside container)
-RUN npm install -g pnpm@8.15.0 tsx@4.7.0
+# Install build tools for native modules (like argon2) and pnpm/tsx
+RUN apk add --no-cache python3 make g++ \
+  && npm install -g pnpm@8.15.0 tsx@4.7.0
 
 # Copy workspace files
 COPY pnpm-workspace.yaml package.json ./
