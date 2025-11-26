@@ -1400,23 +1400,25 @@ function LinkedEntitiesPanel(props: {
             <div key={cfg.type} className="space-y-2">
               <h4 className="text-sm font-semibold">{cfg.label}</h4>
               <ul className="space-y-1 text-sm">
-                {items.map((item) => (
-                  <li
-                    key={item._id}
-                    className="flex items-center justify-between gap-2 border-b border-gray-100 pb-1 last:border-b-0"
-                  >
-                    <button
-                      type="button"
-                      className="text-blue-600 hover:text-blue-800 underline text-left"
-                      onClick={() => navigate(`/entities/${cfg.type}/${item._id}`)}
+                {items.map((item) => {
+                  const status = (item as any).status as string | undefined;
+
+                  return (
+                    <li
+                      key={item._id}
+                      className="flex items-center justify-between gap-2 border-b border-gray-100 pb-1 last:border-b-0"
                     >
-                      {getEntityDisplayNameFromDoc(item)}
-                    </button>
-                    {item.status && (
-                      <span className="text-xs text-gray-500">{String(item.status)}</span>
-                    )}
-                  </li>
-                ))}
+                      <button
+                        type="button"
+                        className="text-blue-600 hover:text-blue-800 underline text-left"
+                        onClick={() => navigate(`/entities/${cfg.type}/${item._id}`)}
+                      >
+                        {getEntityDisplayNameFromDoc(item)}
+                      </button>
+                      {status && <span className="text-xs text-gray-500">{status}</span>}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           );
