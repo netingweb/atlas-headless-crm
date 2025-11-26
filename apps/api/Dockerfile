@@ -96,9 +96,10 @@ RUN if [ -f /app/package.json ]; then \
       mv /app/package.json.bak /app/package.json; \
     fi
 
-# Copy built files
+# Copy built files and seed scripts
 COPY --from=base /app/packages ./packages
 COPY --from=base /app/apps/api/dist ./apps/api/dist
+COPY --from=base /app/scripts ./scripts
 
 EXPOSE 3000
 
