@@ -1,6 +1,10 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import type { MCPClient, MCPTool } from '../services/mcp-client.js';
-import { buildZodObjectFromJsonSchema, normalizeToolFilterList, JsonSchema } from '../utils/schema.js';
+import {
+  buildZodObjectFromJsonSchema,
+  normalizeToolFilterList,
+  JsonSchema,
+} from '../utils/schema.js';
 
 export interface ToolFilterConfig {
   allow?: string[];
@@ -25,8 +29,9 @@ export function createLangChainTools(params: {
   tenantId: string;
   unitId: string;
   mcpClient: MCPClient;
+  authToken?: string;
 }): DynamicStructuredTool[] {
-  const { tools, filter, tenantId, unitId, mcpClient } = params;
+  const { tools, filter, tenantId, unitId, mcpClient, authToken } = params;
 
   return tools
     .filter((tool) => isToolAllowed(tool.name, filter))
@@ -37,15 +42,19 @@ export function createLangChainTools(params: {
         name: tool.name,
         description: tool.description,
         schema,
-        func: async (rawArgs: Record<string, unknown>) => {
+        func: async (rawArgs: Record<string, unknown>): Promise<string> => {
           const validated = schema.parse(rawArgs);
-          const result = await mcpClient.callTool(tenantId, unitId, tool.name, validated);
+          const result = await mcpClient.callTool(
+            tenantId,
+            unitId,
+            tool.name,
+            validated,
+            authToken
+          );
 
           if (result?.isError) {
             const message =
-              result.content
-                ?.map((entry: { text: string }) => entry.text)
-                .join('\n') ||
+              result.content?.map((entry: { text: string }) => entry.text).join('\n') ||
               `Tool ${tool.name} failed`;
             throw new Error(message);
           }
@@ -55,4 +64,3 @@ export function createLangChainTools(params: {
       });
     });
 }
-

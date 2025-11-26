@@ -22,6 +22,20 @@ export interface ThinkingLog {
   timestamp: number;
 }
 
+export interface SubagentCallLog {
+  agent: string;
+  input?: unknown;
+  timestamp: number;
+}
+
+export interface SSECounters {
+  messages: number;
+  planSteps: number;
+  subagentCalls: number;
+  toolCalls: number;
+  toolResults: number;
+}
+
 export interface AgentExecutionLog {
   conversationId: string;
   messageId: string;
@@ -32,6 +46,9 @@ export interface AgentExecutionLog {
   timestamp: number;
   durationMs: number;
   error?: string;
+  tracingUrl?: string;
+  sseEvents: SSECounters;
+  subagentCalls: SubagentCallLog[];
 }
 
 class AgentLogger {
@@ -65,7 +82,13 @@ class AgentLogger {
       return;
     }
 
-    this.logs.push(log);
+    const normalized: AgentExecutionLog = {
+      ...log,
+      sseEvents: log.sseEvents ?? createEmptySSECounters(),
+      subagentCalls: log.subagentCalls ?? [],
+    };
+
+    this.logs.push(normalized);
 
     // Trim if necessary
     if (this.logs.length > this.maxLogs) {
@@ -167,12 +190,14 @@ class AgentLogger {
     totalErrors: number;
     avgDurationMs: number;
     toolUsageStats: Record<string, { count: number; errors: number; avgDurationMs: number }>;
+    sseEvents: SSECounters;
   } {
     const totalExecutions = this.logs.length;
     let totalToolCalls = 0;
     let totalThinkingSteps = 0;
     let totalErrors = 0;
     let totalDurationMs = 0;
+    const sseEvents = createEmptySSECounters();
 
     this.logs.forEach((log) => {
       totalToolCalls += log.toolCalls.length;
@@ -181,6 +206,11 @@ class AgentLogger {
         totalErrors++;
       }
       totalDurationMs += log.durationMs;
+      sseEvents.messages += log.sseEvents?.messages || 0;
+      sseEvents.planSteps += log.sseEvents?.planSteps || 0;
+      sseEvents.subagentCalls += log.sseEvents?.subagentCalls || 0;
+      sseEvents.toolCalls += log.sseEvents?.toolCalls || 0;
+      sseEvents.toolResults += log.sseEvents?.toolResults || 0;
     });
 
     return {
@@ -190,12 +220,23 @@ class AgentLogger {
       totalErrors,
       avgDurationMs: totalExecutions > 0 ? totalDurationMs / totalExecutions : 0,
       toolUsageStats: this.getToolUsageStats(),
+      sseEvents,
     };
   }
 }
 
 // Singleton instance
 export const agentLogger = new AgentLogger();
+
+export function createEmptySSECounters(): SSECounters {
+  return {
+    messages: 0,
+    planSteps: 0,
+    subagentCalls: 0,
+    toolCalls: 0,
+    toolResults: 0,
+  };
+}
 
 // Export for use in browser console debugging
 if (typeof window !== 'undefined') {

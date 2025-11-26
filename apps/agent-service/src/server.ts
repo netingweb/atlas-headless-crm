@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import type { Logger } from './logger.js';
 import type { SessionManager } from './services/session-manager.js';
@@ -27,7 +27,21 @@ export function createServer(deps: ServerDependencies): FastifyInstance {
     credentials: true,
   });
 
-  app.get('/healthz', async () => ({ status: 'ok' }));
+  app.get('/healthz', () => ({ status: 'ok' }));
+
+  function applyCorsHeaders(reply: FastifyReply, origin?: string): void {
+    if (origin) {
+      reply.header('Access-Control-Allow-Origin', origin);
+      const existingVary = reply.getHeader('Vary');
+      const varyValue = existingVary
+        ? `${Array.isArray(existingVary) ? existingVary.join(', ') : String(existingVary)}, Origin`
+        : 'Origin';
+      reply.header('Vary', varyValue);
+    } else {
+      reply.header('Access-Control-Allow-Origin', '*');
+    }
+    reply.header('Access-Control-Allow-Credentials', 'true');
+  }
 
   app.post<{
     Params: { agentId?: string };
@@ -47,12 +61,12 @@ export function createServer(deps: ServerDependencies): FastifyInstance {
       return;
     }
 
-    if (
-      !deps.auth.isTenantAuthorized(authContext, payload.tenantId, payload.unitId)
-    ) {
+    if (!deps.auth.isTenantAuthorized(authContext, payload.tenantId, payload.unitId)) {
       reply.code(403).send({ error: 'Forbidden for tenant/unit' });
       return;
     }
+
+    applyCorsHeaders(reply, request.headers.origin);
 
     const session = deps.sessions.createSession({
       ...payload,
@@ -62,6 +76,7 @@ export function createServer(deps: ServerDependencies): FastifyInstance {
         roles: authContext?.roles,
         scopes: authContext?.scopes,
       },
+      authToken: authContext?.token,
     });
 
     reply.code(201).send({
@@ -74,6 +89,8 @@ export function createServer(deps: ServerDependencies): FastifyInstance {
     Querystring: { token?: string };
   }>('/v1/agents/:agentId/sessions/:sessionId/stream', async (request, reply) => {
     const { agentId, sessionId } = request.params;
+    applyCorsHeaders(reply, request.headers.origin);
+
     let session;
     try {
       session = deps.sessions.getSession(sessionId);
@@ -128,4 +145,3 @@ export function createServer(deps: ServerDependencies): FastifyInstance {
 
   return app;
 }
-

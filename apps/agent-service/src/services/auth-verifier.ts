@@ -1,7 +1,16 @@
 import jwt from 'jsonwebtoken';
-import { JwtPayloadSchema } from '@crm-atlas/types';
+import { z } from 'zod';
 import type { Logger } from '../logger.js';
 import type { AgentSession } from '../types/session.js';
+const JwtPayloadSchema = z.object({
+  sub: z.string(),
+  tenant_id: z.string(),
+  unit_id: z.string(),
+  roles: z.array(z.string()),
+  scopes: z.array(z.string()),
+  iat: z.number().optional(),
+  exp: z.number().optional(),
+});
 
 export interface AuthContext {
   userId: string;
@@ -9,6 +18,7 @@ export interface AuthContext {
   unitId: string;
   roles: string[];
   scopes: string[];
+  token?: string;
 }
 
 interface VerifyInput {
@@ -17,7 +27,10 @@ interface VerifyInput {
 }
 
 export class AuthVerifier {
-  constructor(private readonly secret: string | undefined, private readonly logger: Logger) {}
+  constructor(
+    private readonly secret: string | undefined,
+    private readonly logger: Logger
+  ) {}
 
   isEnabled(): boolean {
     return !!this.secret;
@@ -42,6 +55,7 @@ export class AuthVerifier {
         unitId: payload.unit_id,
         roles: payload.roles,
         scopes: payload.scopes,
+        token,
       };
     } catch (error) {
       this.logger.warn(
@@ -79,4 +93,3 @@ export class AuthVerifier {
     return headerToken || input.tokenParam || null;
   }
 }
-

@@ -24,13 +24,22 @@ describe('AgentConfigLoader', () => {
     process.env.LANGSMITH_WEB_URL = originalLangsmithWeb;
   });
 
-  it('loads agent definitions for a tenant', async () => {
+  it('loads agent definitions for a tenant with tracing disabled (placeholders preserved)', async () => {
     const definition = await loader.getAgent('demo', 'crm_orchestrator');
     expect(definition).not.toBeNull();
     expect(definition?.llm.model).toBe('gpt-4o-mini');
     expect(definition?.llm.apiKey).toBe('test-openai-key');
-    expect(definition?.tracing?.variables.LANGCHAIN_API_KEY).toBe('test-langsmith-key');
+    expect(definition?.tracing?.enabled).toBe(false);
+    expect(definition?.tracing?.variables.LANGCHAIN_API_KEY).toBe('${env:LANGCHAIN_API_KEY}');
     expect(definition?.type).toBe('orchestrator');
+  });
+
+  it('resolves tracing env vars when tracing is enabled', async () => {
+    const definition = await loader.getAgent('demo2', 'crm_orchestrator');
+    expect(definition).not.toBeNull();
+    expect(definition?.tracing?.enabled).toBe(true);
+    expect(definition?.tracing?.variables.LANGCHAIN_API_KEY).toBe('test-langsmith-key');
+    expect(definition?.tracing?.variables.LANGSMITH_API_URL).toBe('http://langsmith.local');
   });
 
   it('returns null for unknown agent', async () => {
@@ -38,4 +47,3 @@ describe('AgentConfigLoader', () => {
     expect(definition).toBeNull();
   });
 });
-

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -22,8 +23,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { Save, Eye, EyeOff, Copy } from 'lucide-react';
 
-const DEFAULT_AGENT_SERVICE_URL =
-  import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:4100';
+const DEFAULT_AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:4100';
 
 const aiConfigSchema = z.object({
   provider: z.enum(['openai', 'azure']),
@@ -48,6 +48,10 @@ export default function AIEngineTab() {
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>(
     (config?.provider as AIProvider) || 'openai'
   );
+  const [healthStatus, setHealthStatus] = useState<'idle' | 'ok' | 'error'>('idle');
+  const [healthCheckedAt, setHealthCheckedAt] = useState<number | null>(null);
+  const [healthError, setHealthError] = useState<string | null>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
 
   const defaultFormValues: AIConfigForm = {
     provider: config?.provider || 'openai',
@@ -72,6 +76,7 @@ export default function AIEngineTab() {
   });
 
   const currentModel = watch('model');
+  const watchedAgentServiceUrl = watch('agentServiceUrl');
 
   const tenantSettingsQuery = useQuery({
     queryKey: ['tenant-playground-settings', tenantId],
@@ -92,8 +97,7 @@ export default function AIEngineTab() {
         model: tenantSettingsQuery.data.ai.model || 'gpt-4o-mini',
         temperature: tenantSettingsQuery.data.ai.temperature ?? 0.7,
         maxTokens: tenantSettingsQuery.data.ai.maxTokens ?? 2000,
-        agentServiceUrl:
-          tenantSettingsQuery.data.ai.agentServiceUrl || DEFAULT_AGENT_SERVICE_URL,
+        agentServiceUrl: tenantSettingsQuery.data.ai.agentServiceUrl || DEFAULT_AGENT_SERVICE_URL,
         agentId: tenantSettingsQuery.data.ai.agentId || 'crm_orchestrator',
       };
       reset(apiValues);
@@ -164,14 +168,44 @@ export default function AIEngineTab() {
     updateSettingsMutation.mutate(data);
   };
 
+  const getNormalizedAgentServiceUrl = () =>
+    (watchedAgentServiceUrl || DEFAULT_AGENT_SERVICE_URL).replace(/\/$/, '');
+
+  const handleHealthCheck = async () => {
+    setCheckingHealth(true);
+    const baseUrl = getNormalizedAgentServiceUrl();
+    try {
+      const response = await fetch(`${baseUrl}/healthz`, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} ${response.statusText}`);
+      }
+      setHealthStatus('ok');
+      setHealthError(null);
+    } catch (error) {
+      setHealthStatus('error');
+      setHealthError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setHealthCheckedAt(Date.now());
+      setCheckingHealth(false);
+    }
+  };
+
+  const healthLabel =
+    healthStatus === 'ok' ? 'Online' : healthStatus === 'error' ? 'Offline' : 'Non verificato';
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>AI Engine Configuration</CardTitle>
           <CardDescription>
-            Configure the LLM provider and settings for AI agents. The agent runs client-side and
-            uses MCP tools exposed by the API server.
+            Configura provider e parametri dell&lsquo;agente remoto. Ogni agente viene eseguito da
+            <code className="mx-1 rounded bg-gray-100 px-1">apps/agent-service</code>, sfrutta gli
+            strumenti MCP e legge le definizioni per-tenant da{' '}
+            <code className="mx-1 rounded bg-gray-100 px-1">config/&lt;tenant&gt;/agents.json</code>
+            . Il servizio espone SSE e, se configurato, link LangSmith per il tracing.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -296,8 +330,7 @@ export default function AIEngineTab() {
                 <p className="text-sm text-red-500">{errors.agentServiceUrl.message}</p>
               )}
               <p className="text-xs text-gray-500">
-                Base URL of the standalone agent-service (defaults to{' '}
-                {DEFAULT_AGENT_SERVICE_URL}).
+                Base URL of the standalone agent-service (defaults to {DEFAULT_AGENT_SERVICE_URL}).
               </p>
             </div>
 
@@ -354,6 +387,44 @@ export default function AIEngineTab() {
               <p className="text-xs text-gray-500">Caricamento configurazione in corso...</p>
             )}
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Agent Service Status</CardTitle>
+          <CardDescription>
+            Esegui un health-check su <code>{getNormalizedAgentServiceUrl()}</code> per confermare
+            la raggiungibilità dell&rsquo;endpoint SSE.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge
+              variant={
+                healthStatus === 'ok'
+                  ? 'default'
+                  : healthStatus === 'error'
+                    ? 'destructive'
+                    : 'secondary'
+              }
+            >
+              {healthLabel}
+            </Badge>
+            {healthCheckedAt && (
+              <span className="text-xs text-muted-foreground">
+                Ultimo controllo: {new Date(healthCheckedAt).toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+          {healthError && <p className="text-xs text-red-600">Dettaglio: {healthError}</p>}
+          <Button variant="outline" size="sm" onClick={handleHealthCheck} disabled={checkingHealth}>
+            {checkingHealth ? 'Verifica in corso...' : 'Verifica stato'}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Consiglio: esegui il check dopo ogni modifica a <code>agentServiceUrl</code> o alle
+            regole di rete per assicurarti che il Playground possa aprire lo stream SSE.
+          </p>
         </CardContent>
       </Card>
 

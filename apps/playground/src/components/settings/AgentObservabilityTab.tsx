@@ -11,7 +11,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { agentLogger } from '@/lib/ai/agent-logger';
-import { BarChart3, Download, Trash2, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import {
+  Activity,
+  BarChart3,
+  Download,
+  ExternalLink,
+  RefreshCw,
+  Trash2,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function AgentObservabilityTab() {
@@ -76,8 +85,13 @@ export default function AgentObservabilityTab() {
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Ogni esecuzione restituisce eventi SSE dal servizio agent-service e, se configurato,
+        condivide il link LangSmith per approfondire tracing e metriche.
+      </p>
+
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Executions</CardTitle>
@@ -129,6 +143,37 @@ export default function AgentObservabilityTab() {
                 ? `${((summary.totalErrors / summary.totalExecutions) * 100).toFixed(1)}% error rate`
                 : 'No executions'}
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              SSE Stream
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-muted-foreground space-y-1">
+            <div className="flex justify-between">
+              <span>Messages</span>
+              <span className="font-semibold text-gray-900">{summary.sseEvents.messages}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Plan steps</span>
+              <span className="font-semibold text-gray-900">{summary.sseEvents.planSteps}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Subagents</span>
+              <span className="font-semibold text-gray-900">{summary.sseEvents.subagentCalls}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Tool calls</span>
+              <span className="font-semibold text-gray-900">{summary.sseEvents.toolCalls}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Tool results</span>
+              <span className="font-semibold text-gray-900">{summary.sseEvents.toolResults}</span>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -193,10 +238,12 @@ export default function AgentObservabilityTab() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Execution Logs</CardTitle>
-              <CardDescription>
-                Detailed logs of agent executions with chain of thought and tool calls
-              </CardDescription>
+              <div>
+                <CardTitle>Execution Logs</CardTitle>
+                <CardDescription>
+                  Dettagli sulle esecuzioni, inclusi conteggi SSE, subagent e link LangSmith
+                </CardDescription>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={refreshData}>
@@ -272,6 +319,17 @@ export default function AgentObservabilityTab() {
                           <p className="text-sm font-medium text-gray-700">User Message:</p>
                           <p className="text-sm text-gray-600">{log.userMessage}</p>
                         </div>
+                        <div className="text-xs text-muted-foreground flex flex-wrap gap-3">
+                          <span>
+                            SSE · msg {log.sseEvents?.messages ?? 0} · plan{' '}
+                            {log.sseEvents?.planSteps ?? 0} · subagents{' '}
+                            {log.sseEvents?.subagentCalls ?? 0}
+                          </span>
+                          <span>
+                            tool calls {log.sseEvents?.toolCalls ?? 0} / results{' '}
+                            {log.sseEvents?.toolResults ?? 0}
+                          </span>
+                        </div>
                         <div className="flex gap-4 text-xs text-muted-foreground">
                           <span>
                             {log.toolCalls.length} tool call{log.toolCalls.length !== 1 ? 's' : ''}
@@ -318,6 +376,25 @@ export default function AgentObservabilityTab() {
                                 </div>
                               </div>
                             )}
+                            {log.subagentCalls?.length > 0 && (
+                              <div>
+                                <p className="text-sm font-medium mb-2">Subagent calls:</p>
+                                <div className="space-y-2 pl-4">
+                                  {log.subagentCalls.map((subagent, idx) => (
+                                    <div key={`${subagent.agent}-${subagent.timestamp}-${idx}`}>
+                                      <p className="text-xs font-mono text-gray-700">
+                                        {subagent.agent}
+                                      </p>
+                                      {subagent.input && (
+                                        <pre className="text-[11px] bg-gray-50 rounded p-2 overflow-auto">
+                                          {JSON.stringify(subagent.input, null, 2)}
+                                        </pre>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             {log.error && (
                               <div className="bg-red-50 border border-red-200 rounded p-2">
                                 <p className="text-sm font-medium text-red-800">Error:</p>
@@ -331,6 +408,16 @@ export default function AgentObservabilityTab() {
                                   {log.assistantResponse.substring(0, 500)}
                                   {log.assistantResponse.length > 500 ? '...' : ''}
                                 </p>
+                              </div>
+                            )}
+                            {log.tracingUrl && (
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium">LangSmith Trace:</p>
+                                <Button variant="link" size="sm" asChild>
+                                  <a href={log.tracingUrl} target="_blank" rel="noreferrer">
+                                    Apri run <ExternalLink className="h-3 w-3 ml-1" />
+                                  </a>
+                                </Button>
                               </div>
                             )}
                           </div>

@@ -39,6 +39,7 @@ export class AgentRuntime {
       tenantId: session.tenantId,
       unitId: session.unitId,
       agentId: session.agentId,
+      authToken: session.authToken,
     });
 
     const tracing = await this.tracingFactory.create({
@@ -82,7 +83,7 @@ export class AgentRuntime {
     let usage: Record<string, unknown> | undefined;
 
     try {
-      const stream = await agent.streamEvents(
+      const stream = (await agent.streamEvents(
         {
           messages: this.buildMessages(session, definition),
         },
@@ -93,7 +94,7 @@ export class AgentRuntime {
             thread_id: session.id,
           },
         }
-      );
+      )) as AsyncIterable<LangChainStreamEvent>;
 
       for await (const event of stream) {
         this.forwardEvent(event, emit);
@@ -214,9 +215,9 @@ export class AgentRuntime {
     return '';
   }
 
-  private extractFinalMessage(event: LangChainStreamEvent):
-    | { content?: string; usage?: Record<string, unknown> }
-    | null {
+  private extractFinalMessage(
+    event: LangChainStreamEvent
+  ): { content?: string; usage?: Record<string, unknown> } | null {
     if (event.event !== 'on_chain_end' && event.event !== 'on_chat_model_end') {
       return null;
     }
@@ -228,11 +229,12 @@ export class AgentRuntime {
 
     let content: string | undefined;
     if (Array.isArray(output.messages)) {
-      const assistantMessages = output.messages.filter(
-        (msg: { role?: string }) => msg.role === 'assistant'
-      );
-      const last = assistantMessages.at(-1) ?? output.messages.at(-1);
-      if (last?.content) {
+      const assistantMessages = (
+        output.messages as Array<{ role?: string; content?: unknown }>
+      ).filter((msg: { role?: string }) => msg.role === 'assistant');
+      const last =
+        assistantMessages.at(-1) ?? (output.messages as Array<{ content?: unknown }>).at(-1);
+      if (last && 'content' in last && last.content) {
         content = this.extractChunkContent(last.content);
       }
     } else if (output.content) {
@@ -293,7 +295,9 @@ export class AgentRuntime {
     }
     if (typeof input === 'object') {
       if ('todos' in input && Array.isArray((input as { todos: unknown }).todos)) {
-        return (input as { todos: unknown[] }).todos.map((todo, idx) => `${idx + 1}. ${this.extractPlanDetail(todo)}`).join('\n');
+        return (input as { todos: unknown[] }).todos
+          .map((todo, idx) => `${idx + 1}. ${this.extractPlanDetail(todo)}`)
+          .join('\n');
       }
       try {
         return JSON.stringify(input, null, 2);
@@ -315,4 +319,3 @@ export class AgentRuntime {
     return typeof candidate === 'string' ? candidate : 'subagent';
   }
 }
-

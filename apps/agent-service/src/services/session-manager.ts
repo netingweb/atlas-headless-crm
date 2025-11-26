@@ -18,6 +18,7 @@ export class SessionManager {
       status: 'pending',
       createdAt: now,
       updatedAt: now,
+      authToken: payload.authToken,
     };
     this.sessions.set(id, session);
     return session;
@@ -54,4 +55,3 @@ export class SessionManager {
     return updated;
   }
 }
-

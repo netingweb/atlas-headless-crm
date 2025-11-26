@@ -14,6 +14,7 @@ export interface AgentSession {
   createdAt: number;
   updatedAt: number;
   lastError?: string;
+  authToken?: string;
 }
 
 export interface SessionRequestPayload {
@@ -23,5 +24,5 @@ export interface SessionRequestPayload {
   messages: ChatMessage[];
   viewContext?: ViewContext;
   metadata?: ConversationMetadata;
+  authToken?: string;
 }
-

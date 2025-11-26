@@ -50,5 +50,5 @@ ENV NODE_PATH=/app/node_modules:/app/apps/agent-service/node_modules
 
 EXPOSE 4100
 
-CMD ["node", "apps/agent-service/dist/apps/agent-service/src/main.js"]
+CMD ["node", "apps/agent-service/dist/main.js"]
 

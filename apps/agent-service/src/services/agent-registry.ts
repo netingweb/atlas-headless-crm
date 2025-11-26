@@ -9,6 +9,7 @@ interface ResolveParams {
   tenantId: string;
   unitId: string;
   agentId: string;
+  authToken?: string;
 }
 
 type DeepAgentInstance = ReturnType<typeof createDeepAgent>;
@@ -31,13 +32,18 @@ export class AgentRegistry {
       throw new Error(`Agent "${params.agentId}" not configured for tenant "${params.tenantId}"`);
     }
 
-    const mcpTools = await this.mcpClient.listTools(params.tenantId, params.unitId);
+    const mcpTools = await this.mcpClient.listTools(
+      params.tenantId,
+      params.unitId,
+      params.authToken
+    );
     const tools = createLangChainTools({
       tools: mcpTools,
       filter: definition.tools,
       tenantId: params.tenantId,
       unitId: params.unitId,
       mcpClient: this.mcpClient,
+      authToken: params.authToken,
     });
 
     const subagents = await this.buildSubAgents({
@@ -47,6 +53,7 @@ export class AgentRegistry {
       requested: definition.subagents || [],
       mcpTools,
       visited: new Set([params.agentId]),
+      authToken: params.authToken,
     });
 
     const agent = createDeepAgent({
@@ -62,7 +69,7 @@ export class AgentRegistry {
 
   private createLLM(definition: AgentDefinition): ChatOpenAI {
     if (definition.llm.provider !== 'openai') {
-      throw new Error(`Unsupported LLM provider: ${definition.llm.provider}`);
+      throw new Error(`Unsupported LLM provider: ${String(definition.llm.provider)}`);
     }
 
     const apiKey = definition.llm.apiKey || process.env.OPENAI_API_KEY;
@@ -95,8 +102,9 @@ export class AgentRegistry {
     }>;
     mcpTools: Awaited<ReturnType<MCPClient['listTools']>>;
     visited: Set<string>;
+    authToken?: string;
   }): Promise<SubAgent[]> {
-    const { tenantId, unitId, requested, mcpTools, visited } = params;
+    const { tenantId, unitId, requested, mcpTools, visited, authToken } = params;
     if (!requested || requested.length === 0) {
       return [];
     }
@@ -129,6 +137,7 @@ export class AgentRegistry {
         tenantId,
         unitId,
         mcpClient: this.mcpClient,
+        authToken,
       });
 
       subagents.push({
@@ -157,4 +166,3 @@ export class AgentRegistry {
     };
   }
 }
-

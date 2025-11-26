@@ -11,10 +11,7 @@ import {
   type AgentServiceEvent,
   type AgentServiceMessage,
 } from '@/lib/ai/agent';
-import {
-  generateActionableQuestions,
-  type ToolExecution,
-} from '@/lib/ai/actionable-questions';
+import { generateActionableQuestions, type ToolExecution } from '@/lib/ai/actionable-questions';
 import { ActionableQuestions, type ActionableQuestion } from '@/components/ai/ActionableQuestions';
 import {
   ConfirmationDialog,
@@ -27,7 +24,13 @@ import { useNavigate } from 'react-router-dom';
 import { MemoryManager } from '@/lib/ai/memory';
 import ReactMarkdown from 'react-markdown';
 import ChainOfThought from './ChainOfThought';
-import { agentLogger, type ToolCallLog, type ThinkingLog } from '@/lib/ai/agent-logger';
+import {
+  agentLogger,
+  createEmptySSECounters,
+  type SubagentCallLog,
+  type ToolCallLog,
+  type ThinkingLog,
+} from '@/lib/ai/agent-logger';
 
 export interface ChatInterfaceHandle {
   copyChat: () => Promise<void>;
@@ -195,8 +198,11 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
     const executionStartTime = Date.now();
     let assistantResponse = '';
     const thinkingLogs: ThinkingLog[] = [];
+    const subagentLogs: SubagentCallLog[] = [];
     const toolCallLogs: Map<string, { startTime: number; toolCall: ToolCallLog }> = new Map();
     const toolExecutions: ToolExecution[] = [];
+    const sseCounters = createEmptySSECounters();
+    let latestTracingUrl: string | undefined;
 
     try {
       // Add user message to memory
@@ -207,8 +213,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
       // Prepare chat history from memory (or fallback to current messages)
       const fallbackHistory = [...messages, userMessage].reduce<AgentServiceMessage[]>(
         (history, msg) => {
-          const role: AgentServiceMessage['role'] =
-            msg.role === 'assistant' ? 'assistant' : 'user';
+          const role: AgentServiceMessage['role'] = msg.role === 'assistant' ? 'assistant' : 'user';
           history.push({
             role,
             content: msg.content,
@@ -218,20 +223,14 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
         []
       );
       const savedHistory =
-        memoryManagerRef.current
-          ?.getChatHistory()
-          ?.map((msg) => {
-            const normalizedRole: AgentServiceMessage['role'] =
-              msg.role === 'assistant'
-                ? 'assistant'
-                : msg.role === 'system'
-                  ? 'system'
-                  : 'user';
-            return {
-              role: normalizedRole,
-              content: msg.content,
-            };
-          }) ?? null;
+        memoryManagerRef.current?.getChatHistory()?.map((msg) => {
+          const normalizedRole: AgentServiceMessage['role'] =
+            msg.role === 'assistant' ? 'assistant' : msg.role === 'system' ? 'system' : 'user';
+          return {
+            role: normalizedRole,
+            content: msg.content,
+          };
+        }) ?? null;
       const chatHistory = savedHistory ?? fallbackHistory;
 
       if (!tenantId || !unitId || !config?.agentId) {
@@ -289,6 +288,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
           onEvent: (event: AgentServiceEvent) => {
             switch (event.type) {
               case 'message': {
+                sseCounters.messages += 1;
                 const data = event.data as { role?: 'assistant' | 'tool'; content?: unknown };
                 const chunk =
                   typeof data?.content === 'string' ? data.content : serialize(data?.content);
@@ -301,6 +301,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                 break;
               }
               case 'plan_step': {
+                sseCounters.planSteps += 1;
                 const data = event.data as { detail?: string; status?: 'started' | 'completed' };
                 if (data?.detail) {
                   const detail = (data.status === 'completed' ? '✅' : '🧭') + ' ' + data.detail;
@@ -309,13 +310,20 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                 break;
               }
               case 'subagent_call': {
-                const data = event.data as { agent?: string };
+                sseCounters.subagentCalls += 1;
+                const data = event.data as { agent?: string; input?: unknown };
                 if (data?.agent) {
                   pushThinking(`🤝 Subagent: ${data.agent}`);
+                  subagentLogs.push({
+                    agent: data.agent,
+                    input: data.input,
+                    timestamp: Date.now(),
+                  });
                 }
                 break;
               }
               case 'tool_call': {
+                sseCounters.toolCalls += 1;
                 const data = event.data as {
                   toolName?: string;
                   input?: Record<string, unknown>;
@@ -341,7 +349,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                   appendToAssistantMessage((msg) => {
                     const currentCalls = msg.toolCalls ? [...msg.toolCalls] : [];
                     currentCalls.push({
-                        name: toolName,
+                      name: toolName,
                       args,
                     });
                     msg.toolCalls = currentCalls;
@@ -350,6 +358,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                 break;
               }
               case 'tool_result': {
+                sseCounters.toolResults += 1;
                 const data = event.data as { toolName?: string; output?: unknown };
                 if (data && data.toolName) {
                   const toolName = data.toolName;
@@ -389,6 +398,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
               case 'tracing': {
                 const data = event.data as { runUrl?: string };
                 if (data?.runUrl) {
+                  latestTracingUrl = data.runUrl;
                   appendToAssistantMessage((msg) => {
                     msg.tracingUrl = data.runUrl;
                   });
@@ -442,6 +452,9 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
         toolCalls: Array.from(toolCallLogs.values()).map((entry) => entry.toolCall),
         timestamp: executionStartTime,
         durationMs: executionDurationMs,
+        tracingUrl: latestTracingUrl,
+        sseEvents: { ...sseCounters },
+        subagentCalls: [...subagentLogs],
       });
     } catch (err) {
       console.error('Failed to run agent:', err);
@@ -459,6 +472,9 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
         timestamp: executionStartTime,
         durationMs: executionDurationMs,
         error: errorMessage,
+        tracingUrl: latestTracingUrl,
+        sseEvents: { ...sseCounters },
+        subagentCalls: [...subagentLogs],
       });
 
       setError(errorMessage);

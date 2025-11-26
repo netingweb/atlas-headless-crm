@@ -55,12 +55,15 @@ const AgentsFileSchema = z.object({
 
 const ENV_PATTERN = /^\$\{env:([A-Z0-9_]+)\}$/i;
 
-function resolveEnv(value?: string): string | undefined {
+function resolveEnv(value?: string, options?: { required?: boolean }): string | undefined {
   if (!value) return value;
   const match = value.match(ENV_PATTERN);
   if (!match) return value;
   const envValue = process.env[match[1]];
   if (!envValue) {
+    if (options?.required === false) {
+      return undefined;
+    }
     throw new Error(`Missing environment variable ${match[1]} referenced in agents.json`);
   }
   return envValue;
@@ -116,6 +119,9 @@ export class AgentConfigLoader {
       return null;
     }
 
+    const tracingConfig = agent.tracing;
+    const tracingEnabled = tracingConfig ? (tracingConfig.enabled ?? true) : undefined;
+
     return {
       id: agentId,
       type: agent.type,
@@ -135,18 +141,21 @@ export class AgentConfigLoader {
           }
         : undefined,
       subagents: agent.subagents,
-      tracing: agent.tracing
+      tracing: tracingConfig
         ? {
             provider: 'langsmith',
-            enabled: agent.tracing.enabled ?? true,
-            variables: Object.fromEntries(
-              Object.entries(agent.tracing.variables || {}).map(([key, val]) => [
-                key,
-                resolveEnv(val) ?? val,
-              ])
-            ),
-            defaultTags: agent.tracing.defaultTags || [],
-            metadata: agent.tracing.metadata,
+            enabled: tracingConfig.enabled ?? true,
+            variables:
+              tracingEnabled === false
+                ? tracingConfig.variables || {}
+                : Object.fromEntries(
+                    Object.entries(tracingConfig.variables || {}).map(([key, val]) => [
+                      key,
+                      resolveEnv(val, { required: true }) ?? val,
+                    ])
+                  ),
+            defaultTags: tracingConfig.defaultTags || [],
+            metadata: tracingConfig.metadata,
           }
         : undefined,
     };
@@ -174,4 +183,3 @@ export class AgentConfigLoader {
     return parsed;
   }
 }
-
