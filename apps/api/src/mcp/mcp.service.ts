@@ -2290,8 +2290,9 @@ OPTIONAL PARAMETERS:
             return null;
           }
 
+          const baseDoc = doc as unknown as Record<string, unknown>;
           const normalizedDoc: Record<string, unknown> = {
-            ...(doc as Record<string, unknown>),
+            ...baseDoc,
             id: (doc as { _id?: unknown })._id,
           };
 
@@ -2380,8 +2381,9 @@ OPTIONAL PARAMETERS:
 
       const normalizedDocuments = documents.map((doc) => {
         const typed = doc as { _id?: unknown };
+        const baseDoc = doc as unknown as Record<string, unknown>;
         const normalized: Record<string, unknown> = {
-          ...(doc as Record<string, unknown>),
+          ...baseDoc,
           id: typed._id,
         };
         return normalized;
@@ -2476,8 +2478,9 @@ OPTIONAL PARAMETERS:
             return null;
           }
 
+          const baseDoc = doc as unknown as Record<string, unknown>;
           const normalizedDoc: Record<string, unknown> = {
-            ...(doc as Record<string, unknown>),
+            ...baseDoc,
             id: (doc as { _id?: unknown })._id,
           };
 
