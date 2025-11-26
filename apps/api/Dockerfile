@@ -67,6 +67,9 @@ COPY --from=base /app/packages ./packages
 COPY --from=base /app/apps/api/dist ./apps/api/dist
 COPY --from=base /app/scripts ./scripts
 
+# Ensure @nestjs/swagger is present at runtime (required by compiled main.js)
+RUN npm install @nestjs/swagger@7.1.17
+
 EXPOSE 3000
 
 # Set NODE_PATH to help Node.js resolve pnpm modules correctly
