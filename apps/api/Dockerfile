@@ -61,8 +61,10 @@ RUN apk add --no-cache python3 make g++
 RUN npm install -g pnpm@8.15.0 tsx@4.7.0
 
 # Reuse node_modules and built artifacts from the build stage so that
-# workspace packages like @crm-atlas/auth are fully available (for runtime and seed scripts)
+# workspace packages like @crm-atlas/auth and @nestjs/swagger are fully available
+# (both at workspace root and at app-local level) for runtime and seed scripts
 COPY --from=base /app/node_modules ./node_modules
+COPY --from=base /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=base /app/packages ./packages
 COPY --from=base /app/apps/api/dist ./apps/api/dist
 COPY --from=base /app/scripts ./scripts
