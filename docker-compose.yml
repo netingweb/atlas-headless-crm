@@ -89,6 +89,13 @@ services:
     # Port exposed via environment variable for Dokploy
     ports:
       - '${API_PORT:-3000}:3000'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.crm-atlas-api.rule=Host(`api.atlas-crm-headless.neting.ai`)"
+      - "traefik.http.routers.crm-atlas-api.entrypoints=web,websecure"
+      - "traefik.http.routers.crm-atlas-api.tls=true"
+      - "traefik.http.routers.crm-atlas-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.crm-atlas-api.loadbalancer.server.port=3000"
     environment:
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/crm_atlas}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-crm_atlas}
@@ -134,6 +141,13 @@ services:
     depends_on:
       api:
         condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.crm-atlas-agent.rule=Host(`agent.atlas-crm-headless.neting.ai`)"
+      - "traefik.http.routers.crm-atlas-agent.entrypoints=web,websecure"
+      - "traefik.http.routers.crm-atlas-agent.tls=true"
+      - "traefik.http.routers.crm-atlas-agent.tls.certresolver=letsencrypt"
+      - "traefik.http.services.crm-atlas-agent.loadbalancer.server.port=4100"
     environment:
       AGENT_SERVICE_PORT: ${AGENT_SERVICE_PORT:-4100}
       AGENT_SERVICE_HOST: 0.0.0.0
@@ -148,6 +162,11 @@ services:
     ports:
       - '${AGENT_SERVICE_PORT:-4100}:4100'
     restart: unless-stopped
+
+networks:
+  default:
+    name: traefik_default
+    external: true
 
 volumes:
   mongo_data:
