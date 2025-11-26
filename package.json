@@ -22,6 +22,7 @@
     "dev:backend": "lsof -ti:3000 | xargs kill -9 2>/dev/null || true && pnpm -w -r --filter @crm-atlas/utils --filter @crm-atlas/embeddings --filter @crm-atlas/search build && pnpm --filter @crm-atlas/api --filter @crm-atlas/indexer --filter @crm-atlas/workflow --filter @crm-atlas/mcp-server --parallel dev",
     "dev:agent-service": "pnpm --filter @crm-atlas/agent-service dev",
     "dev:playground": "pnpm --filter @crm-atlas/playground dev",
+    "dev:all": "./scripts/start-all.sh",
     "start": "pnpm --filter @crm-atlas/api start",
     "build": "pnpm -r --filter './apps/*' --filter './packages/*' build",
     "lint": "pnpm -r --filter './apps/*' --filter './packages/*' lint",

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
 import { entitiesApi, type Entity } from '@/lib/api/entities';
 import { configApi, type EntityDefinition } from '@/lib/api/config';
@@ -63,6 +63,11 @@ const DOCUMENT_READONLY_FIELDS = [
   'extracted_content',
   'metadata',
 ];
+
+function getEntityDisplayNameFromDoc(entity: Entity): string {
+  const id = (entity._id || (entity as any).id || '') as string | number;
+  return (entity.name || entity.title || entity.email || String(id)) as string;
+}
 
 // Component to display documents for an entity
 function EntityDocumentsList({ entityType, entityId }: { entityType: string; entityId: string }) {
@@ -305,12 +310,16 @@ export default function EntityDetail() {
       }
       setFormData(defaults);
     } else if (entity) {
-      // Normalize multiple fields: if a field is multiple but value is not an array, convert it
+      // Normalize entity data for editing
       const normalizedData: Record<string, unknown> = { ...entity };
+
       if (entityDef && 'fields' in entityDef && Array.isArray(entityDef.fields)) {
-        entityDef.fields.forEach((field: { name: string; multiple?: boolean }) => {
-          if (field.multiple === true && normalizedData[field.name] !== undefined) {
-            const value = normalizedData[field.name];
+        entityDef.fields.forEach((field: FieldDefinition) => {
+          const currentValue = normalizedData[field.name];
+
+          // Normalize multiple fields: if a field is multiple but value is not an array, convert it
+          if (field.multiple === true && currentValue !== undefined) {
+            const value = currentValue;
             // If value is not an array, convert it to array (or empty array if null/undefined)
             if (!Array.isArray(value)) {
               normalizedData[field.name] = value != null ? [value] : [];
@@ -322,8 +331,14 @@ export default function EntityDetail() {
               );
             }
           }
+
+          // Normalize reference fields: always store IDs as strings for Select components
+          if (field.type === 'reference' && currentValue != null) {
+            normalizedData[field.name] = String(currentValue);
+          }
         });
       }
+
       setFormData(normalizedData);
     }
   }, [entity, isNew, entityDef]);
@@ -1287,7 +1302,127 @@ export default function EntityDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Linked entities panel for any entity that has incoming references */}
+      {!isNew && entityType && id && (
+        <div className="mt-6">
+          <LinkedEntitiesPanel
+            entityType={entityType}
+            entityId={id}
+            tenantId={tenantId || ''}
+            unitId={unitId || ''}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+function LinkedEntitiesPanel(props: {
+  entityType: string;
+  entityId: string;
+  tenantId: string;
+  unitId: string;
+}) {
+  const { entityType, entityId, tenantId, unitId } = props;
+  const navigate = useNavigate();
+
+  // Load all entity definitions for the tenant so we can discover references dynamically
+  const { data: allEntities } = useQuery({
+    queryKey: ['all-entity-definitions', tenantId],
+    queryFn: () => configApi.getEntities(tenantId),
+    enabled: !!tenantId,
+  });
+
+  const config =
+    React.useMemo(
+      () =>
+        (allEntities || [])
+          .filter((def) => def.name !== entityType && Array.isArray((def as any).fields))
+          .map((def) => {
+            const fields = (def as any).fields as FieldDefinition[];
+            const hasRef = fields.some(
+              (f) => f.type === 'reference' && f.reference_entity === entityType
+            );
+            if (!hasRef) {
+              return null;
+            }
+            return {
+              type: def.name,
+              label: getEntityLabel(def) || humanizeKey(def.name),
+            };
+          })
+          .filter((x): x is { type: string; label: string } => x !== null),
+      [allEntities, entityType]
+    ) || [];
+
+  const queries = useQueries({
+    queries: config.map((cfg) => ({
+      queryKey: ['entity-related', tenantId, unitId, entityType, entityId, cfg.type],
+      queryFn: async () => {
+        try {
+          return await entitiesApi.getRelated(tenantId, unitId, entityType, entityId, cfg.type);
+        } catch (error) {
+          // If relation is not defined or API returns 404, treat as no related entities
+          return [] as Entity[];
+        }
+      },
+      enabled: !!tenantId && !!unitId && !!entityType && !!entityId,
+    })),
+  });
+
+  const hasAnyData = queries.some((q) => Array.isArray(q.data) && q.data.length > 0);
+
+  if (config.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Entità collegate</CardTitle>
+        <CardDescription>
+          Task, opportunità e altre entità collegate a questa {entityType}.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {!hasAnyData && <p className="text-sm text-gray-500">Nessuna entità collegata trovata.</p>}
+
+        {config.map((cfg, index) => {
+          const query = queries[index];
+          const items = (query.data as Entity[] | undefined) || [];
+
+          if (!items.length) {
+            return null;
+          }
+
+          return (
+            <div key={cfg.type} className="space-y-2">
+              <h4 className="text-sm font-semibold">{cfg.label}</h4>
+              <ul className="space-y-1 text-sm">
+                {items.map((item) => (
+                  <li
+                    key={item._id}
+                    className="flex items-center justify-between gap-2 border-b border-gray-100 pb-1 last:border-b-0"
+                  >
+                    <button
+                      type="button"
+                      className="text-blue-600 hover:text-blue-800 underline text-left"
+                      onClick={() => navigate(`/entities/${cfg.type}/${item._id}`)}
+                    >
+                      {getEntityDisplayNameFromDoc(item)}
+                    </button>
+                    {item.status && (
+                      <span className="text-xs text-gray-500">{String(item.status)}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1344,12 +1479,9 @@ function ReferenceField({
   }
 
   const normalizedOptions =
-    options?.map((option) => {
-      const optionId = (option._id || option.id || '') as string | number;
-      const displayName = (option.name ||
-        option.title ||
-        option.email ||
-        String(optionId)) as string;
+    options?.map((option: Entity) => {
+      const optionId = (option._id || (option as any).id || '') as string | number;
+      const displayName = getEntityDisplayNameFromDoc(option);
       return {
         value: String(optionId),
         label: displayName,

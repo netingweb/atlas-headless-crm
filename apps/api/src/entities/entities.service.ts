@@ -7,15 +7,7 @@ import { MongoConfigLoader } from '@crm-atlas/config';
 import { getDb } from '@crm-atlas/db';
 import type { EntityDefinition, FieldDefinition } from '@crm-atlas/types';
 import { RelationsService } from './relations.service';
-import {
-  upsertQdrantPoint,
-  ensureQdrantCollection,
-  upsertDocument,
-  deleteDocument,
-  deleteQdrantPoint,
-} from '@crm-atlas/search';
-import { createEmbeddingsProvider, getProviderConfig } from '@crm-atlas/embeddings';
-import { getEmbeddableFields, concatFields } from '@crm-atlas/utils';
+import { indexEntityInSearch, removeEntityFromSearch } from '@crm-atlas/search';
 import { EntityEvents } from './entities.events';
 
 @Injectable()
@@ -382,57 +374,8 @@ export class EntitiesService {
     doc: Record<string, unknown>
   ): Promise<void> {
     try {
-      // Index in Typesense for full-text search
-      const { ensureCollection } = await import('@crm-atlas/search');
-      await ensureCollection(ctx, entity, entityDef);
-
-      // Prepare document for Typesense (ensure id is string and remove MongoDB _id)
-      const typesenseDoc: { id: string; [key: string]: unknown } = {
-        id: String(doc._id),
-        ...doc,
-        // Ensure tenant/unit are always present for Typesense faceting/filters
-        tenant_id: ctx.tenant_id,
-      };
-      // Only add unit_id for local entities
-      if (entityDef.scope !== 'tenant') {
-        typesenseDoc.unit_id = ctx.unit_id;
-      }
-      // Remove _id to avoid duplication (we use id instead)
-      delete typesenseDoc._id;
-
-      await upsertDocument(ctx, entity, typesenseDoc, entityDef);
-
-      if (process.env.NODE_ENV === 'development') {
-        this.logger.debug(`Indexed ${entity}/${String(doc._id)} in Typesense`);
-      }
-
-      // Index in Qdrant for semantic search (if has embeddable fields)
-      const embeddableFields = getEmbeddableFields(entityDef);
-      if (embeddableFields.length > 0) {
-        const tenantConfig = await this.configLoader.getTenant(ctx.tenant_id);
-        const globalConfig = getProviderConfig();
-        const provider = createEmbeddingsProvider(globalConfig, tenantConfig?.embeddingsProvider);
-
-        const textToEmbed = concatFields(doc, embeddableFields);
-        if (textToEmbed.trim()) {
-          const [vector] = await provider.embedTexts([textToEmbed]);
-          await ensureQdrantCollection(ctx.tenant_id, entity, vector.length);
-
-          const qdrantPayload: Record<string, unknown> = {
-            tenant_id: ctx.tenant_id,
-            ...doc,
-          };
-          // Only add unit_id for local entities
-          if (entityDef.scope !== 'tenant') {
-            qdrantPayload.unit_id = ctx.unit_id;
-          }
-          await upsertQdrantPoint(ctx.tenant_id, entity, {
-            id: String(doc._id),
-            vector,
-            payload: qdrantPayload,
-          });
-        }
-      }
+      const tenantConfig = await this.configLoader.getTenant(ctx.tenant_id);
+      await indexEntityInSearch(ctx, entity, entityDef, doc, tenantConfig || undefined);
     } catch (error) {
       // Log error but don't fail the request
       this.logger.error(
@@ -459,14 +402,7 @@ export class EntitiesService {
     entityDef: EntityDefinition
   ): Promise<void> {
     try {
-      // Remove from Typesense
-      await deleteDocument(ctx, entity, id, entityDef);
-
-      // Remove from Qdrant
-      const embeddableFields = getEmbeddableFields(entityDef);
-      if (embeddableFields.length > 0) {
-        await deleteQdrantPoint(ctx.tenant_id, entity, id);
-      }
+      await removeEntityFromSearch(ctx, entity, id, entityDef);
     } catch (error) {
       // Log error but don't fail the request
       console.error(`Failed to remove entity ${entity}/${id} from indexes:`, error);

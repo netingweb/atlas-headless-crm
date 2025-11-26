@@ -4,24 +4,13 @@ import { SessionManager } from './session-manager';
 import type { AgentRegistry } from './agent-registry';
 import type { TracingFactory, TracingContext } from './tracing-factory';
 import { AgentConfigLoader } from '../config/agent-config-loader';
-import type { Logger } from '../logger';
+import { createLogger, type Logger } from '../logger';
 import type { AgentStreamEvent } from '../streaming/events';
 
 const CONFIG_ROOT = path.resolve(__dirname, '../../../..', 'config');
 const loader = new AgentConfigLoader(CONFIG_ROOT);
 
-const noopLogger: Logger = {
-  level: 'silent',
-  child: () => noopLogger,
-  fatal: () => noopLogger,
-  error: () => noopLogger,
-  warn: () => noopLogger,
-  info: () => noopLogger,
-  debug: () => noopLogger,
-  trace: () => noopLogger,
-  silent: () => noopLogger,
-  bindings: () => ({}),
-};
+const noopLogger: Logger = createLogger('silent');
 
 const ORIGINAL_ENV = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -218,6 +207,8 @@ function createStreamingAgent(
         data: Record<string, unknown>;
       }> {
         for (const event of events) {
+          // Ensure this async generator contains an await to satisfy linting rules
+          await Promise.resolve();
           yield event;
         }
       })()
@@ -232,6 +223,8 @@ function createFailingAgent(error: Error): {
     [Symbol.asyncIterator]: () => {
       return {
         async next(): Promise<IteratorResult<never>> {
+          // Ensure this async method contains an await to satisfy linting rules
+          await Promise.resolve();
           throw error;
         },
       };

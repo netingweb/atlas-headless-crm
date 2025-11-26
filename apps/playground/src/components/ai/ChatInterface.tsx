@@ -246,6 +246,8 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
         metadata: {
           userId: user?._id,
           locale: navigator.language,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          localTime: new Date().toISOString(),
         },
         baseUrl: config.agentServiceUrl,
         authToken: token,
@@ -613,15 +615,34 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                   <ReactMarkdown
                     components={{
                       a: ({ href, children, ...props }) => {
-                        // Handle internal links (starting with /entities/)
-                        if (href && href.startsWith('/entities/')) {
+                        // Normalizza eventuali URL assoluti (es. https://demo/entities/...)
+                        // e tratta come link interni se il path inizia con /entities/
+                        let internalPath: string | null = null;
+
+                        if (href) {
+                          try {
+                            // Se è già un path relativo, usalo direttamente
+                            if (href.startsWith('/')) {
+                              internalPath = href;
+                            } else {
+                              const url = new URL(href, window.location.origin);
+                              if (url.pathname.startsWith('/entities/')) {
+                                internalPath = url.pathname;
+                              }
+                            }
+                          } catch {
+                            // href non è un URL valido, gestito come link esterno più sotto
+                          }
+                        }
+
+                        if (internalPath) {
                           return (
                             <a
                               {...props}
-                              href={href}
+                              href={internalPath}
                               onClick={(e) => {
                                 e.preventDefault();
-                                navigate(href);
+                                navigate(internalPath!);
                               }}
                               className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
                             >
@@ -629,7 +650,8 @@ const ChatInterface = forwardRef<ChatInterfaceHandle>((_, ref) => {
                             </a>
                           );
                         }
-                        // External links open in new tab
+
+                        // Link esterni: apri in una nuova scheda
                         return (
                           <a
                             {...props}

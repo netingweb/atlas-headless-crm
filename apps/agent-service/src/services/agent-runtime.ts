@@ -267,6 +267,32 @@ export class AgentRuntime {
 
   private buildContextPrompt(session: AgentSession): string | null {
     const parts: string[] = [];
+
+    // Provide the current server date so the agent can reason about relative dates.
+    const now = new Date();
+    const isoDate = now.toISOString().slice(0, 10);
+    parts.push(
+      `Current server date: ${isoDate}. Use this as the reference date when interpreting relative expressions like "oggi" (today) and "domani" (tomorrow).`
+    );
+
+    // If available, include user-local time information from session metadata.
+    const metadata = (session.metadata ?? {}) as Record<string, unknown>;
+    const locale = typeof metadata.locale === 'string' ? metadata.locale : undefined;
+    const timezone = typeof metadata.timezone === 'string' ? metadata.timezone : undefined;
+    const localTime = typeof metadata.localTime === 'string' ? metadata.localTime : undefined;
+
+    if (locale || timezone || localTime) {
+      const metaParts: string[] = [];
+      if (locale) metaParts.push(`locale=${locale}`);
+      if (timezone) metaParts.push(`timezone=${timezone}`);
+      if (localTime) metaParts.push(`localTime=${localTime}`);
+      parts.push(
+        `User time context: ${metaParts.join(
+          ', '
+        )}. When the user uses relative time expressions like "domani mattina" or "stasera", interpret them in the user's local timezone if provided; otherwise, fall back to the current server date.`
+      );
+    }
+
     if (session.viewContext?.route) {
       parts.push(`Current route: ${session.viewContext.route}`);
     }

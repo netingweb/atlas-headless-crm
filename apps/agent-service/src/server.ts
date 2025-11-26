@@ -116,7 +116,7 @@ export function createServer(deps: ServerDependencies): FastifyInstance {
       return;
     }
 
-    const stream = new SSEStream(reply);
+    const stream = new SSEStream(reply, request.headers.origin);
     stream.open();
 
     const abortController = new AbortController();

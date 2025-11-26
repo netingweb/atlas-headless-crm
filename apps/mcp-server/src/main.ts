@@ -10,7 +10,12 @@ import {
 import { connectMongo, getDb } from '@crm-atlas/db';
 import { MongoConfigLoader } from '@crm-atlas/config';
 import { EntityRepository } from '@crm-atlas/db';
-import { search, searchQdrant } from '@crm-atlas/search';
+import {
+  search,
+  searchQdrant,
+  indexEntityInSearch,
+  removeEntityFromSearch,
+} from '@crm-atlas/search';
 import { createEmbeddingsProvider, getProviderConfig } from '@crm-atlas/embeddings';
 import { getEmbeddableFields } from '@crm-atlas/utils';
 import type { TenantContext } from '@crm-atlas/core';
@@ -147,7 +152,8 @@ OPTIONAL PARAMETERS:
               type: {
                 type: 'string',
                 enum: ['text', 'semantic', 'hybrid'],
-                description: 'Search type: text (fast), semantic (meaning-based), hybrid (both). Default: hybrid',
+                description:
+                  'Search type: text (fast), semantic (meaning-based), hybrid (both). Default: hybrid',
                 default: 'hybrid',
               },
               limit: {
@@ -582,6 +588,30 @@ OPTIONAL PARAMETERS:
 
       if (action === 'create') {
         const created = await this.repository.create(ctx, entity, args);
+
+        // Immediately index the newly created entity in Typesense/Qdrant
+        try {
+          const entityDef = await this.configLoader.getEntity(ctx, entity);
+          const tenantConfig = await this.configLoader.getTenant(tenantId);
+          if (entityDef) {
+            await indexEntityInSearch(
+              ctx,
+              entity,
+              entityDef,
+              created as Record<string, unknown>,
+              tenantConfig || undefined
+            );
+          }
+        } catch (error) {
+          // Do not fail the MCP tool call if indexing fails; log to stderr for debugging
+          // eslint-disable-next-line no-console
+          console.error(
+            '[MCPServer] Failed to index entity created via MCP',
+            entity,
+            (error as Error)?.message || String(error)
+          );
+        }
+
         return {
           content: [
             {
@@ -875,6 +905,29 @@ OPTIONAL PARAMETERS:
         // Execute update with confirmation
         const updated = await this.repository.update(ctx, entity, id, updateData);
 
+        // Re-index updated entity so search/RAG can see the changes
+        try {
+          const entityDef = await this.configLoader.getEntity(ctx, entity);
+          const tenantConfig = await this.configLoader.getTenant(tenantId);
+          if (entityDef && updated) {
+            await indexEntityInSearch(
+              ctx,
+              entity,
+              entityDef,
+              updated as Record<string, unknown>,
+              tenantConfig || undefined
+            );
+          }
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error(
+            '[MCPServer] Failed to re-index entity updated via MCP',
+            entity,
+            id,
+            (error as Error)?.message || String(error)
+          );
+        }
+
         if (!updated) {
           return {
             content: [
@@ -999,6 +1052,22 @@ OPTIONAL PARAMETERS:
 
         // Execute delete with confirmation
         const deleted = await this.repository.delete(ctx, entity, id);
+
+        // Remove entity from search indexes
+        try {
+          const entityDef = await this.configLoader.getEntity(ctx, entity);
+          if (entityDef && deleted) {
+            await removeEntityFromSearch(ctx, entity, id, entityDef);
+          }
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error(
+            '[MCPServer] Failed to remove entity from search indexes via MCP',
+            entity,
+            id,
+            (error as Error)?.message || String(error)
+          );
+        }
 
         if (!deleted) {
           return {

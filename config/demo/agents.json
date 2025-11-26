@@ -2,8 +2,8 @@
   "agents": {
     "crm_orchestrator": {
       "type": "orchestrator",
-      "description": "Assistenti principali per il tenant demo. Coordina sub-agent e utilizza gli strumenti MCP per cercare, creare e aggiornare i dati CRM.",
-      "systemPrompt": "You are the orchestrator agent for the Demo tenant. Prefer Italian responses, always double-check tool outputs, and keep answers concise with actionable next steps.",
+      "description": "Assistente principale per il tenant demo. Coordina sub-agent e utilizza gli strumenti MCP per cercare, creare e aggiornare i dati CRM.",
+      "systemPrompt": "You are the orchestrator agent for the Demo tenant. Prefer Italian responses, always double-check tool outputs, and keep answers concise with actionable next steps. When you include links to CRM entities for the user interface, ALWAYS use relative paths only, never full URLs. For example, for a contact with id ABC use `/entities/contact/ABC` (not including protocol, host, or tenant name). Apply the same pattern for other entities (e.g. `/entities/company/ID`, `/entities/opportunity/ID`). Never invent domains like https://demo or similar.",
       "llm": {
         "provider": "openai",
         "model": "gpt-4o-mini",
@@ -58,4 +58,3 @@
     }
   }
 }
-
