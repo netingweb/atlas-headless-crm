@@ -38,36 +38,32 @@ export async function verifyApiKey(hash: string, key: string): Promise<boolean> 
 export function extractPrefix(key: string): string | null {
   // Expected format: crm_${prefix}_${secret}
   // Both prefix and secret are base64url strings and may contain underscores.
-  // We know the secret is ALWAYS generated from API_KEY_SECRET_LENGTH bytes,
-  // so its base64url-encoded length is fixed (API_KEY_SECRET_CHAR_LENGTH).
+  // We:
+  // 1. Strip the "crm_" prefix
+  // 2. Split from the END on the last underscore
+  //    - Everything before it is the prefix (can contain underscores, including as first char)
+  //    - Everything after it is the secret (should have fixed length)
 
   if (!key.startsWith('crm_')) {
     return null;
   }
 
-  // Minimum length: "crm_" (4) + prefix (>=1) + "_" (1) + secret (fixed length)
-  const minKeyLength = 4 + 1 + 1 + API_KEY_SECRET_CHAR_LENGTH;
-  if (key.length < minKeyLength) {
+  const rest = key.slice(4); // remove "crm_"
+  const lastSeparator = rest.lastIndexOf('_');
+
+  // We need at least 1 char for prefix and 1 for secret
+  if (lastSeparator <= 0 || lastSeparator === rest.length - 1) {
     return null;
   }
 
-  // Secret occupies the last API_KEY_SECRET_CHAR_LENGTH characters
-  const secretStartIndex = key.length - API_KEY_SECRET_CHAR_LENGTH;
+  const prefix = rest.slice(0, lastSeparator);
+  const secret = rest.slice(lastSeparator + 1);
 
-  // There must be an underscore right before the secret acting as separator
-  const separatorIndex = secretStartIndex - 1;
-  if (separatorIndex <= 4 || key[separatorIndex] !== '_') {
+  // Basic validation on secret length (should match what generateApiKey produces)
+  if (secret.length !== API_KEY_SECRET_CHAR_LENGTH) {
     return null;
   }
 
-  // Prefix is everything between "crm_" and the separator underscore
-  const prefixStart = 4;
-  const prefixEnd = separatorIndex;
-  if (prefixEnd <= prefixStart) {
-    return null;
-  }
-
-  const prefix = key.slice(prefixStart, prefixEnd);
   return prefix.length > 0 ? prefix : null;
 }
 
