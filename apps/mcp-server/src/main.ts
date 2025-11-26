@@ -594,11 +594,12 @@ OPTIONAL PARAMETERS:
           const entityDef = await this.configLoader.getEntity(ctx, entity);
           const tenantConfig = await this.configLoader.getTenant(tenantId);
           if (entityDef) {
+            const createdRecord = created as unknown as Record<string, unknown>;
             await indexEntityInSearch(
               ctx,
               entity,
               entityDef,
-              created as Record<string, unknown>,
+              createdRecord,
               tenantConfig || undefined
             );
           }
@@ -910,11 +911,12 @@ OPTIONAL PARAMETERS:
           const entityDef = await this.configLoader.getEntity(ctx, entity);
           const tenantConfig = await this.configLoader.getTenant(tenantId);
           if (entityDef && updated) {
+            const updatedRecord = updated as unknown as Record<string, unknown>;
             await indexEntityInSearch(
               ctx,
               entity,
               entityDef,
-              updated as Record<string, unknown>,
+              updatedRecord,
               tenantConfig || undefined
             );
           }
