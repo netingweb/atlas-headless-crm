@@ -1,10 +1,9 @@
-FROM node:20-alpine AS base
+FROM node:20 AS base
 
 WORKDIR /app
 
-# Install build tools for native modules (like argon2) and pnpm/tsx
-RUN apk add --no-cache python3 make g++ \
-  && npm install -g pnpm@8.15.0 tsx@4.7.0
+# Install pnpm and tsx (needed for seed script inside container)
+RUN npm install -g pnpm@8.15.0 tsx@4.7.0
 
 # Copy workspace files
 COPY pnpm-workspace.yaml package.json ./
@@ -51,12 +50,9 @@ RUN pnpm -r --filter "./packages/*" \
     --filter @crm-atlas/mcp-server build
 
 # Production stage
-FROM node:20-alpine AS production
+FROM node:20 AS production
 
 WORKDIR /app
-
-# Install build tools needed for native modules (like argon2)
-RUN apk add --no-cache python3 make g++
 
 # Install pnpm and tsx (needed for seed script inside container)
 RUN npm install -g pnpm@8.15.0 tsx@4.7.0
