@@ -14,7 +14,8 @@ COPY pnpm-lock.yaml ./
 # This ensures pnpm can resolve workspace dependencies
 RUN mkdir -p packages/auth packages/config packages/core packages/db \
     packages/documents packages/embeddings packages/search packages/storage \
-    packages/types packages/utils apps/api apps/workflow apps/indexer apps/mcp-server apps/playground
+    packages/types packages/utils \
+    apps/api apps/agent-service apps/workflow apps/indexer apps/mcp-server apps/playground
 
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/config/package.json ./packages/config/
@@ -27,6 +28,7 @@ COPY packages/storage/package.json ./packages/storage/
 COPY packages/types/package.json ./packages/types/
 COPY packages/utils/package.json ./packages/utils/
 COPY apps/api/package.json ./apps/api/
+COPY apps/agent-service/package.json ./apps/agent-service/
 COPY apps/workflow/package.json ./apps/workflow/
 COPY apps/indexer/package.json ./apps/indexer/
 COPY apps/mcp-server/package.json ./apps/mcp-server/
