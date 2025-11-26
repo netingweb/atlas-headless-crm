@@ -41,8 +41,13 @@ RUN pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
 # Copy source code
 COPY . .
 
-# Build all packages
-RUN pnpm build
+# Build only required packages and apps for the API image
+# We explicitly avoid building the agent-service here because it has its own Dockerfile
+RUN pnpm -r --filter "./packages/*" \
+    --filter @crm-atlas/api \
+    --filter @crm-atlas/indexer \
+    --filter @crm-atlas/workflow \
+    --filter @crm-atlas/mcp-server build
 
 # Production stage
 FROM node:20-alpine AS production
