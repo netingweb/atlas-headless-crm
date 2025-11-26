@@ -385,7 +385,7 @@ export default function AgentObservabilityTab() {
                                       <p className="text-xs font-mono text-gray-700">
                                         {subagent.agent}
                                       </p>
-                                      {subagent.input && (
+                                      {subagent.input != null && (
                                         <pre className="text-[11px] bg-gray-50 rounded p-2 overflow-auto">
                                           {JSON.stringify(subagent.input, null, 2)}
                                         </pre>
