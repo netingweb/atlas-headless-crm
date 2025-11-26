@@ -60,43 +60,9 @@ RUN apk add --no-cache python3 make g++
 # Install pnpm and tsx (needed for seed script inside container)
 RUN npm install -g pnpm@8.15.0 tsx@4.7.0
 
-# Copy workspace files
-COPY pnpm-workspace.yaml package.json ./
-COPY pnpm-lock.yaml ./
-
-# Create package directories and copy package.json files
-# This ensures pnpm can resolve workspace dependencies
-RUN mkdir -p packages/auth packages/config packages/core packages/db \
-    packages/documents packages/embeddings packages/search packages/storage \
-    packages/types packages/utils apps/api
-
-COPY packages/auth/package.json ./packages/auth/
-COPY packages/config/package.json ./packages/config/
-COPY packages/core/package.json ./packages/core/
-COPY packages/db/package.json ./packages/db/
-COPY packages/documents/package.json ./packages/documents/
-COPY packages/embeddings/package.json ./packages/embeddings/
-COPY packages/search/package.json ./packages/search/
-COPY packages/storage/package.json ./packages/storage/
-COPY packages/types/package.json ./packages/types/
-COPY packages/utils/package.json ./packages/utils/
-COPY apps/api/package.json ./apps/api/
-
-# Install production dependencies only for the API and its workspace deps
-# Use --no-frozen-lockfile if lockfile is outdated (will update it)
-# Temporarily remove prepare script to avoid husky, but allow native module compilation
-ENV HUSKY=0
-ENV CI=true
-RUN if [ -f /app/package.json ]; then \
-      sed -i.bak '/"prepare":/d' /app/package.json || true; \
-    fi && \
-    pnpm install --filter ./apps/api... --frozen-lockfile --prod || \
-    pnpm install --filter ./apps/api... --no-frozen-lockfile --prod && \
-    if [ -f /app/package.json.bak ]; then \
-      mv /app/package.json.bak /app/package.json; \
-    fi
-
-# Copy built files and seed scripts
+# Reuse node_modules and built artifacts from the build stage so that
+# workspace packages like @crm-atlas/auth are fully available (for runtime and seed scripts)
+COPY --from=base /app/node_modules ./node_modules
 COPY --from=base /app/packages ./packages
 COPY --from=base /app/apps/api/dist ./apps/api/dist
 COPY --from=base /app/scripts ./scripts
