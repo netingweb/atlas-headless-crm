@@ -38,6 +38,9 @@ COPY apps/playground/package.json ./apps/playground/
 # Use --no-frozen-lockfile if lockfile is outdated (will update it)
 RUN pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
 
+# Rebuild native modules (like argon2) for the current platform (node:20 Debian)
+RUN pnpm rebuild argon2
+
 # Copy source code
 COPY . .
 
