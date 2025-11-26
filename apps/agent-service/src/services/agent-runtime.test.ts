@@ -226,15 +226,20 @@ function createStreamingAgent(
 }
 
 function createFailingAgent(error: Error): {
-  streamEvents: jest.Mock<Promise<AsyncGenerator<never>>>;
+  streamEvents: jest.Mock<Promise<AsyncIterable<never>>>;
 } {
+  const failingIterable: AsyncIterable<never> = {
+    [Symbol.asyncIterator]: () => {
+      return {
+        async next(): Promise<IteratorResult<never>> {
+          throw error;
+        },
+      };
+    },
+  };
+
   return {
-    streamEvents: jest.fn().mockResolvedValue(
-      (async function* generator(): AsyncGenerator<never> {
-        yield; // Required yield for generator
-        throw error;
-      })()
-    ),
+    streamEvents: jest.fn().mockResolvedValue(failingIterable),
   };
 }
 
