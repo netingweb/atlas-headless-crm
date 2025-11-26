@@ -94,7 +94,7 @@ services:
       - "traefik.http.routers.crm-atlas-api.rule=Host(`api.atlas-crm-headless.neting.ai`)"
       - "traefik.http.routers.crm-atlas-api.entrypoints=web,websecure"
       - "traefik.http.routers.crm-atlas-api.tls=true"
-      - "traefik.http.routers.crm-atlas-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.crm-atlas-api.tls.certresolver=mytlschallenge"
       - "traefik.http.services.crm-atlas-api.loadbalancer.server.port=3000"
     environment:
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/crm_atlas}
@@ -146,7 +146,7 @@ services:
       - "traefik.http.routers.crm-atlas-agent.rule=Host(`agent.atlas-crm-headless.neting.ai`)"
       - "traefik.http.routers.crm-atlas-agent.entrypoints=web,websecure"
       - "traefik.http.routers.crm-atlas-agent.tls=true"
-      - "traefik.http.routers.crm-atlas-agent.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.crm-atlas-agent.tls.certresolver=mytlschallenge"
       - "traefik.http.services.crm-atlas-agent.loadbalancer.server.port=4100"
     environment:
       AGENT_SERVICE_PORT: ${AGENT_SERVICE_PORT:-4100}
