@@ -13,6 +13,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - internal_network
 
   redis:
     image: redis:7-alpine
@@ -26,6 +28,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - internal_network
 
   typesense:
     image: typesense/typesense:0.25.2
@@ -45,6 +49,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - internal_network
 
   qdrant:
     image: qdrant/qdrant:v1.7.0
@@ -63,6 +69,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - internal_network
 
   minio:
     image: minio/minio:latest
@@ -80,7 +88,8 @@ services:
       timeout: 20s
       retries: 3
     restart: unless-stopped
-
+    networks:
+      - internal_network
   api:
     build:
       context: .
@@ -96,6 +105,7 @@ services:
       - "traefik.http.routers.crm-atlas-api.tls=true"
       - "traefik.http.routers.crm-atlas-api.tls.certresolver=mytlschallenge"
       - "traefik.http.services.crm-atlas-api.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik_traefik-network"
     environment:
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/crm_atlas}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-crm_atlas}
@@ -132,6 +142,9 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    networks:
+      - internal_network
+      - traefik_traefik-network
 
   agent-service:
     build:
@@ -148,6 +161,7 @@ services:
       - "traefik.http.routers.crm-atlas-agent.tls=true"
       - "traefik.http.routers.crm-atlas-agent.tls.certresolver=mytlschallenge"
       - "traefik.http.services.crm-atlas-agent.loadbalancer.server.port=4100"
+      - "traefik.docker.network=traefik_traefik-network"
     environment:
       AGENT_SERVICE_PORT: ${AGENT_SERVICE_PORT:-4100}
       AGENT_SERVICE_HOST: 0.0.0.0
@@ -162,10 +176,14 @@ services:
     ports:
       - '${AGENT_SERVICE_PORT:-4100}:4100'
     restart: unless-stopped
+    networks:
+      - internal_network
+      - traefik_traefik-network
 
 networks:
-  default:
-    name: traefik_default
+  internal_network:
+    driver: bridge
+  traefik_traefik-network:
     external: true
 
 volumes:
