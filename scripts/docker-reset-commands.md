@@ -127,3 +127,7 @@ docker image prune -a
 # Reset completo di Docker (ATTENZIONE: rimuove tutto)
 docker system prune -a --volumes
 ```
+
+
+
+

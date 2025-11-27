@@ -80,3 +80,7 @@ export async function removeEntityFromSearch(
     await deleteQdrantPoint(ctx.tenant_id, entity, id);
   }
 }
+
+
+
+
