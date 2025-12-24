@@ -35,6 +35,13 @@ export class AgentRuntime {
     const session = this.sessions.getSession(sessionId);
     this.sessions.updateStatus(sessionId, 'running');
 
+    if (!session.authToken) {
+      this.logger.warn(
+        { sessionId, tenantId: session.tenantId, unitId: session.unitId },
+        '[AgentRuntime] Session has no authToken, MCP calls may fail'
+      );
+    }
+
     const { agent, definition } = await this.registry.resolve({
       tenantId: session.tenantId,
       unitId: session.unitId,

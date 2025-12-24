@@ -31,8 +31,14 @@ export class MCPClient {
   }
 
   async listTools(tenantId: string, unitId: string, token?: string): Promise<MCPTool[]> {
+    const headers = this.buildHeaders(token ?? this.defaultToken);
+    if (!headers?.Authorization && !this.defaultToken && !token) {
+      console.warn(
+        `[MCPClient] Warning: Calling listTools without authentication token for ${tenantId}/${unitId}`
+      );
+    }
     const { data } = await this.client.get<MCPTool[]>(`/${tenantId}/${unitId}/mcp/tools`, {
-      headers: this.buildHeaders(token),
+      headers,
     });
     return data;
   }

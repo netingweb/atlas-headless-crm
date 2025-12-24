@@ -109,6 +109,15 @@ if [ -z "$QDRANT_URL" ]; then
   echo -e "${BLUE}📝 Set QDRANT_URL to localhost (local development)${NC}"
 fi
 
+# Ensure OPENAI_API_KEY is exported (needed by agent-service)
+if [ -z "$OPENAI_API_KEY" ] && [ -f ".env" ]; then
+  OPENAI_API_KEY_VALUE=$(grep '^OPENAI_API_KEY=' .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+  if [ -n "$OPENAI_API_KEY_VALUE" ]; then
+    export OPENAI_API_KEY="$OPENAI_API_KEY_VALUE"
+    echo -e "${BLUE}📝 Loaded OPENAI_API_KEY from .env${NC}"
+  fi
+fi
+
 echo ""
 echo -e "${BLUE}📦 Building shared packages (utils, embeddings, search)...${NC}"
 pnpm -w -r --filter @crm-atlas/utils --filter @crm-atlas/embeddings --filter @crm-atlas/search build

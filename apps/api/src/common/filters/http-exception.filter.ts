@@ -1,5 +1,5 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
-import { ValidationError as CoreValidationError } from '@crm-atlas/core';
+import { ValidationError as CoreValidationError, CrmAtlasError } from '@crm-atlas/core';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -20,6 +20,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = exception.message;
       code = exception.code;
       errors = exception.errors;
+    } else if (exception instanceof CrmAtlasError) {
+      status = exception.statusCode;
+      message = exception.message;
+      code = exception.code;
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();

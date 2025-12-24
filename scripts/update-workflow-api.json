@@ -1,0 +1,30 @@
+{
+  "actions": [
+    {
+      "type": "api_call",
+      "endpoint": "/api/{{tenant_id}}/{{unit_id}}/contact/{{entity_id}}",
+      "method": "GET"
+    },
+    {
+      "type": "webhook",
+      "webhook_url": "https://automation.neting.it/webhook/2a0f4907-80e3-4216-ae7b-279b1dbc8c59",
+      "webhook_method": "POST",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "data": {
+        "email": "{{actions.0.result.email}}"
+      },
+      "timeout": 30000
+    },
+    {
+      "type": "create",
+      "entity": "data_servizi",
+      "data": {
+        "contact_id": "{{entity_id}}",
+        "data": "{{actions.1.result.data}}",
+        "last_updated": "{{now}}"
+      }
+    }
+  ]
+}

@@ -68,6 +68,17 @@ export function createServer(deps: ServerDependencies): FastifyInstance {
 
     applyCorsHeaders(reply, request.headers.origin);
 
+    // Extract token from Authorization header - always extract it for MCP calls
+    const authHeader = request.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authContext?.token;
+
+    if (!token) {
+      deps.logger.warn(
+        { tenantId: payload.tenantId, unitId: payload.unitId, agentId: payload.agentId },
+        '[AgentService] No auth token provided in request, MCP calls will fail'
+      );
+    }
+
     const session = deps.sessions.createSession({
       ...payload,
       metadata: {
@@ -76,7 +87,7 @@ export function createServer(deps: ServerDependencies): FastifyInstance {
         roles: authContext?.roles,
         scopes: authContext?.scopes,
       },
-      authToken: authContext?.token,
+      authToken: token,
     });
 
     reply.code(201).send({

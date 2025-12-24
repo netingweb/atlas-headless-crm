@@ -32,6 +32,13 @@ export class AgentRegistry {
       throw new Error(`Agent "${params.agentId}" not configured for tenant "${params.tenantId}"`);
     }
 
+    if (!params.authToken) {
+      this.logger.warn(
+        { tenantId: params.tenantId, unitId: params.unitId, agentId: params.agentId },
+        '[AgentRegistry] No authToken provided, MCP calls may fail'
+      );
+    }
+
     const mcpTools = await this.mcpClient.listTools(
       params.tenantId,
       params.unitId,

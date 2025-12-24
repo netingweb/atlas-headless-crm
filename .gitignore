@@ -48,3 +48,5 @@ temp
 
 # Docker Compose override for local development
 docker-compose.override.yml
+apps/agent-service/config/
+.env.bak
