@@ -3,9 +3,12 @@
 **Headless CRM multi-tenant, API-first, MCP-ready, open source.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Status: Experimental](https://img.shields.io/badge/Status-Experimental-orange.svg)](https://github.com/netingweb/atlas-headless-crm)
 [![Author](https://img.shields.io/badge/Author-Luca%20Mainieri-blue.svg)](https://www.neting.it)
 
-**Author**: [Luca Mainieri](https://www.neting.it) | **License**: MIT
+**Author**: [Luca Mainieri](https://www.lucamainieri.it) | [Neting](https://www.neting.it) | **License**: MIT
+
+> ⚠️ **Experimental Project**: This project is currently in experimental/development phase. APIs and features may change without notice. Use at your own risk.
 
 ## 📖 Introduction
 
@@ -181,7 +184,9 @@ See [docs/guides/data-model.md](docs/guides/data-model.md) for complete details.
 crm-atlas/
 ├── apps/                    # Applications
 │   ├── api/                 # Main REST API (NestJS)
+│   ├── agent-service/       # AI Agent Service (LangChain)
 │   ├── indexer/             # Automatic indexing service
+│   ├── playground/         # Web UI for CRM management
 │   ├── workflow/            # Workflow Engine (BullMQ)
 │   └── mcp-server/          # MCP Server for AI assistants
 ├── packages/                # Shared packages
@@ -244,11 +249,18 @@ pnpm seed
 
 # 6. Start API in development mode
 pnpm dev
+
+# Or start all services including Agent Service and Playground
+pnpm dev:all
 ```
 
 The API will be available at **http://localhost:3000**
 
 **Interactive API Documentation**: http://localhost:3000/docs
+
+**Playground UI**: http://localhost:5173
+
+**Note**: For Agent Service to work, you need to configure `OPENAI_API_KEY` in your `.env` file.
 
 For a detailed guide, see [docs/guides/running-and-testing.md](docs/guides/running-and-testing.md)
 
@@ -334,7 +346,49 @@ pnpm workflow
 
 See [docs/guides/workflow-engine.md](docs/guides/workflow-engine.md) for complete details.
 
-### 4. MCP Server (`apps/mcp-server`)
+### 4. Agent Service (`apps/agent-service`)
+
+AI-powered agent service that provides conversational interface to the CRM using LangChain and OpenAI.
+
+**Start:**
+
+```bash
+pnpm dev:agent-service
+```
+
+**Features:**
+
+- Conversational AI interface for CRM operations
+- LangChain-based agent orchestration
+- Support for multiple agent types (orchestrator, standard, subagent)
+- Integration with MCP tools for CRM operations
+- Session management and streaming responses
+
+**Configuration**: Agents are defined in `config/{tenant_id}/agents.json`
+
+See [docs/guides/agent-service.md](docs/guides/agent-service.md) for details.
+
+### 5. Playground (`apps/playground`)
+
+Web-based UI for managing and testing the CRM.
+
+**Start:**
+
+```bash
+pnpm dev:playground
+```
+
+**Features:**
+
+- Entity management interface
+- Workflow creation and testing
+- AI agent chat interface
+- Configuration management
+- Search and exploration tools
+
+**Access**: http://localhost:5173
+
+### 6. MCP Server (`apps/mcp-server`)
 
 MCP server for integration with AI assistants.
 
@@ -394,10 +448,14 @@ pnpm config:sync            # Sync JSON config → MongoDB
 ### Services
 
 ```bash
-pnpm indexer                # Start Indexer Service
-pnpm indexer:backfill       # Backfill indexes
-pnpm workflow               # Start Workflow Engine
-pnpm mcp                    # Start MCP Server
+pnpm dev:all              # Start all services (API, Agent Service, Playground)
+pnpm dev:backend         # Start backend services (API, Indexer, Workflow, MCP)
+pnpm dev:agent-service   # Start Agent Service
+pnpm dev:playground      # Start Playground frontend
+pnpm indexer             # Start Indexer Service
+pnpm indexer:backfill    # Backfill indexes
+pnpm workflow            # Start Workflow Engine
+pnpm mcp                 # Start MCP Server
 ```
 
 ### Docker
@@ -610,6 +668,10 @@ OPENAI_API_KEY=sk-your-key
 OPENAI_MODEL=text-embedding-ada-002
 JINA_API_KEY=your-jina-key
 JINA_MODEL=jina-embeddings-v2-base-en
+
+# Agent Service
+AGENT_CONFIG_ROOT=./config  # Optional, defaults to ./config
+# Note: OPENAI_API_KEY is required for Agent Service to function
 ```
 
 ### JSON Configuration
@@ -622,6 +684,7 @@ Configurations are managed via JSON files in `config/{tenant_id}/`:
 - `permissions.json` - Roles and scopes
 - `dictionary.json` - Predefined value dictionaries
 - `workflows.json` - Automation workflows
+- `agents.json` - AI agent configurations
 - `mcp.manifest.json` - MCP manifest (optional)
 
 See [config/README.md](config/README.md) for details.
@@ -651,6 +714,7 @@ You **must** run `pnpm config:sync` after modifying:
 - ✅ **dictionary.json** - Dictionary changes
 - ✅ **sharing_policy.json** - Sharing policy changes
 - ✅ **workflows.json** - Workflow changes
+- ✅ **agents.json** - Agent configuration changes
 - ✅ **mcp.manifest.json** - MCP manifest changes
 
 **Note**: Configuration changes in JSON files are **not automatically applied**. The API loads configurations from MongoDB, so you must sync your changes to the database.
@@ -803,7 +867,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Luca Mainieri**
 
-- Website: [www.neting.it](https://www.neting.it)
+- Personal Website: [www.lucamainieri.it](https://www.lucamainieri.it)
+- Company Website: [www.neting.it](https://www.neting.it)
 - Project: Atlas CRM Headless
 
 For a complete list of contributors and acknowledgments, see [AUTHORS.md](AUTHORS.md).
@@ -825,4 +890,4 @@ Atlas CRM Headless is built with amazing open-source technologies:
 
 ---
 
-**Made with ❤️ by [Luca Mainieri](https://www.neting.it)**
+**Made with ❤️ by [Luca Mainieri](https://www.lucamainieri.it) | [Neting](https://www.neting.it)**
