@@ -7,6 +7,7 @@ export interface Logger {
 
 export class ConsoleLogger implements Logger {
   info(message: string, meta?: Record<string, unknown>): void {
+    // eslint-disable-next-line no-console
     console.log(`[INFO] ${message}`, meta ? JSON.stringify(meta) : '');
   }
 
@@ -20,6 +21,7 @@ export class ConsoleLogger implements Logger {
 
   debug(message: string, meta?: Record<string, unknown>): void {
     if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
       console.debug(`[DEBUG] ${message}`, meta ? JSON.stringify(meta) : '');
     }
   }

@@ -22,6 +22,7 @@ export class ValidatorCache {
       // Debug: log schema for service_order
       if (entityName === 'service_order' && schema.properties) {
         const properties = schema.properties as Record<string, unknown>;
+        // eslint-disable-next-line no-console
         console.log(
           '[ValidatorCache] Building schema for service_order:',
           JSON.stringify(properties.service_type, null, 2)
@@ -139,10 +140,12 @@ export class ValidatorCache {
 
       // Debug: log schema for multiple fields with enum
       if (field.name === 'service_type' && field.validation?.enum) {
+        // eslint-disable-next-line no-console
         console.log(
           '[ValidatorCache] Generated schema for service_type:',
           JSON.stringify(arraySchema, null, 2)
         );
+        // eslint-disable-next-line no-console
         console.log('[ValidatorCache] itemSchema:', JSON.stringify(itemSchema, null, 2));
       }
 
@@ -160,6 +163,7 @@ export class ValidatorCache {
           keysToDelete.push(key);
         }
       }
+      // eslint-disable-next-line no-console
       console.log(
         `[ValidatorCache] Clearing cache for tenant ${tenantId}, found ${keysToDelete.length} keys:`,
         keysToDelete
@@ -177,10 +181,12 @@ export class ValidatorCache {
       for (const key of updateKeysToDelete) {
         this.updateCache.delete(key);
       }
+      // eslint-disable-next-line no-console
       console.log(`[ValidatorCache] Cache cleared for tenant ${tenantId}`);
     } else {
       this.cache.clear();
       this.updateCache.clear();
+      // eslint-disable-next-line no-console
       console.log('[ValidatorCache] All cache cleared');
     }
   }

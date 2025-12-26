@@ -21,6 +21,7 @@ interface CreateTracingInput {
 export class TracingFactory {
   constructor(private readonly logger: Logger) {}
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async create(input: CreateTracingInput): Promise<TracingContext | null> {
     const { definition } = input;
     const tracing = definition.tracing;
@@ -48,9 +49,7 @@ export class TracingFactory {
       name: `${definition.id}::${input.sessionId}`,
       run_type: 'chain',
       project_name:
-        tracing.variables?.LANGCHAIN_PROJECT ||
-        process.env.LANGCHAIN_PROJECT ||
-        'agent-service',
+        tracing.variables?.LANGCHAIN_PROJECT || process.env.LANGCHAIN_PROJECT || 'agent-service',
       client,
       tags: [
         ...(tracing.defaultTags || []),
@@ -68,12 +67,15 @@ export class TracingFactory {
     return {
       runTree,
       client,
-      finalize: async (outputs?: Record<string, unknown>, error?: Error) => {
+      finalize: async (outputs?: Record<string, unknown>, error?: Error): Promise<void> => {
         await runTree.end(outputs, error?.message, Date.now(), outputs);
       },
-      getRunUrl: async () => {
+      getRunUrl: async (): Promise<string | undefined> => {
         try {
-          return client.getRunUrl({ runId: runTree.id, projectOpts: { projectName: runTree.project_name } });
+          return client.getRunUrl({
+            runId: runTree.id,
+            projectOpts: { projectName: runTree.project_name },
+          });
         } catch (error) {
           this.logger.warn(
             { err: error, runId: runTree.id },
@@ -85,4 +87,3 @@ export class TracingFactory {
     };
   }
 }
-
